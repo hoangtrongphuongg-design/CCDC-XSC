@@ -69,7 +69,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
 
     const [profile] = await db
       .select({
-        id: users.id,
+        userId: users.id,
         username: users.username,
         fullName: users.fullName,
         employeeCode: users.employeeCode,
@@ -98,7 +98,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
       })
       .from(userGroupPermissions)
       .innerJoin(groups, eq(userGroupPermissions.groupId, groups.id))
-      .where(and(eq(userGroupPermissions.userId, profile.id), eq(userGroupPermissions.isActive, true), eq(groups.isActive, true)));
+      .where(and(eq(userGroupPermissions.userId, profile.userId), eq(userGroupPermissions.isActive, true), eq(groups.isActive, true)));
 
     return { ...profile, permissions };
   } catch {
