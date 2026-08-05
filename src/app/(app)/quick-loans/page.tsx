@@ -1,10 +1,11 @@
 import { asc, desc, eq } from "drizzle-orm";
-import { Plus, Zap } from "lucide-react";
+import { CheckCircle2, Clock3, PackageCheck, Plus, Zap } from "lucide-react";
 import { db } from "@/lib/db";
 import { groups, quickLoans, toolCatalog } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { WORKFLOW_LABELS } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
@@ -28,11 +29,22 @@ export default async function QuickLoansPage() {
   ]);
   const groupMap = new Map(groupRows.map((g) => [g.id, g.name]));
   const sourceGroups = auth.permissions.filter((p) => p.groupCode !== "KHO_TL");
+  const pendingReceipt = rows.filter((row) => row.status === "pending_receipt").length;
+  const borrowed = rows.filter((row) => row.status === "borrowed").length;
+  const waitingClose = rows.filter((row) => row.status === "return_reported").length;
+  const completed = rows.filter((row) => row.status === "completed").length;
+
   return (
     <>
-      <PageHeader title="Cho mượn nhanh" description="Sổ giao nhận ngắn hạn cho dụng cụ nhỏ hoặc vật dụng không có mã máy." />
+      <PageHeader title="Cho mượn nhanh" description="Ghi nhận giao nhận ngắn hạn cho dụng cụ nhỏ hoặc vật dụng không có mã máy." />
+      <section className="stat-grid">
+        <StatCard title="Chờ xác nhận nhận" value={pendingReceipt} icon={Clock3} tone="warning" />
+        <StatCard title="Đang được mượn" value={borrowed} icon={Zap} tone="violet" />
+        <StatCard title="Chờ bên cho chốt" value={waitingClose} icon={PackageCheck} tone="cyan" />
+        <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
+      </section>
       <div className="content-grid">
-        <Card>
+        <Card className="table-card">
           <CardHeader><CardTitle>Giao dịch mượn nhanh</CardTitle><Zap size={18} /></CardHeader>
           <CardContent>
             <DataTable headers={["Phiếu", "Vật dụng", "SL", "Nhóm cho", "Nhóm mượn", "Hạn trả", "Trạng thái", "Thao tác"]} rows={rows.map((row) => {
@@ -42,10 +54,10 @@ export default async function QuickLoansPage() {
               if (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "operator")) actions.push(
                 <form action={closeQuickLoanAction} key="close" className="row-actions">
                   <input type="hidden" name="loanId" value={row.id} />
-                  <input name="returnedGood" type="number" min="0" step="0.01" defaultValue={Number(row.quantityBorrowed)} aria-label="Trả tốt" title="Trả tốt" style={{ width: 72 }} />
-                  <input name="returnedDamaged" type="number" min="0" step="0.01" defaultValue="0" aria-label="Trả hư" title="Trả hư" style={{ width: 72 }} />
-                  <input name="lostQuantity" type="number" min="0" step="0.01" defaultValue="0" aria-label="Mất" title="Mất" style={{ width: 72 }} />
-                  <input name="returnNote" placeholder="Ghi chú trả" aria-label="Ghi chú trả" style={{ width: 120 }} />
+                  <input name="returnedGood" type="number" min="0" step="0.01" defaultValue={Number(row.quantityBorrowed)} aria-label="Trả tốt" title="Trả tốt" className="field-inline-xs" />
+                  <input name="returnedDamaged" type="number" min="0" step="0.01" defaultValue="0" aria-label="Trả hư" title="Trả hư" className="field-inline-xs" />
+                  <input name="lostQuantity" type="number" min="0" step="0.01" defaultValue="0" aria-label="Mất" title="Mất" className="field-inline-xs" />
+                  <input name="returnNote" placeholder="Ghi chú trả" aria-label="Ghi chú trả" className="field-inline-md" />
                   <Button size="sm">Xác nhận trả</Button>
                 </form>,
               );
@@ -53,7 +65,7 @@ export default async function QuickLoansPage() {
             })} empty={<EmptyState description="Chưa có giao dịch mượn nhanh." />} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="side-panel">
           <CardHeader><CardTitle>Tạo ghi nhận mượn nhanh</CardTitle><Plus size={18} /></CardHeader>
           <CardContent>
             {sourceGroups.length ? <form action={createQuickLoanAction} className="form-grid">
@@ -64,7 +76,7 @@ export default async function QuickLoansPage() {
               <FormField label="Quy cách"><input name="specification" /></FormField>
               <div className="form-grid two"><FormField label="Số lượng" required><input name="quantityBorrowed" type="number" min="0.01" step="0.01" /></FormField><FormField label="Đơn vị"><input name="unit" defaultValue="cái" /></FormField></div>
               <FormField label="Ngày dự kiến trả"><input name="expectedReturnAt" type="datetime-local" /></FormField>
-              <FormField label="Ghi chú bên cho"><textarea name="lenderNote" /></FormField>
+              <FormField label="Ghi chú bên cho"><textarea name="lenderNote" placeholder="Phụ kiện kèm theo hoặc lưu ý sử dụng" /></FormField>
               <Button type="submit">Tạo giao dịch</Button>
             </form> : <EmptyState title="Chỉ xem" />}
           </CardContent>

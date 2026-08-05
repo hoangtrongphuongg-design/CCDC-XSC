@@ -1,4 +1,11 @@
-# QUẢN LÝ CCDC - XSC — V1.0
+# QUẢN LÝ CCDC - XSC
+
+**Phiên bản:** 1.1.0
+
+## Giao diện V1.1
+
+Bản V1.1 nâng cấp toàn bộ trải nghiệm desktop/mobile theo phong cách dashboard quản trị chuyên nghiệp, giữ nguyên database và quy trình nghiệp vụ. Chi tiết tại `docs/UI_V1.1.md`.
+
 
 Bản code đầu tiên cho hệ thống quản lý máy móc, công cụ dụng cụ của Xưởng Sửa chữa.
 

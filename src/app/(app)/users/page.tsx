@@ -26,7 +26,7 @@ export default async function UsersPage() {
   return (
     <>
       <PageHeader title="Người dùng" description="Duyệt tài khoản, gán nhóm và phân quyền theo từng nhóm." />
-      <Card>
+      <Card className="table-card">
         <CardHeader><CardTitle>Danh sách tài khoản</CardTitle><ShieldCheck size={18} /></CardHeader>
         <CardContent>
           <DataTable headers={["Nhân viên", "Username", "Mã NV", "Trạng thái", "Quyền nhóm", "Thao tác"]} rows={userRows.map((user) => {
@@ -34,9 +34,9 @@ export default async function UsersPage() {
             if (user.accountStatus === "pending") actions.push(
               <form action={approveUserAction} key="approve" className="row-actions">
                 <input type="hidden" name="userId" value={user.id} />
-                <select name="groupId" aria-label="Nhóm chính" style={{ width: 150 }}>{operationalGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
-                <select name="permissionLevel" aria-label="Mức quyền" style={{ width: 110 }}><option value="operator">Operator</option><option value="manager">Manager</option></select>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}><input type="checkbox" name="isWsManager" style={{ width: 18, minHeight: 18 }} /> WS Manager</label>
+                <select name="groupId" aria-label="Nhóm chính" className="field-inline-lg">{operationalGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+                <select name="permissionLevel" aria-label="Mức quyền" className="field-inline-sm"><option value="operator">Operator</option><option value="manager">Manager</option></select>
+                <label className="checkbox-row"><input type="checkbox" name="isWsManager" /> WS Manager</label>
                 <Button size="sm">Duyệt</Button>
               </form>,
             );
@@ -46,7 +46,7 @@ export default async function UsersPage() {
           })} empty={<EmptyState description="Chưa có tài khoản." />} />
         </CardContent>
       </Card>
-      <Card style={{ marginTop: 16 }}>
+      <Card className="section-gap">
         <CardHeader><CardTitle>Gán thêm quyền nhóm</CardTitle></CardHeader>
         <CardContent>
           <form action={assignGroupPermissionAction} className="form-grid three">
@@ -57,13 +57,13 @@ export default async function UsersPage() {
           </form>
         </CardContent>
       </Card>
-      <Card style={{ marginTop: 16 }}>
+      <Card className="section-gap">
         <CardHeader><CardTitle>Vai trò cấp hệ thống</CardTitle></CardHeader>
         <CardContent>
           <form action={setUserFlagsAction} className="form-grid three">
             <FormField label="User"><select name="userId">{userRows.filter((u) => u.accountStatus === "active").map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}</select></FormField>
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}><input type="checkbox" name="isWsManager" style={{ width: 20, minHeight: 20 }} /> WS Manager</label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}><input type="checkbox" name="isAdmin" style={{ width: 20, minHeight: 20 }} /> Admin</label>
+            <label className="checkbox-row"><input type="checkbox" name="isWsManager" /> WS Manager</label>
+            <label className="checkbox-row"><input type="checkbox" name="isAdmin" /> Admin</label>
             <Button type="submit">Cập nhật vai trò</Button>
           </form>
         </CardContent>

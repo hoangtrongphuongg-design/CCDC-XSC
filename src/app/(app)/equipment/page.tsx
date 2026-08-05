@@ -1,10 +1,11 @@
 import { asc, eq } from "drizzle-orm";
-import { Plus } from "lucide-react";
+import { Boxes, CircleCheck, PackageOpen, Plus, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, toolCatalog, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { EQUIPMENT_STATUS_LABELS, CONDITION_LABELS } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
@@ -40,9 +41,15 @@ export default async function EquipmentPage() {
 
   return (
     <>
-      <PageHeader title="Dụng cụ toàn xưởng" description="Mọi user active được xem; thao tác chỉ trong nhóm được phân quyền." />
+      <PageHeader title="Dụng cụ toàn xưởng" description="Danh mục tập trung cho toàn bộ máy có mã và dụng cụ nhỏ; thao tác được giới hạn theo quyền nhóm." />
+      <section className="stat-grid">
+        <StatCard title="Máy/CCDC có mã" value={rows.length} icon={Boxes} tone="primary" />
+        <StatCard title="Sẵn sàng tại nhóm" value={rows.filter((row) => row.status === "in_use_owner").length} icon={CircleCheck} tone="success" />
+        <StatCard title="Đang trong quy trình" value={rows.filter((row) => !["in_use_owner", "disposal_warehouse"].includes(row.status)).length} icon={Wrench} tone="warning" />
+        <StatCard title="Dụng cụ nhỏ" value={toolRows.length} icon={PackageOpen} tone="violet" />
+      </section>
       <div className="content-grid">
-        <Card>
+        <Card className="table-card">
           <CardHeader><CardTitle>Danh mục máy/CCDC có mã</CardTitle></CardHeader>
           <CardContent>
             <DataTable
@@ -63,7 +70,7 @@ export default async function EquipmentPage() {
             />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="side-panel">
           <CardHeader><CardTitle>Thêm máy/CCDC có mã</CardTitle><Plus size={18} /></CardHeader>
           <CardContent>
             {manageable.length ? (
@@ -81,14 +88,14 @@ export default async function EquipmentPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="content-grid" style={{ marginTop: 16 }}>
-        <Card>
+      <div className="content-grid section-gap">
+        <Card className="table-card">
           <CardHeader><CardTitle>Dụng cụ nhóm không có mã máy</CardTitle></CardHeader>
           <CardContent>
             <DataTable headers={["Tên dụng cụ", "Quy cách", "Nhóm quản lý", "Số lượng"]} rows={toolRows.map((t) => [t.name, t.specification || "—", t.groupName, `${t.quantity} ${t.unit}`])} empty={<EmptyState description="Chưa có danh mục dụng cụ nhỏ." />} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="side-panel">
           <CardHeader><CardTitle>Thêm dụng cụ nhóm</CardTitle></CardHeader>
           <CardContent>
             {auth.permissions.length ? <form action={createGroupToolAction} className="form-grid">

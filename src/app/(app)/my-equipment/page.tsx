@@ -23,7 +23,7 @@ export default async function MyEquipmentPage() {
   return (
     <>
       <PageHeader title="Dụng cụ nhóm tôi" description="Các máy thuộc nhóm mà tài khoản được phân quyền thao tác." />
-      <Card>
+      <Card className="table-card">
         <CardHeader><CardTitle>{rows.length} máy/CCDC</CardTitle></CardHeader>
         <CardContent>
           <DataTable headers={["Mã", "Tên", "Loại", "Nhóm", "Vị trí", "Tình trạng", "Trạng thái"]} rows={rows.map((r) => [
@@ -33,7 +33,7 @@ export default async function MyEquipmentPage() {
           ])} empty={<EmptyState title="Chưa có dụng cụ nhóm" description="Admin cần gán quyền nhóm hoặc import dữ liệu máy." />} />
         </CardContent>
       </Card>
-      <Card style={{ marginTop: 16 }}>
+      <Card className="table-card section-gap">
         <CardHeader><CardTitle>{tools.length} dụng cụ nhỏ/không mã</CardTitle></CardHeader>
         <CardContent>
           <DataTable headers={["Tên dụng cụ", "Quy cách", "Nhóm", "Số lượng"]} rows={tools.map((t) => [t.name, t.specification || "—", t.groupName, `${t.quantity} ${t.unit}`])} empty={<EmptyState description="Chưa có dụng cụ nhỏ trong nhóm được phân quyền." />} />

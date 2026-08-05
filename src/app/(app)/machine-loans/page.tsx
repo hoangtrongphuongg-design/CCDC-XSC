@@ -1,10 +1,11 @@
-import { asc, desc, eq, inArray } from "drizzle-orm";
-import { Handshake, Plus } from "lucide-react";
+import { asc, desc, eq } from "drizzle-orm";
+import { CheckCircle2, Clock3, Handshake, Plus, RotateCcw } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, machineLoans } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { WORKFLOW_LABELS } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
@@ -39,19 +40,30 @@ export default async function MachineLoansPage() {
   const equipmentMap = new Map((await db.select({ id: equipment.id, code: equipment.code, name: equipment.name }).from(equipment)).map((e) => [e.id, e]));
   const actingGroups = auth.permissions.filter((p) => p.groupCode !== "KHO_TL");
 
+  const pending = loans.filter((row) => ["pending_owner", "approved", "wait_handover"].includes(row.status)).length;
+  const onLoan = loans.filter((row) => row.status === "on_loan").length;
+  const waitingReturn = loans.filter((row) => row.status === "return_requested").length;
+  const completed = loans.filter((row) => row.status === "completed").length;
+
   return (
     <>
-      <PageHeader title="Mượn máy" description="Mượn tạm thời máy có mã; nhóm quản lý không thay đổi." />
+      <PageHeader title="Mượn máy" description="Quản lý đề xuất, phê duyệt, bàn giao và nhận lại máy có mã giữa các nhóm." />
+      <section className="stat-grid">
+        <StatCard title="Chờ xử lý" value={pending} icon={Clock3} tone="warning" />
+        <StatCard title="Đang mượn" value={onLoan} icon={Handshake} tone="cyan" />
+        <StatCard title="Chờ nhận lại" value={waitingReturn} icon={RotateCcw} tone="violet" />
+        <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
+      </section>
       <div className="content-grid">
-        <Card>
-          <CardHeader><CardTitle>Phiếu mượn máy</CardTitle><Handshake size={18} /></CardHeader>
+        <Card className="table-card">
+          <CardHeader><CardTitle>Danh sách phiếu mượn máy</CardTitle><Handshake size={18} /></CardHeader>
           <CardContent>
             <DataTable
               headers={["Phiếu", "Máy", "Nhóm cho", "Nhóm mượn", "Hạn trả", "Trạng thái", "Thao tác"]}
               rows={loans.map((loan) => {
                 const actions = [] as React.ReactNode[];
                 if (loan.status === "pending_owner" && hasGroupPermission(auth, loan.ownerGroupId, "manager")) actions.push(
-                  <form action={approveMachineLoanAction} key="approve" className="row-actions"><input type="hidden" name="loanId" value={loan.id} /><input name="handoverCondition" placeholder="Tình trạng khi giao" aria-label="Tình trạng khi giao" style={{ width: 150 }} /><Button size="sm">Duyệt</Button></form>,
+                  <form action={approveMachineLoanAction} key="approve" className="row-actions"><input type="hidden" name="loanId" value={loan.id} /><input name="handoverCondition" placeholder="Tình trạng khi giao" aria-label="Tình trạng khi giao" className="field-inline-lg" /><Button size="sm">Duyệt</Button></form>,
                 );
                 if (loan.status === "wait_handover" && !loan.handedOverAt && hasGroupPermission(auth, loan.ownerGroupId, "manager")) actions.push(
                   <form action={confirmLoanHandoverAction} key="handover"><input type="hidden" name="loanId" value={loan.id} /><Button size="sm" variant="secondary">Đã giao</Button></form>,
@@ -63,7 +75,7 @@ export default async function MachineLoansPage() {
                   <form action={requestMachineReturnAction} key="return"><input type="hidden" name="loanId" value={loan.id} /><Button size="sm" variant="secondary">Báo trả</Button></form>,
                 );
                 if (loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "manager")) actions.push(
-                  <form action={confirmMachineReturnAction} key="close" className="row-actions"><input type="hidden" name="loanId" value={loan.id} /><select name="condition" aria-label="Tình trạng kỹ thuật" style={{ width: 135 }}><option value="good">Tốt</option><option value="limited">Hạn chế</option><option value="minor_damage">Hư nhẹ</option><option value="major_damage">Hư nặng</option></select><input name="returnCondition" placeholder="Ghi chú khi trả" aria-label="Ghi chú khi trả" style={{ width: 150 }} /><Button size="sm">Nhận lại</Button></form>,
+                  <form action={confirmMachineReturnAction} key="close" className="row-actions"><input type="hidden" name="loanId" value={loan.id} /><select name="condition" aria-label="Tình trạng kỹ thuật" className="field-inline-md"><option value="good">Tốt</option><option value="limited">Hạn chế</option><option value="minor_damage">Hư nhẹ</option><option value="major_damage">Hư nặng</option></select><input name="returnCondition" placeholder="Ghi chú khi trả" aria-label="Ghi chú khi trả" className="field-inline-lg" /><Button size="sm">Nhận lại</Button></form>,
                 );
                 const machine = equipmentMap.get(loan.equipmentId);
                 return [
@@ -80,18 +92,18 @@ export default async function MachineLoansPage() {
             />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="side-panel">
           <CardHeader><CardTitle>Tạo đề xuất mượn</CardTitle><Plus size={18} /></CardHeader>
           <CardContent>
             {actingGroups.length ? (
               <form action={createMachineLoanAction} className="form-grid">
                 <FormField label="Nhóm mượn" required><select name="borrowerGroupId">{actingGroups.map((g) => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
                 <FormField label="Máy cần mượn" required><select name="equipmentId">{equipmentRows.map((e) => <option key={e.id} value={e.id}>{e.code} — {e.name} ({groupMap.get(e.ownerGroupId)})</option>)}</select></FormField>
-                <FormField label="Mục đích sử dụng" required><textarea name="purpose" /></FormField>
-                <FormField label="Vị trí sử dụng"><input name="workLocation" /></FormField>
+                <FormField label="Mục đích sử dụng" required><textarea name="purpose" placeholder="Nêu rõ công việc hoặc khu vực sử dụng" /></FormField>
+                <FormField label="Vị trí sử dụng"><input name="workLocation" placeholder="Ví dụ: Khu vực nghiền" /></FormField>
                 <FormField label="Người nhận"><input name="receiverName" /></FormField>
                 <FormField label="Ngày dự kiến trả" required><input name="expectedReturnDate" type="date" /></FormField>
-                <Button type="submit">Gửi đề xuất</Button>
+                <Button type="submit">Gửi đề xuất mượn</Button>
               </form>
             ) : <EmptyState title="Chỉ xem" description="Tài khoản chưa có quyền thao tác tại nhóm nào." />}
           </CardContent>

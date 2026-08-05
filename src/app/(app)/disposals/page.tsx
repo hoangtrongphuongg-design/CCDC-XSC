@@ -1,10 +1,11 @@
 import { asc, desc, eq } from "drizzle-orm";
-import { Plus, Recycle } from "lucide-react";
+import { CheckCircle2, Clock3, PackageCheck, Plus, Recycle } from "lucide-react";
 import { db } from "@/lib/db";
 import { disposals, equipment, groups } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { WORKFLOW_LABELS } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
@@ -23,12 +24,23 @@ export default async function DisposalsPage() {
   const groupMap = new Map(groupRows.map((g) => [g.id, g.name]));
   const equipmentMap = new Map((await db.select({ id: equipment.id, code: equipment.code, name: equipment.name }).from(equipment)).map((e) => [e.id, e]));
   const warehouse = groupRows.find((g) => g.code === "KHO_TL");
+  const pendingGroup = rows.filter((row) => row.status === "pending_group").length;
+  const pendingWs = rows.filter((row) => row.status === "pending_ws").length;
+  const waitingWarehouse = rows.filter((row) => row.status === "wait_warehouse").length;
+  const completed = rows.filter((row) => row.status === "completed").length;
+
   return (
     <>
-      <PageHeader title="Thanh lý" description="Đề xuất, duyệt và nhập Kho thanh lý. Mã máy vẫn được giữ nguyên trong lịch sử." />
+      <PageHeader title="Thanh lý" description="Kiểm soát đề xuất, phê duyệt và bàn giao Kho thanh lý; mã máy luôn được giữ trong lịch sử." />
+      <section className="stat-grid">
+        <StatCard title="Chờ nhóm xác nhận" value={pendingGroup} icon={Clock3} tone="warning" />
+        <StatCard title="Chờ WS phê duyệt" value={pendingWs} icon={Recycle} tone="danger" />
+        <StatCard title="Chờ nhập kho" value={waitingWarehouse} icon={PackageCheck} tone="violet" />
+        <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
+      </section>
       <div className="content-grid">
-        <Card>
-          <CardHeader><CardTitle>Phiếu thanh lý</CardTitle><Recycle size={18} /></CardHeader>
+        <Card className="table-card">
+          <CardHeader><CardTitle>Danh sách phiếu thanh lý</CardTitle><Recycle size={18} /></CardHeader>
           <CardContent>
             <DataTable headers={["Phiếu", "Máy", "Nhóm quản lý", "Lý do", "Trạng thái", "Thao tác"]} rows={rows.map((row) => {
               const actions = [] as React.ReactNode[];
@@ -40,12 +52,12 @@ export default async function DisposalsPage() {
             })} empty={<EmptyState description="Chưa có phiếu thanh lý." />} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="side-panel">
           <CardHeader><CardTitle>Đề xuất thanh lý</CardTitle><Plus size={18} /></CardHeader>
           <CardContent>
             {equipmentRows.length ? <form action={createDisposalAction} className="form-grid">
               <FormField label="Máy không thể phục hồi" required><select name="equipmentId">{equipmentRows.filter((e) => hasGroupPermission(auth, e.ownerGroupId, "operator")).map((e) => <option key={e.id} value={e.id}>{e.code} — {e.name}</option>)}</select></FormField>
-              <FormField label="Tình trạng hư hỏng" required><textarea name="conditionSummary" /></FormField>
+              <FormField label="Tình trạng hư hỏng" required><textarea name="conditionSummary" placeholder="Mô tả tình trạng và kết luận kỹ thuật" /></FormField>
               <FormField label="Lý do đề xuất thanh lý" required><textarea name="reason" /></FormField>
               <Button type="submit">Tạo đề xuất</Button>
             </form> : <EmptyState title="Chưa có máy chờ thanh lý" description="Máy phải có kết luận không thể phục hồi trước khi tạo phiếu." />}
