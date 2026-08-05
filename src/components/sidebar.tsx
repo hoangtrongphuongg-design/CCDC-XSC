@@ -21,6 +21,7 @@ import type { LucideIcon } from "lucide-react";
 import type { AuthContext } from "@/lib/auth/session";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { getRoleSummary } from "@/lib/auth/roles";
 
 type NavItem = readonly [href: string, label: string, icon: LucideIcon];
 
@@ -54,7 +55,7 @@ function initials(name: string) {
 
 export function Sidebar({ auth }: { auth: AuthContext }) {
   const pathname = usePathname();
-  const roleLabel = auth.isAdmin ? "Quản trị hệ thống" : auth.isWsManager ? "Quản lý Xưởng" : "Người dùng";
+  const roleLabel = getRoleSummary(auth);
 
   const renderGroup = (label: string, items: readonly NavItem[]) => (
     <div className="nav-section" key={label}>

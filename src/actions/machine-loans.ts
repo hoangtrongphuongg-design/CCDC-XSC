@@ -17,7 +17,7 @@ const refresh = () => {
 
 /**
  * Mọi thành viên đang hoạt động của nhóm mượn, kể cả quyền viewer, đều được
- * lập đề nghị. Việc duyệt vẫn tách riêng cho Operator/Manager nhóm đang quản lý máy.
+ * lập đề nghị. Việc duyệt thuộc Operator của nhóm đang quản lý máy; Manager nhóm có quyền duyệt thay theo phạm vi quản lý.
  */
 export async function createMachineLoanAction(formData: FormData) {
   const equipmentId = String(formData.get("equipmentId") || "");
@@ -78,7 +78,7 @@ export async function createMachineLoanAction(formData: FormData) {
   refresh();
 }
 
-/** Operator hoặc Manager của nhóm đang quản lý máy được duyệt. */
+/** Operator nhóm duyệt; Manager nhóm có quyền duyệt thay vì là cấp quản lý của nhóm. */
 export async function approveMachineLoanAction(formData: FormData) {
   const loanId = String(formData.get("loanId") || "");
   const handoverCondition = String(formData.get("handoverCondition") || "").trim();
@@ -123,7 +123,7 @@ export async function approveMachineLoanAction(formData: FormData) {
   refresh();
 }
 
-/** Operator/Manager nhóm cho xác nhận đã giao máy. */
+/** Operator nhóm xác nhận giao; Manager nhóm có thể thực hiện khi cần. */
 export async function confirmLoanHandoverAction(formData: FormData) {
   const loanId = String(formData.get("loanId") || "");
   const [loan] = await db.select().from(machineLoans).where(eq(machineLoans.id, loanId)).limit(1);

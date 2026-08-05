@@ -9,29 +9,43 @@ import { hashPassword } from "@/lib/auth/password";
 import { writeAudit } from "@/lib/audit";
 import { isOfficialOperationalGroupCode, STANDARD_GROUPS } from "@/lib/group-structure";
 
+type PermissionLevel = "viewer" | "operator" | "manager";
+type SystemRole = "admin" | "ws_manager";
+
+function parsePermissionLevel(value: FormDataEntryValue | null): PermissionLevel {
+  const raw = String(value || "viewer");
+  if (!(["viewer", "operator", "manager"] as const).includes(raw as PermissionLevel)) {
+    throw new Error("Mức quyền không hợp lệ.");
+  }
+  return raw as PermissionLevel;
+}
+
 export async function approveUserAction(formData: FormData) {
   const auth = await requireAdmin();
   const userId = String(formData.get("userId") || "");
   const groupId = String(formData.get("groupId") || "");
-  const permissionLevelRaw = String(formData.get("permissionLevel") || "viewer");
-  if (!["viewer", "operator", "manager"].includes(permissionLevelRaw)) throw new Error("Mức quyền không hợp lệ.");
-  const permissionLevel = permissionLevelRaw as "viewer" | "operator" | "manager";
-  const isWsManager = formData.get("isWsManager") === "on";
+  const permissionLevel = parsePermissionLevel(formData.get("permissionLevel"));
+
   if (!userId || !groupId) throw new Error("Thiếu user hoặc nhóm.");
   const [primaryGroup] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
-  if (!primaryGroup || primaryGroup.isSystem || !primaryGroup.isActive || !isOfficialOperationalGroupCode(primaryGroup.code)) throw new Error("Nhóm chính không hợp lệ.");
+  if (!primaryGroup || primaryGroup.isSystem || !primaryGroup.isActive || !isOfficialOperationalGroupCode(primaryGroup.code)) {
+    throw new Error("Nhóm chính không hợp lệ.");
+  }
 
   await db.transaction(async (tx) => {
     const [target] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!target) throw new Error("Không tìm thấy user.");
+
+    // Duyệt tài khoản chỉ kích hoạt tài khoản và gán quyền nhóm.
+    // Admin và Quản lý Xưởng được cấp riêng ở màn hình Vai trò cấp hệ thống.
     await tx.update(users).set({
       accountStatus: "active",
       primaryGroupId: groupId,
-      isWsManager,
       reviewedBy: auth.userId,
       reviewedAt: new Date(),
       updatedAt: new Date(),
     }).where(eq(users.id, userId));
+
     await tx.insert(userGroupPermissions).values({
       userId,
       groupId,
@@ -40,8 +54,17 @@ export async function approveUserAction(formData: FormData) {
       assignedBy: auth.userId,
     }).onConflictDoUpdate({
       target: [userGroupPermissions.userId, userGroupPermissions.groupId],
-      set: { permissionLevel, isPrimary: true, isActive: true, assignedBy: auth.userId, assignedAt: new Date(), revokedAt: null, revokedBy: null },
+      set: {
+        permissionLevel,
+        isPrimary: true,
+        isActive: true,
+        assignedBy: auth.userId,
+        assignedAt: new Date(),
+        revokedAt: null,
+        revokedBy: null,
+      },
     });
+
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
       action: "user.approve",
@@ -49,9 +72,10 @@ export async function approveUserAction(formData: FormData) {
       entityId: userId,
       description: `Duyệt tài khoản ${target.username}`,
       beforeData: target,
-      afterData: { accountStatus: "active", groupId, permissionLevel, isWsManager },
+      afterData: { accountStatus: "active", groupId, permissionLevel },
     });
   });
+
   revalidatePath("/users");
 }
 
@@ -60,10 +84,15 @@ export async function updateUserStatusAction(formData: FormData) {
   const userId = String(formData.get("userId") || "");
   const status = String(formData.get("status") || "blocked") as "active" | "blocked" | "rejected";
   if (!userId) throw new Error("Thiếu user.");
+
   await db.transaction(async (tx) => {
     const [before] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!before) throw new Error("Không tìm thấy user.");
-    await tx.update(users).set({ accountStatus: status, sessionVersion: before.sessionVersion + 1, updatedAt: new Date() }).where(eq(users.id, userId));
+    await tx.update(users).set({
+      accountStatus: status,
+      sessionVersion: before.sessionVersion + 1,
+      updatedAt: new Date(),
+    }).where(eq(users.id, userId));
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
       action: "user.status.update",
@@ -74,6 +103,7 @@ export async function updateUserStatusAction(formData: FormData) {
       afterData: { accountStatus: status },
     });
   });
+
   revalidatePath("/users");
 }
 
@@ -81,10 +111,9 @@ export async function assignGroupPermissionAction(formData: FormData) {
   const auth = await requireAdmin();
   const userId = String(formData.get("userId") || "");
   const groupId = String(formData.get("groupId") || "");
-  const levelRaw = String(formData.get("permissionLevel") || "viewer");
-  if (!["viewer", "operator", "manager"].includes(levelRaw)) throw new Error("Mức quyền không hợp lệ.");
-  const level = levelRaw as "viewer" | "operator" | "manager";
+  const level = parsePermissionLevel(formData.get("permissionLevel"));
   if (!userId || !groupId) throw new Error("Thiếu user hoặc nhóm.");
+
   const [assignedGroup] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
   const officialCodes = new Set(STANDARD_GROUPS.map((group) => group.code));
   if (!assignedGroup || !assignedGroup.isActive || !officialCodes.has(assignedGroup.code as (typeof STANDARD_GROUPS)[number]["code"])) {
@@ -92,11 +121,28 @@ export async function assignGroupPermissionAction(formData: FormData) {
   }
 
   await db.transaction(async (tx) => {
-    await tx.insert(userGroupPermissions).values({ userId, groupId, permissionLevel: level, assignedBy: auth.userId })
-      .onConflictDoUpdate({
-        target: [userGroupPermissions.userId, userGroupPermissions.groupId],
-        set: { permissionLevel: level, isActive: true, assignedBy: auth.userId, assignedAt: new Date(), revokedAt: null, revokedBy: null },
-      });
+    await tx.insert(userGroupPermissions).values({
+      userId,
+      groupId,
+      permissionLevel: level,
+      assignedBy: auth.userId,
+    }).onConflictDoUpdate({
+      target: [userGroupPermissions.userId, userGroupPermissions.groupId],
+      set: {
+        permissionLevel: level,
+        isActive: true,
+        assignedBy: auth.userId,
+        assignedAt: new Date(),
+        revokedAt: null,
+        revokedBy: null,
+      },
+    });
+
+    await tx.update(users).set({
+      sessionVersion: sql`${users.sessionVersion} + 1`,
+      updatedAt: new Date(),
+    }).where(eq(users.id, userId));
+
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
       action: "user.permission.assign",
@@ -106,6 +152,7 @@ export async function assignGroupPermissionAction(formData: FormData) {
       afterData: { groupId, level },
     });
   });
+
   revalidatePath("/users");
 }
 
@@ -113,10 +160,19 @@ export async function revokeGroupPermissionAction(formData: FormData) {
   const auth = await requireAdmin();
   const userId = String(formData.get("userId") || "");
   const groupId = String(formData.get("groupId") || "");
+
   await db.transaction(async (tx) => {
-    await tx.update(userGroupPermissions).set({ isActive: false, revokedBy: auth.userId, revokedAt: new Date() })
-      .where(and(eq(userGroupPermissions.userId, userId), eq(userGroupPermissions.groupId, groupId)));
-    await tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1`, updatedAt: new Date() }).where(eq(users.id, userId));
+    await tx.update(userGroupPermissions).set({
+      isActive: false,
+      revokedBy: auth.userId,
+      revokedAt: new Date(),
+    }).where(and(eq(userGroupPermissions.userId, userId), eq(userGroupPermissions.groupId, groupId)));
+
+    await tx.update(users).set({
+      sessionVersion: sql`${users.sessionVersion} + 1`,
+      updatedAt: new Date(),
+    }).where(eq(users.id, userId));
+
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
       action: "user.permission.revoke",
@@ -126,6 +182,7 @@ export async function revokeGroupPermissionAction(formData: FormData) {
       afterData: { groupId },
     });
   });
+
   revalidatePath("/users");
 }
 
@@ -133,9 +190,13 @@ export async function resetTemporaryPasswordAction(formData: FormData) {
   const auth = await requireAdmin();
   const userId = String(formData.get("userId") || "");
   const temporaryPassword = String(formData.get("temporaryPassword") || "");
-  if (temporaryPassword.length < 8 || temporaryPassword.length > 72) throw new Error("Mật khẩu tạm phải dài 8–72 ký tự.");
+  if (temporaryPassword.length < 8 || temporaryPassword.length > 72) {
+    throw new Error("Mật khẩu tạm phải dài 8–72 ký tự.");
+  }
+
   const [target] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!target) throw new Error("Không tìm thấy user.");
+
   await db.transaction(async (tx) => {
     await tx.update(users).set({
       passwordHash: await hashPassword(temporaryPassword),
@@ -143,6 +204,7 @@ export async function resetTemporaryPasswordAction(formData: FormData) {
       sessionVersion: target.sessionVersion + 1,
       updatedAt: new Date(),
     }).where(eq(users.id, userId));
+
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
       action: "user.password.reset",
@@ -152,29 +214,54 @@ export async function resetTemporaryPasswordAction(formData: FormData) {
       afterData: { mustChangePassword: true },
     });
   });
+
   revalidatePath("/users");
 }
 
-export async function setUserFlagsAction(formData: FormData) {
+/**
+ * Admin hệ thống và Quản lý Xưởng là hai vai trò độc lập.
+ * Thao tác với một vai trò không được làm thay đổi vai trò còn lại.
+ */
+export async function setSystemRoleAction(formData: FormData) {
   const auth = await requireAdmin();
   const userId = String(formData.get("userId") || "");
-  const isWsManager = formData.get("isWsManager") === "on";
-  const isAdmin = formData.get("isAdmin") === "on";
+  const role = String(formData.get("role") || "") as SystemRole;
+  const enabled = String(formData.get("enabled") || "false") === "true";
+
   if (!userId) throw new Error("Thiếu user.");
-  if (userId === auth.userId && !isAdmin) throw new Error("Không thể tự gỡ quyền admin của chính mình.");
+  if (!(["admin", "ws_manager"] as const).includes(role)) throw new Error("Vai trò hệ thống không hợp lệ.");
+  if (role === "admin" && userId === auth.userId && !enabled) {
+    throw new Error("Không thể tự gỡ quyền admin của chính mình.");
+  }
+
   const [before] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!before) throw new Error("Không tìm thấy user.");
+
+  const changes = role === "admin"
+    ? { isAdmin: enabled }
+    : { isWsManager: enabled };
+
   await db.transaction(async (tx) => {
-    await tx.update(users).set({ isWsManager, isAdmin, sessionVersion: before.sessionVersion + 1, updatedAt: new Date() }).where(eq(users.id, userId));
+    await tx.update(users).set({
+      ...changes,
+      sessionVersion: before.sessionVersion + 1,
+      updatedAt: new Date(),
+    }).where(eq(users.id, userId));
+
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
-      action: "user.flags.update",
+      action: role === "admin" ? "user.role.admin.update" : "user.role.ws_manager.update",
       entityType: "user",
       entityId: userId,
-      description: `Cập nhật vai trò hệ thống cho ${before.username}`,
-      beforeData: { isWsManager: before.isWsManager, isAdmin: before.isAdmin },
-      afterData: { isWsManager, isAdmin },
+      description: `${enabled ? "Cấp" : "Thu hồi"} vai trò ${role === "admin" ? "Quản trị hệ thống" : "Quản lý Xưởng"} cho ${before.username}`,
+      beforeData: { isAdmin: before.isAdmin, isWsManager: before.isWsManager },
+      afterData: {
+        isAdmin: role === "admin" ? enabled : before.isAdmin,
+        isWsManager: role === "ws_manager" ? enabled : before.isWsManager,
+      },
     });
   });
+
   revalidatePath("/users");
+  revalidatePath("/dashboard");
 }

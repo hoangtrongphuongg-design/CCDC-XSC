@@ -1,26 +1,23 @@
 # QUẢN LÝ CCDC - XSC
 
-**Phiên bản:** 1.3.1  
+**Phiên bản:** 1.3.2  
 **Kiến trúc:** GitHub → Vercel → Neon PostgreSQL
 
-## 1. Nội dung chính của V1.3.1
+## Nội dung chính
 
-- Đồng bộ 13 nhóm nghiệp vụ chính thức và 1 nhóm hệ thống `KHO_TL`.
-- Danh sách nhóm được dùng thống nhất tại đăng ký, phân quyền, danh mục dụng cụ, mượn, điều chuyển, sửa chữa, thanh lý và báo cáo.
+- Đồng bộ 13 nhóm nghiệp vụ chính thức và nhóm hệ thống `KHO_TL` trên toàn hệ thống.
 - Trang **Dụng cụ toàn xưởng** chỉ dùng để tra cứu.
-- Việc thêm và cập nhật được chuyển về **Dụng cụ nhóm tôi** bằng một cửa sổ nhập liệu thống nhất.
-- Hệ thống tự sinh mã theo nhóm:
-  - Máy/CCDC quản lý từng thiết bị: `COI-0001`, `WS-0001`, `CBL-0001`.
-  - Dụng cụ quản lý theo số lượng: `COI-VT-0001`, `WS-VT-0001`.
-- Mã đã cấp không đổi trong suốt vòng đời và không tái sử dụng.
+- Thêm và cập nhật dụng cụ tại **Dụng cụ nhóm tôi** bằng cửa sổ nhập liệu thống nhất.
+- Tự sinh mã theo nhóm: `COI-0001`, `WS-0001`, `CBL-0001`; dụng cụ theo số lượng dùng dạng `WS-VT-0001`.
+- Mã dụng cụ không đổi trong suốt vòng đời và không tái sử dụng.
 - Phân loại thiết bị ở mức vừa đủ: 6 nhóm cơ khí, 2 nhóm điện và 1 nhóm khác.
-- Bổ sung quyền `viewer`, hiển thị là **Nhân viên — Xem & mượn**.
-- Mọi nhân viên thuộc nhóm được lập thủ tục **Mượn máy** và **Mượn nhanh**.
-- Operator/Manager của nhóm cho duyệt phiếu.
+- Nhân viên được xem dữ liệu, tạo thủ tục Mượn máy/Mượn nhanh, xác nhận nhận và báo trả.
+- Operator nhóm cho duyệt; Manager nhóm có quyền quản lý và duyệt thay trong phạm vi nhóm.
 - Nhân viên thuộc nhóm cho được xác nhận đã nhận lại máy/dụng cụ.
-- Người tạo phiếu không được tự duyệt chính phiếu đó.
+- Người tạo phiếu không được tự duyệt phiếu của chính mình.
+- **Quản trị hệ thống** và **Quản lý Xưởng** là hai vai trò độc lập; một vai trò không tự động cấp vai trò còn lại.
 
-## 2. Cơ cấu nhóm chính thức
+## Cơ cấu nhóm chính thức
 
 ### Bảo trì cơ
 
@@ -40,7 +37,7 @@
 11. Bảo trì điện - Nhóm Nghiền BS - Lò nung
 12. Bảo trì điện - Nhóm Nghiền XM - Trạm điện - Phụ trợ
 
-### Khác
+### Nhóm khác
 
 13. Nhóm khác (Đơn vị khác; nhà thầu,...)
 
@@ -48,33 +45,35 @@
 
 - `KHO_TL` — Kho thanh lý
 
-## 3. Quyền người dùng
+## Ma trận vai trò
 
-| Mức quyền | Phạm vi chính |
+| Vai trò | Phạm vi chính |
 |---|---|
-| Nhân viên — Xem & mượn | Xem dữ liệu; tạo đề nghị mượn máy/mượn nhanh; xác nhận nhận, báo trả; xác nhận nhận lại nếu thuộc nhóm cho |
-| Operator — Thao tác nhóm | Có quyền Nhân viên; thêm/cập nhật dụng cụ; duyệt và giao máy/dụng cụ của nhóm |
-| Manager — Quản lý nhóm | Kế thừa Operator; hoàn thành hồ sơ nháp và xử lý các bước quản lý nhóm |
-| WS Manager | Duyệt nghiệp vụ cấp Xưởng, sửa chữa và thanh lý theo luồng |
-| Admin | Quản lý tài khoản, nhóm và cấu hình; không tự động có quyền duyệt nghiệp vụ nếu chưa được gán quyền nhóm |
+| Nhân viên — Xem & mượn | Xem dữ liệu; tạo đề nghị mượn; xác nhận nhận và báo trả; xác nhận nhận lại nếu thuộc nhóm cho |
+| Operator — Thao tác nhóm | Thêm/cập nhật dụng cụ; duyệt và giao máy/dụng cụ của nhóm; xử lý nghiệp vụ thường ngày |
+| Manager — Quản lý nhóm | Quản lý toàn bộ dụng cụ của nhóm; xác nhận điều chuyển, thanh lý và xử lý ngoại lệ cấp nhóm |
+| Quản lý Xưởng | Duyệt nghiệp vụ cấp Xưởng, điều phối sửa chữa, phê duyệt cuối điều chuyển và thanh lý |
+| Quản trị hệ thống | Quản lý tài khoản, cơ cấu nhóm và cấu hình; không tự động được duyệt nghiệp vụ |
 
-## 4. Luồng Mượn máy
+`Operator` và `Manager` là hai mức quyền nhóm khác nhau. `Quản lý Xưởng` và `Quản trị hệ thống` là hai vai trò cấp hệ thống độc lập.
+
+## Luồng Mượn máy
 
 ```text
 Nhân viên nhóm mượn tạo đề nghị
-→ Operator/Manager nhóm cho duyệt
-→ Operator/Manager nhóm cho xác nhận đã giao
+→ Operator nhóm cho duyệt; Manager có thể duyệt thay
+→ Operator nhóm cho xác nhận đã giao; Manager có thể thực hiện thay
 → Nhân viên nhóm mượn xác nhận đã nhận
 → Nhân viên nhóm mượn báo trả
-→ Nhân viên bất kỳ thuộc nhóm cho xác nhận nhận lại và tình trạng
+→ Nhân viên thuộc nhóm cho xác nhận nhận lại và tình trạng
 → Hoàn thành
 ```
 
-## 5. Luồng Mượn nhanh
+## Luồng Mượn nhanh
 
 ```text
 Nhân viên nhóm mượn tạo đề nghị
-→ Operator/Manager nhóm cho duyệt
+→ Operator nhóm cho duyệt; Manager có thể duyệt thay
 → Hệ thống trừ số lượng khỏi danh mục nhóm cho
 → Nhân viên nhóm mượn xác nhận đã nhận
 → Nhân viên nhóm mượn báo trả
@@ -82,7 +81,7 @@ Nhân viên nhóm mượn tạo đề nghị
 → Hoàn thành
 ```
 
-## 6. Cài đặt local
+## Cài đặt local
 
 Yêu cầu Node.js 20 trở lên.
 
@@ -91,7 +90,7 @@ npm install
 cp .env.example .env
 ```
 
-Điền các biến trong `.env`:
+Điền biến môi trường:
 
 ```env
 DATABASE_URL="postgresql://...neon.tech/...?sslmode=require"
@@ -102,83 +101,57 @@ ADMIN_EMPLOYEE_CODE="ADMIN001"
 ADMIN_FULL_NAME="Phương - Quản trị XSC"
 ```
 
-Chạy migration:
+Chạy:
 
 ```bash
 npm run db:migrate
-```
-
-Tạo admin lần đầu:
-
-```bash
 npm run db:seed
-```
-
-Chạy web:
-
-```bash
 npm run dev
 ```
 
-Mở `http://localhost:3000`.
+Tài khoản do `db:seed` tạo chỉ có vai trò **Quản trị hệ thống**, không tự động là **Quản lý Xưởng**.
 
-## 7. Nâng cấp từ bản đang dùng
+## Nâng cấp từ V1.3.1
 
-Bản V1.3.1 có thay đổi database. Sau khi cập nhật code, phải chạy migration trước khi trải nghiệm tính năng mới.
-
-### Cách 1 — Chạy bằng Terminal
-
-```bash
-npm install
-npm run db:migrate
-```
-
-Script sẽ chạy lần lượt:
+Sau khi cập nhật code, chạy migration mới:
 
 ```text
-drizzle/0000_initial.sql
-drizzle/0001_groups_assets_viewer.sql
-drizzle/0002_employee_loan_permissions.sql
-drizzle/0003_quick_loan_default.sql
+drizzle/0004_separate_system_roles.sql
 ```
 
-### Cách 2 — Chạy trực tiếp trên Neon
+Migration này chuẩn hóa tài khoản mặc định `admin`:
 
-Mở Neon → SQL Editor và chạy lần lượt các file chưa chạy:
+- Gỡ vai trò Quản lý Xưởng đã từng được seed tự động.
+- Đưa quyền nhóm Workshop về mức Nhân viên.
+- Thu hồi quyền Kho thanh lý đã từng được seed tự động.
+
+Các tài khoản khác không bị thay đổi.
+
+Sau migration, vào:
 
 ```text
-drizzle/0001_groups_assets_viewer.sql
-drizzle/0002_employee_loan_permissions.sql
-drizzle/0003_quick_loan_default.sql
+Quản trị → Người dùng & phân quyền → Vai trò cấp hệ thống
 ```
 
-Sau đó vào web:
+Cấp riêng **Quản lý Xưởng** cho đúng người phụ trách nghiệp vụ.
 
-```text
-Quản trị → Cơ cấu nhóm Xưởng → Đồng bộ 13 nhóm chính thức
-```
+## Triển khai GitHub và Vercel
 
-Không xóa database cũ và không chạy lại seed nếu tài khoản admin đã tồn tại.
-
-## 8. Triển khai GitHub và Vercel
-
-1. Giải nén bộ code.
-2. Chép toàn bộ nội dung vào repo GitHub hiện tại.
-3. Không đưa `.env` lên GitHub.
+1. Giải nén bộ code và chép toàn bộ nội dung vào repo hiện tại.
+2. Không đưa `.env` lên GitHub.
+3. Chạy migration trên Neon trước khi redeploy.
 4. Commit và push:
 
 ```bash
 git add .
-git commit -m "Upgrade CCDC XSC to V1.3.1"
+git commit -m "Upgrade CCDC XSC to V1.3.2"
 git push origin main
 ```
 
-5. Trên Vercel, kiểm tra:
-   - `DATABASE_URL`
-   - `AUTH_SECRET`
-6. Redeploy sau khi migration Neon đã hoàn tất.
+5. Kiểm tra `DATABASE_URL` và `AUTH_SECRET` trên Vercel.
+6. Redeploy.
 
-## 9. Kiểm tra trước khi dùng thử
+## Kiểm tra trước khi dùng thử
 
 ```bash
 npm run typecheck
@@ -188,19 +161,11 @@ npm run build
 
 Kiểm tra thủ công:
 
-1. Admin đồng bộ 13 nhóm chính thức.
-2. Gán một user mức Nhân viên, một user mức Operator.
-3. Nhân viên tạo phiếu Mượn máy.
-4. Operator nhóm cho duyệt và giao.
-5. Nhân viên nhóm mượn nhận và báo trả.
-6. Một Nhân viên của nhóm cho xác nhận nhận lại.
-7. Lặp lại với Mượn nhanh.
-8. Kiểm tra mã tự sinh tại Dụng cụ nhóm tôi.
-9. Kiểm tra Dụng cụ toàn xưởng không còn nút thêm.
-10. Kiểm tra lịch sử hoạt động ghi đúng người, nhóm và thời gian.
-
-## 10. Lưu ý
-
-- Bản này chưa tích hợp upload ảnh thật lên dịch vụ lưu trữ.
-- Không tự động migrate database khi Vercel build; migration phải chạy riêng trên Neon hoặc máy local.
-- Trước khi đưa vào vận hành chính thức, nên thử với 3–5 tài khoản và 20–30 dụng cụ thật.
+1. Admin chỉ thấy quyền Quản trị hệ thống nếu chưa được cấp thêm vai trò khác.
+2. Quản lý Xưởng không vào được trang quản trị user nếu không có quyền Admin.
+3. Admin không duyệt điều chuyển/thanh lý nếu không có vai trò Quản lý Xưởng.
+4. Nhân viên tạo phiếu mượn được nhưng không duyệt được.
+5. Operator nhóm cho duyệt được; Manager nhóm có thể duyệt thay.
+6. Nhân viên nhóm cho xác nhận nhận lại được.
+7. Mã dụng cụ tự tăng riêng theo từng nhóm.
+8. Dụng cụ toàn xưởng không có nút thêm.

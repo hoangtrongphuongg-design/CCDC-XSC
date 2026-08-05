@@ -87,7 +87,7 @@ export async function createQuickLoanAction(formData: FormData) {
   refresh();
 }
 
-/** Operator/Manager nhóm cho duyệt và xác nhận sẵn sàng giao. */
+/** Operator nhóm cho duyệt; Manager nhóm có thể duyệt thay khi cần. */
 export async function approveQuickLoanAction(formData: FormData) {
   const loanId = String(formData.get("loanId") || "");
   const lenderNote = String(formData.get("lenderNote") || "").trim();

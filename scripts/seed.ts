@@ -37,14 +37,18 @@ async function main() {
       requestedGroupId: workshop.id,
       accountStatus: "active",
       isAdmin: true,
-      isWsManager: true,
+      isWsManager: false,
       mustChangePassword: true,
       reviewedAt: new Date(),
     }).returning();
-    await db.insert(userGroupPermissions).values({ userId: admin.id, groupId: workshop.id, permissionLevel: "manager", isPrimary: true, assignedBy: admin.id });
-    const [warehouse] = await db.select().from(groups).where(eq(groups.code, "KHO_TL")).limit(1);
-    if (warehouse) await db.insert(userGroupPermissions).values({ userId: admin.id, groupId: warehouse.id, permissionLevel: "manager", assignedBy: admin.id });
-    console.log(`Đã tạo admin ${username}. Bắt buộc đổi mật khẩu ở lần đầu.`);
+    await db.insert(userGroupPermissions).values({
+      userId: admin.id,
+      groupId: workshop.id,
+      permissionLevel: "viewer",
+      isPrimary: true,
+      assignedBy: admin.id,
+    });
+    console.log(`Đã tạo admin ${username}. Tài khoản chỉ có vai trò Quản trị hệ thống; không tự động là Quản lý Xưởng.`);
   }
 }
 

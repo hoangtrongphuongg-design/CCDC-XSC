@@ -15,8 +15,9 @@
 - Một user có thể có quyền tại nhiều nhóm.
 - `operator`: thao tác nghiệp vụ tại nhóm.
 - `manager`: thêm quyền duyệt/xác nhận của nhóm.
-- `WS Manager`: duyệt điều chuyển, sửa chữa và thanh lý toàn xưởng.
-- `Admin`: quản trị user, nhóm, quyền và cấu hình; không mặc định duyệt thay nghiệp vụ.
+- `Quản lý Xưởng`: duyệt điều chuyển, sửa chữa và thanh lý toàn xưởng.
+- `Admin`: quản trị user, nhóm, quyền và cấu hình.
+- `Quản lý Xưởng` và `Admin` là hai vai trò độc lập; vai trò này không tự động cấp vai trò kia.
 - Người tạo phiếu không tự duyệt bước đối ứng của chính phiếu đó.
 
 ## Mượn máy
@@ -29,7 +30,7 @@
 ## Điều chuyển cố định
 
 - Thay đổi nhóm quản lý, giữ nguyên mã máy.
-- Hai nhóm đồng ý, WS Manager duyệt, hai bên xác nhận bàn giao.
+- Hai nhóm đồng ý, Quản lý Xưởng duyệt, hai bên xác nhận bàn giao.
 - Máy đang được mượn có thể chuyển cố định cho chính nhóm đang giữ; phiếu điều chuyển phải liên kết và đóng phiếu mượn.
 
 ## Cho mượn nhanh
@@ -50,7 +51,7 @@
 
 - Nhóm tạo đề xuất.
 - Manager nhóm xác nhận.
-- WS Manager duyệt.
+- Quản lý Xưởng duyệt.
 - User được phân quyền tại `KHO_TL` xác nhận nhập Kho thanh lý.
 - Sau khi nhập kho, thiết bị không được mượn, điều chuyển, sửa chữa hoặc cấp phát lại.
 - Mã máy vẫn được giữ trong lịch sử.

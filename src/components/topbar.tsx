@@ -1,6 +1,7 @@
 import { Bell, CalendarDays, LogOut, ShieldCheck } from "lucide-react";
 import type { AuthContext } from "@/lib/auth/session";
 import { logoutAction } from "@/actions/auth";
+import { getRoleSummary } from "@/lib/auth/roles";
 
 function initials(name: string) {
   return name
@@ -19,7 +20,7 @@ export function Topbar({ auth }: { auth: AuthContext }) {
     year: "numeric",
     timeZone: "Asia/Ho_Chi_Minh",
   }).format(new Date());
-  const roleLabel = auth.isAdmin ? "Quản trị hệ thống" : auth.isWsManager ? "Quản lý Xưởng" : "Thành viên";
+  const roleLabel = getRoleSummary(auth);
 
   return (
     <header className="topbar" data-slot="topbar">
