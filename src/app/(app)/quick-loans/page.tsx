@@ -23,7 +23,7 @@ import {
 export default async function QuickLoansPage() {
   const auth = await requireUser();
   const [groupRows, tools, rows] = await Promise.all([
-    db.select({ id: groups.id, name: groups.name }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
+    db.select({ id: groups.id, name: groups.name, isSystem: groups.isSystem }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
     db.select().from(toolCatalog).where(eq(toolCatalog.isActive, true)).orderBy(asc(toolCatalog.name)),
     db.select().from(quickLoans).orderBy(desc(quickLoans.createdAt)).limit(100),
   ]);
@@ -70,7 +70,7 @@ export default async function QuickLoansPage() {
           <CardContent>
             {sourceGroups.length ? <form action={createQuickLoanAction} className="form-grid">
               <FormField label="Nhóm cho mượn" required><select name="sourceGroupId">{sourceGroups.map((g) => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
-              <FormField label="Nhóm mượn" required><select name="borrowerGroupId">{groupRows.filter((g) => g.name !== "Kho thanh lý").map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></FormField>
+              <FormField label="Nhóm mượn" required><select name="borrowerGroupId">{groupRows.filter((g) => !g.isSystem).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></FormField>
               <FormField label="Chọn từ danh mục nhóm"><select name="toolId" defaultValue=""><option value="">Vật dụng khác / nhập tự do</option>{tools.map((t) => <option key={t.id} value={t.id}>{t.name}{t.specification ? ` — ${t.specification}` : ""}</option>)}</select></FormField>
               <FormField label="Tên vật dụng" required><input name="itemName" placeholder="Ví dụ: Taro M20" /></FormField>
               <FormField label="Quy cách"><input name="specification" /></FormField>

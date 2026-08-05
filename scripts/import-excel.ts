@@ -21,15 +21,35 @@ function pick(row: Record<string, unknown>, names: string[]) {
   return undefined;
 }
 
+function fold(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function mapGroupCode(name: string) {
-  const n = name.toLowerCase();
+  const n = fold(name);
+
+  // Nhận diện nhóm điện trước để tránh khớp nhầm với nhóm cơ cùng khu vực.
+  if (n.includes("dien") && n.includes("mo")) return "DIEN_MO";
+  if (n.includes("dien") && n.includes("cbl") && n.includes("nt")) return "DIEN_CBL_NT";
+  if (n.includes("dien") && n.includes("nghien bs") && n.includes("lo")) return "DIEN_NBS_LO";
+  if (n.includes("dien") && n.includes("nghien xm") && (n.includes("tram dien") || n.includes("phu tro"))) return "DIEN_NXM_TD_PT";
+
+  if (n.includes("coi")) return "COI";
+  if (n.includes("boi tron")) return "BOI_TRON";
+  if (n.includes("bang tai")) return "BANG_TAI";
   if (n.includes("workshop")) return "WORKSHOP";
-  if (n.includes("nbs")) return "NBS";
   if (n.includes("cbl")) return "CBL";
-  if (n.includes("lò") || n === "lo") return "LO";
-  if (n.includes("mỏ") || n === "mo") return "MO";
-  if (n.includes("nxm")) return "NXM";
-  if (n.includes("cơ khí ca")) return "CK_CA";
+  if (n.includes("nghien bs") || n.includes("nbs")) return "NBS";
+  if (n.includes("nhom lo") || n === "lo" || n.includes("bao tri co lo")) return "LO";
+  if (n.includes("nxm") || n.includes("nghien xm")) return "NXM";
+  if (n.includes("nhom khac") || n.includes("nha thau") || n.includes("don vi khac")) return "NHOM_KHAC";
   return null;
 }
 

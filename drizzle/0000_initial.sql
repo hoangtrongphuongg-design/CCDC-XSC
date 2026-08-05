@@ -268,12 +268,22 @@ CREATE TABLE IF NOT EXISTS import_issues (
 CREATE INDEX IF NOT EXISTS import_issues_batch_idx ON import_issues(batch_id, severity);
 
 INSERT INTO groups(code, name, is_system) VALUES
-  ('WORKSHOP', 'Workshop', false),
-  ('NBS', 'NBS', false),
-  ('CBL', 'CBL', false),
-  ('LO', 'Lò', false),
-  ('MO', 'Mỏ', false),
-  ('NXM', 'NXM', false),
-  ('CK_CA', 'Cơ khí ca', false),
+  ('COI', 'Bảo trì cơ - Nhóm Cối', false),
+  ('CBL', 'Bảo trì cơ - Nhóm CBL', false),
+  ('NBS', 'Bảo trì cơ - Nghiền BS-NT', false),
+  ('LO', 'Bảo trì cơ - Nhóm Lò', false),
+  ('NXM', 'Bảo trì cơ - Nhóm NXM', false),
+  ('WORKSHOP', 'Bảo trì cơ - Nhóm Workshop', false),
+  ('BOI_TRON', 'Bảo trì cơ - Nhóm Bôi trơn', false),
+  ('BANG_TAI', 'Bảo trì cơ - Nhóm Băng tải', false),
+  ('DIEN_MO', 'Bảo trì điện - Nhóm điện Mỏ', false),
+  ('DIEN_CBL_NT', 'Bảo trì điện - Nhóm điện CBL - NT', false),
+  ('DIEN_NBS_LO', 'Bảo trì điện - Nhóm Nghiền BS - Lò nung', false),
+  ('DIEN_NXM_TD_PT', 'Bảo trì điện - Nhóm Nghiền XM - Trạm điện - Phụ trợ', false),
+  ('NHOM_KHAC', 'Nhóm khác (Đơn vị khác; nhà thầu,...)', false),
   ('KHO_TL', 'Kho thanh lý', true)
-ON CONFLICT (code) DO NOTHING;
+ON CONFLICT (code) DO UPDATE SET
+  name = EXCLUDED.name,
+  is_system = EXCLUDED.is_system,
+  is_active = true,
+  updated_at = now();

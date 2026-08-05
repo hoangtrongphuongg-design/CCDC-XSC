@@ -2,9 +2,9 @@
 
 **Phiên bản:** 1.1.0
 
-## Giao diện V1.1
+## Giao diện V1.2
 
-Bản V1.1 nâng cấp toàn bộ trải nghiệm desktop/mobile theo phong cách dashboard quản trị chuyên nghiệp, giữ nguyên database và quy trình nghiệp vụ. Chi tiết tại `docs/UI_V1.1.md`.
+Bản V1.2 nâng cấp toàn bộ trải nghiệm desktop/mobile theo phong cách dashboard quản trị chuyên nghiệp, giữ nguyên database và quy trình nghiệp vụ. Chi tiết tại `docs/UI_V1.2.md`.
 
 
 Bản code đầu tiên cho hệ thống quản lý máy móc, công cụ dụng cụ của Xưởng Sửa chữa.
@@ -92,15 +92,11 @@ Nhập chính thức:
 npm run import:excel -- "/duong-dan/THEO DOI CAP PHAT - SUA CHUA CCDC(1).xlsx"
 ```
 
-Script V1 tự động nhập sheet `DANH_MUC_MAY`, chuẩn hóa các nhóm:
+Script V1 tự động nhập sheet `DANH_MUC_MAY`, chuẩn hóa theo 13 nhóm chính thức:
 
-- Workshop
-- NBS
-- CBL
-- Lò
-- Mỏ
-- NXM
-- Cơ khí ca
+- 8 nhóm Bảo trì cơ: Cối, CBL, Nghiền BS-NT, Lò, NXM, Workshop, Bôi trơn, Băng tải.
+- 4 nhóm Bảo trì điện: Điện Mỏ, Điện CBL-NT, Nghiền BS-Lò nung, Nghiền XM-Trạm điện-Phụ trợ.
+- 1 Nhóm khác dành cho đơn vị khác, nhà thầu và trường hợp tương đương.
 
 Các dòng không xác định được được ghi vào `import_issues`. Script chưa tự động nhập toàn bộ nhật ký cấp phát và sửa chữa cũ vì file nguồn có các trường hợp trạng thái/lịch sử không đồng nhất; cần đối chiếu trước khi nhập.
 
@@ -234,3 +230,15 @@ Kiểm tra thủ công:
 - `docs/PROJECT_BRIEF.md`: bản ghi nhớ nghiệp vụ và giao diện.
 - `docs/VALIDATION.md`: phạm vi kiểm tra đã thực hiện và các kiểm tra bắt buộc sau khi cài dependency.
 - `docs/DEPLOY_CHECKLIST.md`: checklist kết nối GitHub — Neon — Vercel.
+
+## Quản trị cơ cấu nhóm V1.2.1
+
+Trang `/groups` dành cho admin để:
+
+- Đồng bộ 13 nhóm nghiệp vụ chính thức: 8 nhóm Bảo trì cơ, 4 nhóm Bảo trì điện và 1 Nhóm khác.
+- Quản lý riêng nhóm hệ thống `KHO_TL` – Kho thanh lý.
+- Thêm nhóm nghiệp vụ mới, đổi tên và kích hoạt/ngừng sử dụng.
+- Theo dõi số máy/CCDC và số người dùng đang gán theo nhóm.
+- Ngăn vô hiệu hóa nhóm còn dữ liệu đang sử dụng.
+
+Không có thay đổi schema database trong V1.2.1; chỉ cần cập nhật code, redeploy và nhấn “Đồng bộ 13 nhóm chính thức” tại trang Cơ cấu nhóm Xưởng.

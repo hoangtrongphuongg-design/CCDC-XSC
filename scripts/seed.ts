@@ -3,25 +3,22 @@ import { eq } from "drizzle-orm";
 import { db, pool } from "../src/lib/db";
 import { groups, userGroupPermissions, users } from "../src/lib/db/schema";
 import { hashPassword } from "../src/lib/auth/password";
-
-const groupSeed = [
-  ["WORKSHOP", "Workshop", false],
-  ["NBS", "NBS", false],
-  ["CBL", "CBL", false],
-  ["LO", "Lò", false],
-  ["MO", "Mỏ", false],
-  ["NXM", "NXM", false],
-  ["CK_CA", "Cơ khí ca", false],
-  ["KHO_TL", "Kho thanh lý", true],
-] as const;
+import { STANDARD_GROUPS } from "../src/lib/group-structure";
 
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error("Thiếu DATABASE_URL");
-  for (const [code, name, isSystem] of groupSeed) {
-    await db.insert(groups).values({ code, name, isSystem }).onConflictDoUpdate({ target: groups.code, set: { name, isSystem, isActive: true, updatedAt: new Date() } });
+
+  for (const group of STANDARD_GROUPS) {
+    await db
+      .insert(groups)
+      .values({ code: group.code, name: group.name, isSystem: group.isSystem })
+      .onConflictDoUpdate({
+        target: groups.code,
+        set: { name: group.name, isSystem: group.isSystem, isActive: true, updatedAt: new Date() },
+      });
   }
 
-  const username = (process.env.ADMIN_USERNAME || "admin_xsc").trim().toLowerCase();
+  const username = (process.env.ADMIN_USERNAME || "admin").trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
   if (!password || password.length < 8) throw new Error("ADMIN_PASSWORD phải có ít nhất 8 ký tự.");
   const [workshop] = await db.select().from(groups).where(eq(groups.code, "WORKSHOP")).limit(1);

@@ -14,8 +14,8 @@ const auth: AuthContext = {
   mustChangePassword: false,
   sessionVersion: 1,
   primaryGroupId: "g1",
-  primaryGroupName: "NBS",
-  permissions: [{ groupId: "g1", groupCode: "NBS", groupName: "NBS", level: "manager", isPrimary: true }],
+  primaryGroupName: "Bảo trì cơ - Nghiền BS-NT",
+  permissions: [{ groupId: "g1", groupCode: "NBS", groupName: "Bảo trì cơ - Nghiền BS-NT", level: "manager", isPrimary: true }],
 };
 
 test("manager có quyền operator và manager trong đúng nhóm", () => {

@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Gauge,
   Handshake,
+  Network,
   Recycle,
   ShieldCheck,
   Wrench,
@@ -90,7 +91,10 @@ export function Sidebar({ auth }: { auth: AuthContext }) {
         {renderGroup("NGHIỆP VỤ", workflowItems)}
         {renderGroup("THEO DÕI", insightItems)}
         {auth.isAdmin
-          ? renderGroup("QUẢN TRỊ", [["/users", "Người dùng & phân quyền", ShieldCheck]])
+          ? renderGroup("QUẢN TRỊ", [
+              ["/groups", "Cơ cấu nhóm Xưởng", Network],
+              ["/users", "Người dùng & phân quyền", ShieldCheck],
+            ])
           : null}
       </nav>
 
