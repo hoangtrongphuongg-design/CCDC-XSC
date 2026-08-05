@@ -1,0 +1,407 @@
+import {
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
+
+export const accountStatusEnum = pgEnum("account_status", ["pending", "active", "rejected", "blocked"]);
+export const permissionLevelEnum = pgEnum("permission_level", ["operator", "manager"]);
+export const equipmentStatusEnum = pgEnum("equipment_status", [
+  "in_use_owner",
+  "wait_handover",
+  "on_loan",
+  "return_requested",
+  "wait_inspection",
+  "repairing",
+  "wait_repair_confirm",
+  "wait_disposal",
+  "disposal_warehouse",
+  "inactive",
+]);
+export const conditionEnum = pgEnum("equipment_condition", [
+  "good",
+  "limited",
+  "minor_damage",
+  "major_damage",
+  "awaiting_assessment",
+  "irreparable",
+  "unknown",
+]);
+export const machineLoanStatusEnum = pgEnum("machine_loan_status", [
+  "pending_owner",
+  "approved",
+  "wait_handover",
+  "on_loan",
+  "return_requested",
+  "completed",
+  "rejected",
+  "cancelled",
+  "incident",
+]);
+export const transferStatusEnum = pgEnum("transfer_status", [
+  "pending_source",
+  "pending_target",
+  "pending_ws",
+  "wait_handover",
+  "completed",
+  "rejected",
+  "cancelled",
+]);
+export const quickLoanStatusEnum = pgEnum("quick_loan_status", [
+  "pending_receipt",
+  "borrowed",
+  "return_reported",
+  "completed",
+  "cancelled",
+]);
+export const repairStatusEnum = pgEnum("repair_status", [
+  "pending_acceptance",
+  "repairing",
+  "wait_owner_confirm",
+  "completed",
+  "irreparable",
+  "cancelled",
+]);
+export const disposalStatusEnum = pgEnum("disposal_status", [
+  "pending_group",
+  "pending_ws",
+  "wait_warehouse",
+  "completed",
+  "rejected",
+  "cancelled",
+]);
+export const notificationTypeEnum = pgEnum("notification_type", ["info", "success", "warning", "danger"]);
+
+export const groups = pgTable(
+  "groups",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 30 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    isSystem: boolean("is_system").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("groups_code_unique").on(t.code)],
+);
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    username: varchar("username", { length: 30 }).notNull(),
+    passwordHash: text("password_hash").notNull(),
+    employeeCode: varchar("employee_code", { length: 30 }).notNull(),
+    fullName: varchar("full_name", { length: 120 }).notNull(),
+    primaryGroupId: uuid("primary_group_id").references(() => groups.id, { onDelete: "set null" }),
+    requestedGroupId: uuid("requested_group_id").references(() => groups.id, { onDelete: "set null" }),
+    accountStatus: accountStatusEnum("account_status").notNull().default("pending"),
+    isAdmin: boolean("is_admin").notNull().default(false),
+    isWsManager: boolean("is_ws_manager").notNull().default(false),
+    mustChangePassword: boolean("must_change_password").notNull().default(false),
+    sessionVersion: integer("session_version").notNull().default(1),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by"),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("users_username_unique").on(t.username),
+    uniqueIndex("users_employee_code_unique").on(t.employeeCode),
+    index("users_status_idx").on(t.accountStatus),
+  ],
+);
+
+export const userGroupPermissions = pgTable(
+  "user_group_permissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
+    permissionLevel: permissionLevelEnum("permission_level").notNull(),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    assignedBy: uuid("assigned_by").references(() => users.id, { onDelete: "set null" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedBy: uuid("revoked_by").references(() => users.id, { onDelete: "set null" }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("user_group_permission_unique").on(t.userId, t.groupId),
+    index("user_group_permission_lookup").on(t.userId, t.groupId, t.isActive),
+  ],
+);
+
+export const equipment = pgTable(
+  "equipment",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 60 }).notNull(),
+    name: varchar("name", { length: 180 }).notNull(),
+    equipmentType: varchar("equipment_type", { length: 120 }).notNull(),
+    model: varchar("model", { length: 180 }),
+    serial: varchar("serial", { length: 120 }),
+    brand: varchar("brand", { length: 120 }),
+    ownerGroupId: uuid("owner_group_id").notNull().references(() => groups.id),
+    currentGroupId: uuid("current_group_id").notNull().references(() => groups.id),
+    currentHolderId: uuid("current_holder_id").references(() => users.id, { onDelete: "set null" }),
+    currentLocation: varchar("current_location", { length: 180 }),
+    status: equipmentStatusEnum("status").notNull().default("in_use_owner"),
+    condition: conditionEnum("condition").notNull().default("unknown"),
+    purchaseDate: date("purchase_date"),
+    purchasePrice: numeric("purchase_price", { precision: 18, scale: 2 }),
+    notes: text("notes"),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("equipment_code_unique").on(t.code),
+    index("equipment_owner_status_idx").on(t.ownerGroupId, t.status),
+    index("equipment_current_group_idx").on(t.currentGroupId),
+  ],
+);
+
+export const toolCatalog = pgTable(
+  "tool_catalog",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    groupId: uuid("group_id").notNull().references(() => groups.id),
+    name: varchar("name", { length: 180 }).notNull(),
+    specification: varchar("specification", { length: 180 }),
+    unit: varchar("unit", { length: 30 }).notNull().default("cái"),
+    quantityOnHand: numeric("quantity_on_hand", { precision: 12, scale: 2 }).notNull().default("0"),
+    isActive: boolean("is_active").notNull().default(true),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("tool_catalog_group_idx").on(t.groupId, t.isActive)],
+);
+
+export const workflowCounters = pgTable("workflow_counters", {
+  key: varchar("key", { length: 30 }).primaryKey(),
+  value: integer("value").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const machineLoans = pgTable(
+  "machine_loans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 40 }).notNull(),
+    equipmentId: uuid("equipment_id").notNull().references(() => equipment.id),
+    ownerGroupId: uuid("owner_group_id").notNull().references(() => groups.id),
+    borrowerGroupId: uuid("borrower_group_id").notNull().references(() => groups.id),
+    requestedBy: uuid("requested_by").notNull().references(() => users.id),
+    purpose: text("purpose").notNull(),
+    workLocation: varchar("work_location", { length: 180 }),
+    receiverName: varchar("receiver_name", { length: 120 }),
+    expectedReturnDate: date("expected_return_date").notNull(),
+    status: machineLoanStatusEnum("status").notNull().default("pending_owner"),
+    approvedBy: uuid("approved_by").references(() => users.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    handedOverBy: uuid("handed_over_by").references(() => users.id),
+    handedOverAt: timestamp("handed_over_at", { withTimezone: true }),
+    receivedBy: uuid("received_by").references(() => users.id),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    returnRequestedBy: uuid("return_requested_by").references(() => users.id),
+    returnRequestedAt: timestamp("return_requested_at", { withTimezone: true }),
+    closedBy: uuid("closed_by").references(() => users.id),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    handoverCondition: text("handover_condition"),
+    returnCondition: text("return_condition"),
+    accessories: jsonb("accessories").$type<string[]>().notNull().default([]),
+    incidentNotes: text("incident_notes"),
+    rejectionReason: text("rejection_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("machine_loans_code_unique").on(t.code),
+    index("machine_loans_status_idx").on(t.status, t.ownerGroupId, t.borrowerGroupId),
+  ],
+);
+
+export const transfers = pgTable(
+  "transfers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 40 }).notNull(),
+    equipmentId: uuid("equipment_id").notNull().references(() => equipment.id),
+    sourceGroupId: uuid("source_group_id").notNull().references(() => groups.id),
+    targetGroupId: uuid("target_group_id").notNull().references(() => groups.id),
+    proposedByGroupId: uuid("proposed_by_group_id").notNull().references(() => groups.id),
+    proposedBy: uuid("proposed_by").notNull().references(() => users.id),
+    reason: text("reason").notNull(),
+    status: transferStatusEnum("status").notNull(),
+    counterpartAcceptedBy: uuid("counterpart_accepted_by").references(() => users.id),
+    counterpartAcceptedAt: timestamp("counterpart_accepted_at", { withTimezone: true }),
+    wsApprovedBy: uuid("ws_approved_by").references(() => users.id),
+    wsApprovedAt: timestamp("ws_approved_at", { withTimezone: true }),
+    handedOverBy: uuid("handed_over_by").references(() => users.id),
+    handedOverAt: timestamp("handed_over_at", { withTimezone: true }),
+    receivedBy: uuid("received_by").references(() => users.id),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    handoverCondition: text("handover_condition"),
+    accessories: jsonb("accessories").$type<string[]>().notNull().default([]),
+    rejectionReason: text("rejection_reason"),
+    linkedLoanId: uuid("linked_loan_id").references(() => machineLoans.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("transfers_code_unique").on(t.code), index("transfers_status_idx").on(t.status)],
+);
+
+export const quickLoans = pgTable(
+  "quick_loans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 40 }).notNull(),
+    toolId: uuid("tool_id").references(() => toolCatalog.id, { onDelete: "set null" }),
+    itemName: varchar("item_name", { length: 180 }).notNull(),
+    specification: varchar("specification", { length: 180 }),
+    unit: varchar("unit", { length: 30 }).notNull().default("cái"),
+    quantityBorrowed: numeric("quantity_borrowed", { precision: 12, scale: 2 }).notNull(),
+    returnedGood: numeric("returned_good", { precision: 12, scale: 2 }).notNull().default("0"),
+    returnedDamaged: numeric("returned_damaged", { precision: 12, scale: 2 }).notNull().default("0"),
+    lostQuantity: numeric("lost_quantity", { precision: 12, scale: 2 }).notNull().default("0"),
+    sourceGroupId: uuid("source_group_id").notNull().references(() => groups.id),
+    borrowerGroupId: uuid("borrower_group_id").notNull().references(() => groups.id),
+    lenderUserId: uuid("lender_user_id").notNull().references(() => users.id),
+    borrowerUserId: uuid("borrower_user_id").references(() => users.id),
+    expectedReturnAt: timestamp("expected_return_at", { withTimezone: true }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    returnReportedAt: timestamp("return_reported_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    status: quickLoanStatusEnum("status").notNull().default("pending_receipt"),
+    lenderNote: text("lender_note"),
+    borrowerNote: text("borrower_note"),
+    returnNote: text("return_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("quick_loans_code_unique").on(t.code), index("quick_loans_status_idx").on(t.status)],
+);
+
+export const repairs = pgTable(
+  "repairs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 40 }).notNull(),
+    equipmentId: uuid("equipment_id").notNull().references(() => equipment.id),
+    sourceLoanId: uuid("source_loan_id").references(() => machineLoans.id),
+    reportedByGroupId: uuid("reported_by_group_id").notNull().references(() => groups.id),
+    reportedBy: uuid("reported_by").notNull().references(() => users.id),
+    issueDescription: text("issue_description").notNull(),
+    status: repairStatusEnum("status").notNull().default("pending_acceptance"),
+    receivedBy: uuid("received_by").references(() => users.id),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    repairType: varchar("repair_type", { length: 30 }),
+    vendor: varchar("vendor", { length: 180 }),
+    workDescription: text("work_description"),
+    cost: numeric("cost", { precision: 18, scale: 2 }).notNull().default("0"),
+    completedBy: uuid("completed_by").references(() => users.id),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ownerConfirmedBy: uuid("owner_confirmed_by").references(() => users.id),
+    ownerConfirmedAt: timestamp("owner_confirmed_at", { withTimezone: true }),
+    resultNotes: text("result_notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("repairs_code_unique").on(t.code), index("repairs_status_idx").on(t.status)],
+);
+
+export const disposals = pgTable(
+  "disposals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 40 }).notNull(),
+    equipmentId: uuid("equipment_id").notNull().references(() => equipment.id),
+    ownerGroupId: uuid("owner_group_id").notNull().references(() => groups.id),
+    proposedBy: uuid("proposed_by").notNull().references(() => users.id),
+    reason: text("reason").notNull(),
+    conditionSummary: text("condition_summary").notNull(),
+    status: disposalStatusEnum("status").notNull().default("pending_group"),
+    groupConfirmedBy: uuid("group_confirmed_by").references(() => users.id),
+    groupConfirmedAt: timestamp("group_confirmed_at", { withTimezone: true }),
+    wsApprovedBy: uuid("ws_approved_by").references(() => users.id),
+    wsApprovedAt: timestamp("ws_approved_at", { withTimezone: true }),
+    warehouseReceivedBy: uuid("warehouse_received_by").references(() => users.id),
+    warehouseReceivedAt: timestamp("warehouse_received_at", { withTimezone: true }),
+    rejectionReason: text("rejection_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("disposals_code_unique").on(t.code), index("disposals_status_idx").on(t.status)],
+);
+
+export const activityLogs = pgTable(
+  "activity_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    actorGroupId: uuid("actor_group_id").references(() => groups.id, { onDelete: "set null" }),
+    action: varchar("action", { length: 80 }).notNull(),
+    entityType: varchar("entity_type", { length: 80 }).notNull(),
+    entityId: uuid("entity_id"),
+    description: text("description").notNull(),
+    beforeData: jsonb("before_data"),
+    afterData: jsonb("after_data"),
+    ipAddress: varchar("ip_address", { length: 80 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("activity_logs_created_idx").on(t.createdAt), index("activity_logs_entity_idx").on(t.entityType, t.entityId)],
+);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id").references(() => groups.id, { onDelete: "cascade" }),
+    type: notificationTypeEnum("type").notNull().default("info"),
+    title: varchar("title", { length: 180 }).notNull(),
+    message: text("message").notNull(),
+    href: text("href"),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("notifications_user_idx").on(t.userId, t.readAt), index("notifications_group_idx").on(t.groupId, t.readAt)],
+);
+
+export const authRateLimits = pgTable("auth_rate_limits", {
+  key: varchar("key", { length: 180 }).primaryKey(),
+  count: integer("count").notNull().default(1),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const importIssues = pgTable(
+  "import_issues",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    batchId: uuid("batch_id").notNull(),
+    sheetName: varchar("sheet_name", { length: 120 }).notNull(),
+    rowNumber: integer("row_number").notNull(),
+    severity: varchar("severity", { length: 20 }).notNull(),
+    issueCode: varchar("issue_code", { length: 80 }).notNull(),
+    message: text("message").notNull(),
+    rawData: jsonb("raw_data"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("import_issues_batch_idx").on(t.batchId, t.severity)],
+);
