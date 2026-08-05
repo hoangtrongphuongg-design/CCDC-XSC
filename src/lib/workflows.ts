@@ -6,13 +6,14 @@ export type DbTx = any; // Transaction object của Drizzle; giữ tương thíc
 export async function nextWorkflowCode(tx: DbTx, prefix: string) {
   const year = new Date().getFullYear();
   const key = `${prefix}-${year}`;
-  const result = await tx.execute<{ value: number }>(sql`
+  const result = (await tx.execute(sql`
     insert into workflow_counters (key, value, updated_at)
     values (${key}, 1, now())
     on conflict (key) do update set value = workflow_counters.value + 1, updated_at = now()
     returning value
-  `);
-  return `${prefix}-${year}-${String(result.rows[0]?.value ?? 1).padStart(4, "0")}`;
+  `)) as { rows: Array<{ value: number | string }> };
+  const value = Number(result.rows[0]?.value ?? 1);
+  return `${prefix}-${year}-${String(value).padStart(4, "0")}`;
 }
 
 export type LockedEquipment = {
@@ -25,10 +26,10 @@ export type LockedEquipment = {
 };
 
 export async function lockEquipment(tx: DbTx, equipmentId: string): Promise<LockedEquipment> {
-  const result = await tx.execute<LockedEquipment>(sql`
+  const result = (await tx.execute(sql`
     select id, code, owner_group_id, current_group_id, status, condition
     from equipment where id = ${equipmentId} for update
-  `);
+  `)) as { rows: LockedEquipment[] };
   const item = result.rows[0];
   if (!item) throw new Error("Không tìm thấy máy/CCDC.");
   return item;

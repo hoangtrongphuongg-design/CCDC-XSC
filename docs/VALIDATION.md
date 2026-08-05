@@ -42,3 +42,9 @@ Sau đó mới kết nối production trên Vercel.
 10. Thanh lý chỉ hoàn thành sau khi user có quyền `KHO_TL` xác nhận nhận kho.
 11. Máy trong Kho thanh lý không mở được phiếu mượn, điều chuyển hoặc sửa chữa.
 12. Kiểm tra responsive ở 390px, 768px, 1024px, 1280px và 1366px; không có cuộn ngang toàn trang.
+
+
+## Bản vá V1.0.2
+- Sửa ánh xạ `AuthContext.userId`.
+- Bổ sung khai báo TypeScript cục bộ cho `bcryptjs`.
+- Sửa `tx.execute<T>()` trên transaction không định kiểu trong `workflows.ts` bằng cast kết quả rõ ràng.
