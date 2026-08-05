@@ -13,7 +13,7 @@ export type GroupPermission = {
   groupId: string;
   groupCode: string;
   groupName: string;
-  level: "operator" | "manager";
+  level: "viewer" | "operator" | "manager";
   isPrimary: boolean;
 };
 

@@ -1,70 +1,114 @@
 # QUẢN LÝ CCDC - XSC
 
-**Phiên bản:** 1.1.0
+**Phiên bản:** 1.3.1  
+**Kiến trúc:** GitHub → Vercel → Neon PostgreSQL
 
-## Giao diện V1.2
+## 1. Nội dung chính của V1.3.1
 
-Bản V1.2 nâng cấp toàn bộ trải nghiệm desktop/mobile theo phong cách dashboard quản trị chuyên nghiệp, giữ nguyên database và quy trình nghiệp vụ. Chi tiết tại `docs/UI_V1.2.md`.
+- Đồng bộ 13 nhóm nghiệp vụ chính thức và 1 nhóm hệ thống `KHO_TL`.
+- Danh sách nhóm được dùng thống nhất tại đăng ký, phân quyền, danh mục dụng cụ, mượn, điều chuyển, sửa chữa, thanh lý và báo cáo.
+- Trang **Dụng cụ toàn xưởng** chỉ dùng để tra cứu.
+- Việc thêm và cập nhật được chuyển về **Dụng cụ nhóm tôi** bằng một cửa sổ nhập liệu thống nhất.
+- Hệ thống tự sinh mã theo nhóm:
+  - Máy/CCDC quản lý từng thiết bị: `COI-0001`, `WS-0001`, `CBL-0001`.
+  - Dụng cụ quản lý theo số lượng: `COI-VT-0001`, `WS-VT-0001`.
+- Mã đã cấp không đổi trong suốt vòng đời và không tái sử dụng.
+- Phân loại thiết bị ở mức vừa đủ: 6 nhóm cơ khí, 2 nhóm điện và 1 nhóm khác.
+- Bổ sung quyền `viewer`, hiển thị là **Nhân viên — Xem & mượn**.
+- Mọi nhân viên thuộc nhóm được lập thủ tục **Mượn máy** và **Mượn nhanh**.
+- Operator/Manager của nhóm cho duyệt phiếu.
+- Nhân viên thuộc nhóm cho được xác nhận đã nhận lại máy/dụng cụ.
+- Người tạo phiếu không được tự duyệt chính phiếu đó.
 
+## 2. Cơ cấu nhóm chính thức
 
-Bản code đầu tiên cho hệ thống quản lý máy móc, công cụ dụng cụ của Xưởng Sửa chữa.
+### Bảo trì cơ
 
-## 1. Kiến trúc
+1. Bảo trì cơ - Nhóm Cối
+2. Bảo trì cơ - Nhóm CBL
+3. Bảo trì cơ - Nghiền BS-NT
+4. Bảo trì cơ - Nhóm Lò
+5. Bảo trì cơ - Nhóm NXM
+6. Bảo trì cơ - Nhóm Workshop
+7. Bảo trì cơ - Nhóm Bôi trơn
+8. Bảo trì cơ - Nhóm Băng tải
 
-- **GitHub:** lưu mã nguồn.
-- **Vercel:** build và chạy ứng dụng Next.js.
-- **Neon:** cơ sở dữ liệu PostgreSQL.
-- **Next.js App Router + TypeScript strict:** giao diện và backend trong cùng một dự án.
-- **Drizzle ORM:** schema và truy vấn database.
-- **Cookie JWT HttpOnly:** phiên đăng nhập.
+### Bảo trì điện
 
-## 2. Nghiệp vụ đã có trong V1
+9. Bảo trì điện - Nhóm điện Mỏ
+10. Bảo trì điện - Nhóm điện CBL - NT
+11. Bảo trì điện - Nhóm Nghiền BS - Lò nung
+12. Bảo trì điện - Nhóm Nghiền XM - Trạm điện - Phụ trợ
 
-- Đăng ký, đăng nhập, tài khoản chờ admin duyệt.
-- Admin gán nhóm và quyền `operator`/`manager`.
-- Một user có thể có quyền tại nhiều nhóm.
-- Tất cả user active xem được CCDC toàn xưởng.
-- Chỉ thao tác tại nhóm được phân quyền.
-- Máy có một mã duy nhất suốt vòng đời.
-- Dụng cụ toàn xưởng và Dụng cụ nhóm tôi.
-- Mượn máy có mã.
-- Điều chuyển cố định, giữ nguyên mã máy.
-- Cho mượn nhanh vật dụng nhỏ/không mã.
-- Sửa chữa.
-- Thanh lý và xác nhận nhập Kho thanh lý.
-- Báo cáo tổng hợp.
-- Lịch sử hoạt động.
+### Khác
 
-## 3. Các quy tắc bảo vệ đã đưa vào code
+13. Nhóm khác (Đơn vị khác; nhà thầu,...)
 
-- Quyền ghi được đọc lại trực tiếp từ Neon, không chỉ tin thông tin cũ trong cookie.
-- `session_version` làm mất hiệu lực phiên cũ khi khóa tài khoản/reset mật khẩu/thu hồi quyền.
-- Mật khẩu bcrypt cost 12.
-- Rate-limit đăng nhập theo username.
-- Dùng dummy bcrypt hash để giảm khả năng dò username qua thời gian phản hồi.
-- Một máy chỉ có một workflow mở của cùng loại; server action khóa dòng máy và kiểm tra workflow khác trong transaction.
-- Người tạo không tự duyệt giao dịch ở bước phê duyệt đối ứng.
-- Không xóa lịch sử nghiệp vụ; dùng trạng thái hoàn tất/hủy/khóa.
-- Mã máy không đổi khi mượn, điều chuyển, sửa chữa hoặc thanh lý.
+### Nhóm hệ thống
 
-## 4. Cài đặt local
+- `KHO_TL` — Kho thanh lý
+
+## 3. Quyền người dùng
+
+| Mức quyền | Phạm vi chính |
+|---|---|
+| Nhân viên — Xem & mượn | Xem dữ liệu; tạo đề nghị mượn máy/mượn nhanh; xác nhận nhận, báo trả; xác nhận nhận lại nếu thuộc nhóm cho |
+| Operator — Thao tác nhóm | Có quyền Nhân viên; thêm/cập nhật dụng cụ; duyệt và giao máy/dụng cụ của nhóm |
+| Manager — Quản lý nhóm | Kế thừa Operator; hoàn thành hồ sơ nháp và xử lý các bước quản lý nhóm |
+| WS Manager | Duyệt nghiệp vụ cấp Xưởng, sửa chữa và thanh lý theo luồng |
+| Admin | Quản lý tài khoản, nhóm và cấu hình; không tự động có quyền duyệt nghiệp vụ nếu chưa được gán quyền nhóm |
+
+## 4. Luồng Mượn máy
+
+```text
+Nhân viên nhóm mượn tạo đề nghị
+→ Operator/Manager nhóm cho duyệt
+→ Operator/Manager nhóm cho xác nhận đã giao
+→ Nhân viên nhóm mượn xác nhận đã nhận
+→ Nhân viên nhóm mượn báo trả
+→ Nhân viên bất kỳ thuộc nhóm cho xác nhận nhận lại và tình trạng
+→ Hoàn thành
+```
+
+## 5. Luồng Mượn nhanh
+
+```text
+Nhân viên nhóm mượn tạo đề nghị
+→ Operator/Manager nhóm cho duyệt
+→ Hệ thống trừ số lượng khỏi danh mục nhóm cho
+→ Nhân viên nhóm mượn xác nhận đã nhận
+→ Nhân viên nhóm mượn báo trả
+→ Nhân viên thuộc nhóm cho xác nhận trả tốt / trả hư / mất
+→ Hoàn thành
+```
+
+## 6. Cài đặt local
 
 Yêu cầu Node.js 20 trở lên.
 
 ```bash
 npm install
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-Điền `DATABASE_URL`, `AUTH_SECRET` và thông tin admin vào `.env.local`.
+Điền các biến trong `.env`:
 
-Chạy migration (script sẽ thực thi trực tiếp `drizzle/0000_initial.sql` trên Neon):
+```env
+DATABASE_URL="postgresql://...neon.tech/...?sslmode=require"
+AUTH_SECRET="chuỗi bí mật dài"
+ADMIN_USERNAME="admin"
+ADMIN_PASSWORD="mật khẩu tối thiểu 8 ký tự"
+ADMIN_EMPLOYEE_CODE="ADMIN001"
+ADMIN_FULL_NAME="Phương - Quản trị XSC"
+```
+
+Chạy migration:
 
 ```bash
 npm run db:migrate
 ```
 
-Hoặc mở Neon SQL Editor và chạy trực tiếp file `drizzle/0000_initial.sql`. Sau đó tạo admin:
+Tạo admin lần đầu:
 
 ```bash
 npm run db:seed
@@ -78,167 +122,85 @@ npm run dev
 
 Mở `http://localhost:3000`.
 
-## 5. Import file Excel hiện tại
+## 7. Nâng cấp từ bản đang dùng
 
-Chạy thử không ghi database:
+Bản V1.3.1 có thay đổi database. Sau khi cập nhật code, phải chạy migration trước khi trải nghiệm tính năng mới.
 
-```bash
-npm run import:excel -- "/duong-dan/THEO DOI CAP PHAT - SUA CHUA CCDC(1).xlsx" --dry-run
-```
-
-Nhập chính thức:
+### Cách 1 — Chạy bằng Terminal
 
 ```bash
-npm run import:excel -- "/duong-dan/THEO DOI CAP PHAT - SUA CHUA CCDC(1).xlsx"
+npm install
+npm run db:migrate
 ```
 
-Script V1 tự động nhập sheet `DANH_MUC_MAY`, chuẩn hóa theo 13 nhóm chính thức:
+Script sẽ chạy lần lượt:
 
-- 8 nhóm Bảo trì cơ: Cối, CBL, Nghiền BS-NT, Lò, NXM, Workshop, Bôi trơn, Băng tải.
-- 4 nhóm Bảo trì điện: Điện Mỏ, Điện CBL-NT, Nghiền BS-Lò nung, Nghiền XM-Trạm điện-Phụ trợ.
-- 1 Nhóm khác dành cho đơn vị khác, nhà thầu và trường hợp tương đương.
+```text
+drizzle/0000_initial.sql
+drizzle/0001_groups_assets_viewer.sql
+drizzle/0002_employee_loan_permissions.sql
+drizzle/0003_quick_loan_default.sql
+```
 
-Các dòng không xác định được được ghi vào `import_issues`. Script chưa tự động nhập toàn bộ nhật ký cấp phát và sửa chữa cũ vì file nguồn có các trường hợp trạng thái/lịch sử không đồng nhất; cần đối chiếu trước khi nhập.
+### Cách 2 — Chạy trực tiếp trên Neon
 
-## 6. Kết nối GitHub — Vercel — Neon
+Mở Neon → SQL Editor và chạy lần lượt các file chưa chạy:
 
-### GitHub
+```text
+drizzle/0001_groups_assets_viewer.sql
+drizzle/0002_employee_loan_permissions.sql
+drizzle/0003_quick_loan_default.sql
+```
 
-1. Tạo repo trống hoặc dùng repo đã tạo.
-2. Giải nén bộ code vào thư mục repo.
-3. Chạy:
+Sau đó vào web:
+
+```text
+Quản trị → Cơ cấu nhóm Xưởng → Đồng bộ 13 nhóm chính thức
+```
+
+Không xóa database cũ và không chạy lại seed nếu tài khoản admin đã tồn tại.
+
+## 8. Triển khai GitHub và Vercel
+
+1. Giải nén bộ code.
+2. Chép toàn bộ nội dung vào repo GitHub hiện tại.
+3. Không đưa `.env` lên GitHub.
+4. Commit và push:
 
 ```bash
 git add .
-git commit -m "Initial CCDC XSC V1"
+git commit -m "Upgrade CCDC XSC to V1.3.1"
 git push origin main
 ```
 
-### Vercel
-
-1. Mở project Vercel đã tạo.
-2. Chọn **Settings → Git → Connect Git Repository**.
-3. Chọn đúng repo GitHub.
-4. Framework preset: **Next.js**.
-5. Thêm Environment Variables:
+5. Trên Vercel, kiểm tra:
    - `DATABASE_URL`
    - `AUTH_SECRET`
-   - `ADMIN_USERNAME`
-   - `ADMIN_PASSWORD`
-   - `ADMIN_EMPLOYEE_CODE`
-   - `ADMIN_FULL_NAME`
-6. Deploy.
+6. Redeploy sau khi migration Neon đã hoàn tất.
 
-### Neon
-
-1. Lấy **pooled connection string**.
-2. Bảo đảm chuỗi có `sslmode=require`.
-3. Chạy `drizzle/0000_initial.sql` trong Neon SQL Editor.
-4. Chạy seed admin từ máy local với cùng `DATABASE_URL`.
-
-## 7. Vai trò và quyền
-
-### User active không có quyền nhóm
-
-- Xem toàn bộ CCDC.
-- Không thao tác nghiệp vụ.
-
-### Operator nhóm
-
-- Tạo yêu cầu mượn.
-- Xác nhận nhận máy.
-- Báo trả.
-- Tạo mượn nhanh.
-- Báo hư.
-- Tạo đề xuất điều chuyển/thanh lý.
-
-### Manager nhóm
-
-- Có toàn bộ quyền operator.
-- Duyệt máy thuộc nhóm.
-- Xác nhận bàn giao/nhận lại.
-- Đồng ý điều chuyển.
-- Xác nhận đề xuất thanh lý của nhóm.
-
-### WS Manager
-
-- Duyệt điều chuyển cuối.
-- Quản lý sửa chữa toàn xưởng.
-- Duyệt thanh lý.
-
-### Admin
-
-- Duyệt user.
-- Gán/thu hồi quyền nhóm.
-- Khóa/mở tài khoản.
-- Không mặc định duyệt thay nghiệp vụ.
-
-## 8. Kho thanh lý
-
-Migration tạo nhóm hệ thống `KHO_TL`.
-
-Luồng:
-
-```text
-Nhóm tạo đề xuất
-→ Manager nhóm xác nhận
-→ WS Manager duyệt
-→ User có quyền tại KHO_TL xác nhận nhập kho
-→ Máy chuyển sang disposal_warehouse
-```
-
-Sau khi nhập kho, máy không thể mượn, điều chuyển, sửa chữa hoặc cấp phát lại.
-
-## 9. Chưa đưa vào V1
-
-- Upload và lưu ảnh thực tế.
-- Email/Zalo notification.
-- Kiểm kê.
-- SSO giữa các dự án.
-- Import tự động toàn bộ lịch sử cấp phát/sửa chữa cũ.
-- Biên bản PDF có chữ ký số.
-
-Schema đã chuẩn bị `notifications` và các trường phụ kiện/ghi chú để mở rộng sau.
-
-## 10. Kiểm tra trước khi production
+## 9. Kiểm tra trước khi dùng thử
 
 ```bash
 npm run typecheck
-npm run test
+npm test
 npm run build
 ```
 
 Kiểm tra thủ công:
 
-1. Đăng ký → pending.
-2. Admin duyệt và gán nhóm.
-3. User đăng nhập, chỉ thao tác tại nhóm được gán.
-4. Mượn máy đủ các bước giao–nhận–trả.
-5. Điều chuyển đủ xác nhận hai nhóm + WS.
-6. Mượn nhanh xử lý trả tốt/hư/mất.
-7. Sửa chữa và trường hợp không thể phục hồi.
-8. Thanh lý và nhập Kho thanh lý.
-9. Khóa user đang đăng nhập → thao tác tiếp theo bị từ chối.
-10. Không xuất hiện cuộn ngang toàn trang trên mobile và desktop hẹp.
+1. Admin đồng bộ 13 nhóm chính thức.
+2. Gán một user mức Nhân viên, một user mức Operator.
+3. Nhân viên tạo phiếu Mượn máy.
+4. Operator nhóm cho duyệt và giao.
+5. Nhân viên nhóm mượn nhận và báo trả.
+6. Một Nhân viên của nhóm cho xác nhận nhận lại.
+7. Lặp lại với Mượn nhanh.
+8. Kiểm tra mã tự sinh tại Dụng cụ nhóm tôi.
+9. Kiểm tra Dụng cụ toàn xưởng không còn nút thêm.
+10. Kiểm tra lịch sử hoạt động ghi đúng người, nhóm và thời gian.
 
-## 11. Ghi chú V1
+## 10. Lưu ý
 
-Đây là bản đầu tiên có schema và luồng nghiệp vụ đầy đủ để chạy thử nội bộ. Trước khi dùng production, nên kiểm thử bằng dữ liệu thật của từng nhóm và chốt danh sách user quản lý nhóm/WS Manager/Kho thanh lý.
-
-## 12. Tài liệu kèm theo
-
-- `docs/PROJECT_BRIEF.md`: bản ghi nhớ nghiệp vụ và giao diện.
-- `docs/VALIDATION.md`: phạm vi kiểm tra đã thực hiện và các kiểm tra bắt buộc sau khi cài dependency.
-- `docs/DEPLOY_CHECKLIST.md`: checklist kết nối GitHub — Neon — Vercel.
-
-## Quản trị cơ cấu nhóm V1.2.1
-
-Trang `/groups` dành cho admin để:
-
-- Đồng bộ 13 nhóm nghiệp vụ chính thức: 8 nhóm Bảo trì cơ, 4 nhóm Bảo trì điện và 1 Nhóm khác.
-- Quản lý riêng nhóm hệ thống `KHO_TL` – Kho thanh lý.
-- Thêm nhóm nghiệp vụ mới, đổi tên và kích hoạt/ngừng sử dụng.
-- Theo dõi số máy/CCDC và số người dùng đang gán theo nhóm.
-- Ngăn vô hiệu hóa nhóm còn dữ liệu đang sử dụng.
-
-Không có thay đổi schema database trong V1.2.1; chỉ cần cập nhật code, redeploy và nhấn “Đồng bộ 13 nhóm chính thức” tại trang Cơ cấu nhóm Xưởng.
+- Bản này chưa tích hợp upload ảnh thật lên dịch vụ lưu trữ.
+- Không tự động migrate database khi Vercel build; migration phải chạy riêng trên Neon hoặc máy local.
+- Trước khi đưa vào vận hành chính thức, nên thử với 3–5 tài khoản và 20–30 dụng cụ thật.

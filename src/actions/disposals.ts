@@ -20,6 +20,7 @@ export async function createDisposalAction(formData: FormData) {
   const conditionSummary = String(formData.get("conditionSummary") || "").trim();
   const [item] = await db.select().from(equipment).where(eq(equipment.id, equipmentId)).limit(1);
   if (!item) throw new Error("Không tìm thấy máy.");
+  if (item.recordStatus !== "active") throw new Error("Dụng cụ chưa hoàn thành hồ sơ nên chưa thể thanh lý.");
   const auth = await requireGroupPermission(item.ownerGroupId, "operator");
   if (!reason || !conditionSummary) throw new Error("Vui lòng ghi rõ lý do và tình trạng.");
   if (item.condition !== "irreparable" && item.status !== "wait_disposal") throw new Error("Máy chưa có kết luận không thể phục hồi/chờ thanh lý.");

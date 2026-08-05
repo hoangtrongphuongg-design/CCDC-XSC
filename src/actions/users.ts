@@ -7,16 +7,19 @@ import { groups, userGroupPermissions, users } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hashPassword } from "@/lib/auth/password";
 import { writeAudit } from "@/lib/audit";
+import { isOfficialOperationalGroupCode, STANDARD_GROUPS } from "@/lib/group-structure";
 
 export async function approveUserAction(formData: FormData) {
   const auth = await requireAdmin();
   const userId = String(formData.get("userId") || "");
   const groupId = String(formData.get("groupId") || "");
-  const permissionLevel = String(formData.get("permissionLevel") || "operator") as "operator" | "manager";
+  const permissionLevelRaw = String(formData.get("permissionLevel") || "viewer");
+  if (!["viewer", "operator", "manager"].includes(permissionLevelRaw)) throw new Error("Mức quyền không hợp lệ.");
+  const permissionLevel = permissionLevelRaw as "viewer" | "operator" | "manager";
   const isWsManager = formData.get("isWsManager") === "on";
   if (!userId || !groupId) throw new Error("Thiếu user hoặc nhóm.");
   const [primaryGroup] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
-  if (!primaryGroup || primaryGroup.isSystem || !primaryGroup.isActive) throw new Error("Nhóm chính không hợp lệ.");
+  if (!primaryGroup || primaryGroup.isSystem || !primaryGroup.isActive || !isOfficialOperationalGroupCode(primaryGroup.code)) throw new Error("Nhóm chính không hợp lệ.");
 
   await db.transaction(async (tx) => {
     const [target] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -78,8 +81,15 @@ export async function assignGroupPermissionAction(formData: FormData) {
   const auth = await requireAdmin();
   const userId = String(formData.get("userId") || "");
   const groupId = String(formData.get("groupId") || "");
-  const level = String(formData.get("permissionLevel") || "operator") as "operator" | "manager";
+  const levelRaw = String(formData.get("permissionLevel") || "viewer");
+  if (!["viewer", "operator", "manager"].includes(levelRaw)) throw new Error("Mức quyền không hợp lệ.");
+  const level = levelRaw as "viewer" | "operator" | "manager";
   if (!userId || !groupId) throw new Error("Thiếu user hoặc nhóm.");
+  const [assignedGroup] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
+  const officialCodes = new Set(STANDARD_GROUPS.map((group) => group.code));
+  if (!assignedGroup || !assignedGroup.isActive || !officialCodes.has(assignedGroup.code as (typeof STANDARD_GROUPS)[number]["code"])) {
+    throw new Error("Nhóm phân quyền không thuộc cơ cấu chính thức.");
+  }
 
   await db.transaction(async (tx) => {
     await tx.insert(userGroupPermissions).values({ userId, groupId, permissionLevel: level, assignedBy: auth.userId })

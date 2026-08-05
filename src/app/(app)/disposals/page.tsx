@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { CheckCircle2, Clock3, PackageCheck, Plus, Recycle } from "lucide-react";
 import { db } from "@/lib/db";
 import { disposals, equipment, groups } from "@/lib/db/schema";
@@ -18,7 +18,7 @@ export default async function DisposalsPage() {
   const auth = await requireUser();
   const [groupRows, equipmentRows, rows] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
-    db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId }).from(equipment).where(eq(equipment.status, "wait_disposal")).orderBy(asc(equipment.code)),
+    db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId }).from(equipment).where(and(eq(equipment.status, "wait_disposal"), eq(equipment.recordStatus, "active"))).orderBy(asc(equipment.code)),
     db.select().from(disposals).orderBy(desc(disposals.createdAt)).limit(100),
   ]);
   const groupMap = new Map(groupRows.map((g) => [g.id, g.name]));
@@ -28,6 +28,7 @@ export default async function DisposalsPage() {
   const pendingWs = rows.filter((row) => row.status === "pending_ws").length;
   const waitingWarehouse = rows.filter((row) => row.status === "wait_warehouse").length;
   const completed = rows.filter((row) => row.status === "completed").length;
+  const disposableEquipment = equipmentRows.filter((item) => hasGroupPermission(auth, item.ownerGroupId, "operator"));
 
   return (
     <>
@@ -55,12 +56,12 @@ export default async function DisposalsPage() {
         <Card className="side-panel">
           <CardHeader><CardTitle>Đề xuất thanh lý</CardTitle><Plus size={18} /></CardHeader>
           <CardContent>
-            {equipmentRows.length ? <form action={createDisposalAction} className="form-grid">
-              <FormField label="Máy không thể phục hồi" required><select name="equipmentId">{equipmentRows.filter((e) => hasGroupPermission(auth, e.ownerGroupId, "operator")).map((e) => <option key={e.id} value={e.id}>{e.code} — {e.name}</option>)}</select></FormField>
+            {disposableEquipment.length ? <form action={createDisposalAction} className="form-grid">
+              <FormField label="Máy không thể phục hồi" required><select name="equipmentId">{disposableEquipment.map((e) => <option key={e.id} value={e.id}>{e.code} — {e.name}</option>)}</select></FormField>
               <FormField label="Tình trạng hư hỏng" required><textarea name="conditionSummary" placeholder="Mô tả tình trạng và kết luận kỹ thuật" /></FormField>
               <FormField label="Lý do đề xuất thanh lý" required><textarea name="reason" /></FormField>
               <Button type="submit">Tạo đề xuất</Button>
-            </form> : <EmptyState title="Chưa có máy chờ thanh lý" description="Máy phải có kết luận không thể phục hồi trước khi tạo phiếu." />}
+            </form> : <EmptyState title="Không có máy được phép đề xuất" description="Máy phải chờ thanh lý và tài khoản cần quyền Thao tác trong nhóm quản lý." />}
           </CardContent>
         </Card>
       </div>

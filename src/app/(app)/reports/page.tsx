@@ -1,4 +1,4 @@
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { BarChart3, Boxes, Handshake, Recycle, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, machineLoans, repairs, disposals } from "@/lib/db/schema";
@@ -12,9 +12,9 @@ import { EQUIPMENT_STATUS_LABELS } from "@/lib/constants";
 
 export default async function ReportsPage() {
   const [statusRows, groupRows, [loanTotal], [repairTotal], [disposalTotal]] = await Promise.all([
-    db.select({ status: equipment.status, total: count() }).from(equipment).groupBy(equipment.status).orderBy(equipment.status),
+    db.select({ status: equipment.status, total: count() }).from(equipment).where(eq(equipment.recordStatus, "active")).groupBy(equipment.status).orderBy(equipment.status),
     db.select({ groupId: groups.id, groupName: groups.name, total: count(equipment.id) })
-      .from(groups).leftJoin(equipment, eq(groups.id, equipment.ownerGroupId)).groupBy(groups.id, groups.name).orderBy(groups.name),
+      .from(groups).leftJoin(equipment, and(eq(groups.id, equipment.ownerGroupId), eq(equipment.recordStatus, "active"))).groupBy(groups.id, groups.name).orderBy(groups.name),
     db.select({ value: count() }).from(machineLoans),
     db.select({ value: count() }).from(repairs),
     db.select({ value: count() }).from(disposals),

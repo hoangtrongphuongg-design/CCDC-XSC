@@ -6,13 +6,14 @@ import { db } from "@/lib/db";
 import { equipment, groups, userGroupPermissions, users } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
-import { LEGACY_GROUP_CODES, normalizeGroupCode, STANDARD_GROUPS } from "@/lib/group-structure";
+import { LEGACY_GROUP_CODES, normalizeEquipmentPrefix, normalizeGroupCode, STANDARD_GROUPS } from "@/lib/group-structure";
 
 function refreshGroupConsumers() {
   revalidatePath("/groups");
   revalidatePath("/users");
   revalidatePath("/register");
   revalidatePath("/equipment");
+  revalidatePath("/my-equipment");
   revalidatePath("/machine-loans");
   revalidatePath("/quick-loans");
   revalidatePath("/transfers");
@@ -28,11 +29,12 @@ export async function syncStandardGroupsAction() {
     for (const group of STANDARD_GROUPS) {
       await tx
         .insert(groups)
-        .values({ code: group.code, name: group.name, isSystem: group.isSystem })
+        .values({ code: group.code, name: group.name, equipmentPrefix: group.equipmentPrefix, isSystem: group.isSystem })
         .onConflictDoUpdate({
           target: groups.code,
           set: {
             name: group.name,
+            equipmentPrefix: group.equipmentPrefix,
             isSystem: group.isSystem,
             isActive: true,
             updatedAt: new Date(),
@@ -82,9 +84,11 @@ export async function createGroupAction(formData: FormData) {
   const auth = await requireAdmin();
   const code = normalizeGroupCode(String(formData.get("code") || ""));
   const name = String(formData.get("name") || "").trim();
+  const equipmentPrefix = normalizeEquipmentPrefix(String(formData.get("equipmentPrefix") || code));
 
   if (code.length < 2) throw new Error("Mã nhóm phải có ít nhất 2 ký tự.");
   if (name.length < 2 || name.length > 120) throw new Error("Tên nhóm phải dài 2–120 ký tự.");
+  if (equipmentPrefix.length < 2) throw new Error("Tiền tố mã dụng cụ phải có ít nhất 2 ký tự.");
 
   const [existing] = await db.select().from(groups).where(eq(groups.code, code)).limit(1);
   if (existing) throw new Error(`Mã nhóm ${code} đã tồn tại.`);
@@ -92,7 +96,7 @@ export async function createGroupAction(formData: FormData) {
   await db.transaction(async (tx) => {
     const [created] = await tx
       .insert(groups)
-      .values({ code, name, isSystem: false, isActive: true })
+      .values({ code, name, equipmentPrefix, isSystem: false, isActive: true })
       .returning();
 
     await writeAudit(tx as never, {
@@ -112,6 +116,8 @@ export async function updateGroupNameAction(formData: FormData) {
   const auth = await requireAdmin();
   const groupId = String(formData.get("groupId") || "");
   const name = String(formData.get("name") || "").trim();
+  const equipmentPrefixRaw = String(formData.get("equipmentPrefix") || "");
+  const equipmentPrefix = equipmentPrefixRaw ? normalizeEquipmentPrefix(equipmentPrefixRaw) : "";
 
   if (!groupId) throw new Error("Thiếu nhóm cần cập nhật.");
   if (name.length < 2 || name.length > 120) throw new Error("Tên nhóm phải dài 2–120 ký tự.");
@@ -121,15 +127,17 @@ export async function updateGroupNameAction(formData: FormData) {
     if (!before) throw new Error("Không tìm thấy nhóm.");
     if (before.isSystem) throw new Error("Nhóm hệ thống không được đổi tên tại màn hình này.");
 
-    await tx.update(groups).set({ name, updatedAt: new Date() }).where(eq(groups.id, groupId));
+    const nextPrefix = equipmentPrefix || before.equipmentPrefix;
+    if (nextPrefix.length < 2) throw new Error("Tiền tố mã dụng cụ phải có ít nhất 2 ký tự.");
+    await tx.update(groups).set({ name, equipmentPrefix: nextPrefix, updatedAt: new Date() }).where(eq(groups.id, groupId));
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
       action: "group.rename",
       entityType: "group",
       entityId: groupId,
       description: `Đổi tên nhóm ${before.code}`,
-      beforeData: { name: before.name },
-      afterData: { name },
+      beforeData: { name: before.name, equipmentPrefix: before.equipmentPrefix },
+      afterData: { name, equipmentPrefix: equipmentPrefix || before.equipmentPrefix },
     });
   });
 

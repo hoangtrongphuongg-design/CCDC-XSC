@@ -74,13 +74,14 @@ export default async function GroupsPage() {
           </CardHeader>
           <CardContent>
             <DataTable
-              headers={["Nhóm", "Mã cố định", "Khối", "Máy/CCDC", "Nhân sự", "Trạng thái", "Cập nhật"]}
+              headers={["Nhóm", "Mã nhóm", "Tiền tố mã dụng cụ", "Khối", "Máy/CCDC", "Nhân sự", "Trạng thái", "Cập nhật"]}
               rows={rows.map((group) => [
                 <div key="name" className="group-name-cell">
                   <span className={`group-avatar ${group.isSystem ? "is-system" : ""}`}>{group.code.slice(0, 2)}</span>
                   <div><strong>{group.name}</strong><small>{getGroupCategoryLabel(group.code, group.isSystem)}</small></div>
                 </div>,
                 <code key="code" className="group-code">{group.code}</code>,
+                <code key="prefix" className="group-code">{group.equipmentPrefix}</code>,
                 <StatusBadge key="type" label={getGroupCategoryLabel(group.code, group.isSystem)} tone={group.isSystem ? "warning" : "info"} />,
                 <span key="equipment" className="numeric"><strong>{equipmentMap.get(group.id) || 0}</strong></span>,
                 <span key="users" className="numeric">{userMap.get(group.id) || 0}</span>,
@@ -92,6 +93,7 @@ export default async function GroupsPage() {
                     <form action={updateGroupNameAction} className="group-inline-form">
                       <input type="hidden" name="groupId" value={group.id} />
                       <input name="name" defaultValue={group.name} aria-label={`Tên nhóm ${group.code}`} maxLength={120} />
+                      <input name="equipmentPrefix" defaultValue={group.equipmentPrefix} aria-label={`Tiền tố mã ${group.code}`} maxLength={16} className="field-inline-sm" />
                       <Button type="submit" size="sm" variant="secondary">Lưu tên</Button>
                     </form>
                     <form action={setGroupStatusAction}>
@@ -119,6 +121,9 @@ export default async function GroupsPage() {
                 <FormField label="Tên hiển thị" required>
                   <input name="name" placeholder="Tên nhóm quản lý" minLength={2} maxLength={120} required />
                 </FormField>
+                <FormField label="Tiền tố mã dụng cụ" required hint="Không dấu, không khoảng trắng. Ví dụ: WS, COI, DCBLNT">
+                  <input name="equipmentPrefix" placeholder="TIỀN_TỐ" minLength={2} maxLength={16} required />
+                </FormField>
                 <Button type="submit">Tạo nhóm</Button>
               </form>
             </CardContent>
@@ -131,7 +136,7 @@ export default async function GroupsPage() {
                 {STANDARD_GROUPS.map((group) => (
                   <div className="standard-group-item" key={group.code}>
                     <span className={`group-avatar ${group.isSystem ? "is-system" : ""}`}>{group.code.slice(0, 2)}</span>
-                    <div><strong>{group.name}</strong><small>{group.code}{group.isSystem ? " · nhóm hệ thống" : ""}</small></div>
+                    <div><strong>{group.name}</strong><small>{group.code} · mã dụng cụ {group.equipmentPrefix}-XXXX{group.isSystem ? " · nhóm hệ thống" : ""}</small></div>
                     <StatusBadge label={rows.some((row) => row.code === group.code && row.isActive) ? "Đã có" : "Thiếu"} tone={rows.some((row) => row.code === group.code && row.isActive) ? "success" : "danger"} />
                   </div>
                 ))}

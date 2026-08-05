@@ -15,7 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const accountStatusEnum = pgEnum("account_status", ["pending", "active", "rejected", "blocked"]);
-export const permissionLevelEnum = pgEnum("permission_level", ["operator", "manager"]);
+export const permissionLevelEnum = pgEnum("permission_level", ["viewer", "operator", "manager"]);
 export const equipmentStatusEnum = pgEnum("equipment_status", [
   "in_use_owner",
   "wait_handover",
@@ -58,10 +58,12 @@ export const transferStatusEnum = pgEnum("transfer_status", [
   "cancelled",
 ]);
 export const quickLoanStatusEnum = pgEnum("quick_loan_status", [
+  "pending_approval",
   "pending_receipt",
   "borrowed",
   "return_reported",
   "completed",
+  "rejected",
   "cancelled",
 ]);
 export const repairStatusEnum = pgEnum("repair_status", [
@@ -81,6 +83,7 @@ export const disposalStatusEnum = pgEnum("disposal_status", [
   "cancelled",
 ]);
 export const notificationTypeEnum = pgEnum("notification_type", ["info", "success", "warning", "danger"]);
+export const equipmentRecordStatusEnum = pgEnum("equipment_record_status", ["draft", "active"]);
 
 export const groups = pgTable(
   "groups",
@@ -88,6 +91,7 @@ export const groups = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     code: varchar("code", { length: 30 }).notNull(),
     name: varchar("name", { length: 120 }).notNull(),
+    equipmentPrefix: varchar("equipment_prefix", { length: 16 }).notNull(),
     isSystem: boolean("is_system").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -151,6 +155,10 @@ export const equipment = pgTable(
     code: varchar("code", { length: 60 }).notNull(),
     name: varchar("name", { length: 180 }).notNull(),
     equipmentType: varchar("equipment_type", { length: 120 }).notNull(),
+    categoryCode: varchar("category_code", { length: 40 }).notNull().default("KHAC"),
+    specification: varchar("specification", { length: 240 }),
+    unit: varchar("unit", { length: 30 }).notNull().default("cái"),
+    recordStatus: equipmentRecordStatusEnum("record_status").notNull().default("active"),
     model: varchar("model", { length: 180 }),
     serial: varchar("serial", { length: 120 }),
     brand: varchar("brand", { length: 120 }),
@@ -163,6 +171,8 @@ export const equipment = pgTable(
     purchaseDate: date("purchase_date"),
     purchasePrice: numeric("purchase_price", { precision: 18, scale: 2 }),
     notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
     version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -180,20 +190,29 @@ export const toolCatalog = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     groupId: uuid("group_id").notNull().references(() => groups.id),
+    code: varchar("code", { length: 60 }),
+    categoryCode: varchar("category_code", { length: 40 }).notNull().default("KHAC"),
+    equipmentType: varchar("equipment_type", { length: 120 }).notNull().default("Dụng cụ khác"),
+    recordStatus: equipmentRecordStatusEnum("record_status").notNull().default("active"),
     name: varchar("name", { length: 180 }).notNull(),
     specification: varchar("specification", { length: 180 }),
     unit: varchar("unit", { length: 30 }).notNull().default("cái"),
     quantityOnHand: numeric("quantity_on_hand", { precision: 12, scale: 2 }).notNull().default("0"),
     isActive: boolean("is_active").notNull().default(true),
     notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("tool_catalog_group_idx").on(t.groupId, t.isActive)],
+  (t) => [
+    index("tool_catalog_group_idx").on(t.groupId, t.isActive),
+    uniqueIndex("tool_catalog_code_unique").on(t.code),
+  ],
 );
 
 export const workflowCounters = pgTable("workflow_counters", {
-  key: varchar("key", { length: 30 }).primaryKey(),
+  key: varchar("key", { length: 80 }).primaryKey(),
   value: integer("value").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -281,13 +300,17 @@ export const quickLoans = pgTable(
     lostQuantity: numeric("lost_quantity", { precision: 12, scale: 2 }).notNull().default("0"),
     sourceGroupId: uuid("source_group_id").notNull().references(() => groups.id),
     borrowerGroupId: uuid("borrower_group_id").notNull().references(() => groups.id),
-    lenderUserId: uuid("lender_user_id").notNull().references(() => users.id),
+    requestedBy: uuid("requested_by").notNull().references(() => users.id),
+    approvedBy: uuid("approved_by").references(() => users.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    lenderUserId: uuid("lender_user_id").references(() => users.id),
     borrowerUserId: uuid("borrower_user_id").references(() => users.id),
+    closedBy: uuid("closed_by").references(() => users.id),
     expectedReturnAt: timestamp("expected_return_at", { withTimezone: true }),
     receivedAt: timestamp("received_at", { withTimezone: true }),
     returnReportedAt: timestamp("return_reported_at", { withTimezone: true }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
-    status: quickLoanStatusEnum("status").notNull().default("pending_receipt"),
+    status: quickLoanStatusEnum("status").notNull().default("pending_approval"),
     lenderNote: text("lender_note"),
     borrowerNote: text("borrower_note"),
     returnNote: text("return_note"),

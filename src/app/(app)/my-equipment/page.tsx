@@ -2,43 +2,98 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { equipment, groups, toolCatalog } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
-import { EQUIPMENT_STATUS_LABELS, CONDITION_LABELS } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/data-table";
-import { EmptyState } from "@/components/empty-state";
-import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  EquipmentWorkspace,
+  type EquipmentPermission,
+  type IndividualEquipmentRow,
+  type QuantityToolRow,
+} from "@/components/equipment/equipment-workspace";
+import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
+
+export const dynamic = "force-dynamic";
 
 export default async function MyEquipmentPage() {
   const auth = await requireUser();
-  const groupIds = auth.permissions.map((p) => p.groupId);
-  const [rows, tools] = groupIds.length
+  const groupIds = auth.permissions.map((permission) => permission.groupId);
+
+  const permissionRows = groupIds.length
+    ? await db.select({
+        id: groups.id,
+        code: groups.code,
+        name: groups.name,
+        equipmentPrefix: groups.equipmentPrefix,
+      }).from(groups).where(inArray(groups.id, groupIds))
+    : [];
+  const groupById = new Map(permissionRows.map((group) => [group.id, group]));
+
+  const permissions: EquipmentPermission[] = auth.permissions
+    .filter((permission) => permission.groupCode !== "KHO_TL" && isOfficialOperationalGroupCode(permission.groupCode))
+    .map((permission) => ({
+      groupId: permission.groupId,
+      groupCode: permission.groupCode,
+      groupName: permission.groupName,
+      equipmentPrefix: groupById.get(permission.groupId)?.equipmentPrefix || permission.groupCode,
+      level: permission.level,
+    }));
+
+  const operationalGroupIds = permissions.map((permission) => permission.groupId);
+  const [rawEquipmentRows, rawToolRows] = operationalGroupIds.length
     ? await Promise.all([
-        db.select({ code: equipment.code, name: equipment.name, type: equipment.equipmentType, ownerGroup: groups.name, status: equipment.status, condition: equipment.condition, location: equipment.currentLocation })
-          .from(equipment).innerJoin(groups, eq(equipment.ownerGroupId, groups.id)).where(inArray(equipment.ownerGroupId, groupIds)).orderBy(asc(equipment.code)),
-        db.select({ name: toolCatalog.name, specification: toolCatalog.specification, unit: toolCatalog.unit, quantity: toolCatalog.quantityOnHand, groupName: groups.name })
-          .from(toolCatalog).innerJoin(groups, eq(toolCatalog.groupId, groups.id)).where(inArray(toolCatalog.groupId, groupIds)).orderBy(asc(groups.name), asc(toolCatalog.name)),
+        db.select({
+          id: equipment.id,
+          code: equipment.code,
+          name: equipment.name,
+          equipmentType: equipment.equipmentType,
+          categoryCode: equipment.categoryCode,
+          specification: equipment.specification,
+          unit: equipment.unit,
+          model: equipment.model,
+          serial: equipment.serial,
+          brand: equipment.brand,
+          ownerGroupId: equipment.ownerGroupId,
+          ownerGroupName: groups.name,
+          currentLocation: equipment.currentLocation,
+          status: equipment.status,
+          condition: equipment.condition,
+          recordStatus: equipment.recordStatus,
+          notes: equipment.notes,
+        })
+          .from(equipment)
+          .innerJoin(groups, eq(equipment.ownerGroupId, groups.id))
+          .where(inArray(equipment.ownerGroupId, operationalGroupIds))
+          .orderBy(asc(equipment.code)),
+        db.select({
+          id: toolCatalog.id,
+          code: toolCatalog.code,
+          name: toolCatalog.name,
+          equipmentType: toolCatalog.equipmentType,
+          categoryCode: toolCatalog.categoryCode,
+          specification: toolCatalog.specification,
+          unit: toolCatalog.unit,
+          quantityOnHand: toolCatalog.quantityOnHand,
+          ownerGroupId: toolCatalog.groupId,
+          ownerGroupName: groups.name,
+          recordStatus: toolCatalog.recordStatus,
+          notes: toolCatalog.notes,
+        })
+          .from(toolCatalog)
+          .innerJoin(groups, eq(toolCatalog.groupId, groups.id))
+          .where(inArray(toolCatalog.groupId, operationalGroupIds))
+          .orderBy(asc(groups.name), asc(toolCatalog.code), asc(toolCatalog.name)),
       ])
     : [[], []] as const;
+
+  const equipmentRows: IndividualEquipmentRow[] = rawEquipmentRows.map((row) => ({ ...row, managementMode: "individual" }));
+  const toolRows: QuantityToolRow[] = rawToolRows.map((row) => ({ ...row, managementMode: "quantity" }));
+
   return (
     <>
-      <PageHeader title="Dụng cụ nhóm tôi" description="Các máy thuộc nhóm mà tài khoản được phân quyền thao tác." />
-      <Card className="table-card">
-        <CardHeader><CardTitle>{rows.length} máy/CCDC</CardTitle></CardHeader>
-        <CardContent>
-          <DataTable headers={["Mã", "Tên", "Loại", "Nhóm", "Vị trí", "Tình trạng", "Trạng thái"]} rows={rows.map((r) => [
-            <strong key="code">{r.code}</strong>, r.name, r.type, r.ownerGroup, r.location || "—",
-            <StatusBadge key="condition" label={CONDITION_LABELS[r.condition]} tone={r.condition === "good" ? "success" : "warning"} />,
-            <StatusBadge key="status" label={EQUIPMENT_STATUS_LABELS[r.status]} tone={r.status === "in_use_owner" ? "success" : "info"} />,
-          ])} empty={<EmptyState title="Chưa có dụng cụ nhóm" description="Admin cần gán quyền nhóm hoặc import dữ liệu máy." />} />
-        </CardContent>
-      </Card>
-      <Card className="table-card section-gap">
-        <CardHeader><CardTitle>{tools.length} dụng cụ nhỏ/không mã</CardTitle></CardHeader>
-        <CardContent>
-          <DataTable headers={["Tên dụng cụ", "Quy cách", "Nhóm", "Số lượng"]} rows={tools.map((t) => [t.name, t.specification || "—", t.groupName, `${t.quantity} ${t.unit}`])} empty={<EmptyState description="Chưa có dụng cụ nhỏ trong nhóm được phân quyền." />} />
-        </CardContent>
-      </Card>
+      <PageHeader
+        title="Dụng cụ nhóm tôi"
+        description="Tạo, hoàn thiện và cập nhật máy/CCDC trong các nhóm được phân quyền. Mã được hệ thống cấp tự động theo tiền tố từng nhóm."
+      />
+      <EquipmentWorkspace permissions={permissions} equipmentRows={equipmentRows} toolRows={toolRows} />
     </>
   );
 }

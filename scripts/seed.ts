@@ -11,10 +11,10 @@ async function main() {
   for (const group of STANDARD_GROUPS) {
     await db
       .insert(groups)
-      .values({ code: group.code, name: group.name, isSystem: group.isSystem })
+      .values({ code: group.code, name: group.name, equipmentPrefix: group.equipmentPrefix, isSystem: group.isSystem })
       .onConflictDoUpdate({
         target: groups.code,
-        set: { name: group.name, isSystem: group.isSystem, isActive: true, updatedAt: new Date() },
+        set: { name: group.name, equipmentPrefix: group.equipmentPrefix, isSystem: group.isSystem, isActive: true, updatedAt: new Date() },
       });
   }
 

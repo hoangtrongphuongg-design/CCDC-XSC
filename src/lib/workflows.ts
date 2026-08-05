@@ -16,6 +16,27 @@ export async function nextWorkflowCode(tx: DbTx, prefix: string) {
   return `${prefix}-${year}-${String(value).padStart(4, "0")}`;
 }
 
+
+export async function nextAssetCode(
+  tx: DbTx,
+  input: { groupCode: string; equipmentPrefix: string; mode: "individual" | "quantity" },
+) {
+  const counterKind = input.mode === "individual" ? "ASSET" : "TOOL";
+  const key = `${counterKind}:${input.groupCode}`;
+  const result = (await tx.execute(sql`
+    insert into workflow_counters (key, value, updated_at)
+    values (${key}, 1, now())
+    on conflict (key) do update
+      set value = workflow_counters.value + 1, updated_at = now()
+    returning value
+  `)) as { rows: Array<{ value: number | string }> };
+  const value = Number(result.rows[0]?.value ?? 1);
+  const serial = String(value).padStart(4, "0");
+  return input.mode === "individual"
+    ? `${input.equipmentPrefix}-${serial}`
+    : `${input.equipmentPrefix}-VT-${serial}`;
+}
+
 export type LockedEquipment = {
   id: string;
   code: string;
@@ -23,11 +44,12 @@ export type LockedEquipment = {
   current_group_id: string;
   status: string;
   condition: string;
+  record_status: "draft" | "active";
 };
 
 export async function lockEquipment(tx: DbTx, equipmentId: string): Promise<LockedEquipment> {
   const result = (await tx.execute(sql`
-    select id, code, owner_group_id, current_group_id, status, condition
+    select id, code, owner_group_id, current_group_id, status, condition, record_status
     from equipment where id = ${equipmentId} for update
   `)) as { rows: LockedEquipment[] };
   const item = result.rows[0];

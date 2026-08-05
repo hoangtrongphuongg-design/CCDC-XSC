@@ -1,31 +1,38 @@
-# Checklist GitHub — Neon — Vercel
+# Checklist nâng cấp V1.3.1
 
 ## Neon
 
-- [ ] Tạo/copy pooled connection string có `sslmode=require`.
-- [ ] Chạy `drizzle/0000_initial.sql` trong Neon SQL Editor hoặc `npm run db:migrate`.
-- [ ] Chạy `npm run db:seed` để tạo admin đầu tiên.
-- [ ] Đổi ngay mật khẩu tạm khi đăng nhập lần đầu.
+- [ ] Sao lưu hoặc kiểm tra dữ liệu quan trọng trước khi nâng cấp.
+- [ ] Xác nhận `DATABASE_URL` là pooled connection string và có `sslmode=require`.
+- [ ] Chạy `npm run db:migrate` hoặc chạy thủ công `0001`, `0002` và `0003` trong Neon SQL Editor.
+- [ ] Kiểm tra bảng `groups` có đủ 13 nhóm nghiệp vụ và `KHO_TL`.
+- [ ] Kiểm tra enum `permission_level` có `viewer`.
+- [ ] Kiểm tra enum `quick_loan_status` có `pending_approval`.
+- [ ] Không chạy lại `db:seed` nếu admin đã tồn tại.
 
 ## GitHub
 
-- [ ] Giải nén vào repo đã tạo.
-- [ ] Không commit `.env.local`.
-- [ ] Chạy `npm install`, `npm run typecheck`, `npm test`, `npm run build`.
+- [ ] Giải nén bộ code, không upload nguyên file ZIP vào repo.
+- [ ] Không commit `.env` hoặc `.env.local`.
+- [ ] Chạy `npm install`.
+- [ ] Chạy `npm run typecheck`.
+- [ ] Chạy `npm test`.
+- [ ] Chạy `npm run build`.
 - [ ] Commit và push nhánh `main`.
 
 ## Vercel
 
-- [ ] Kết nối đúng repo GitHub.
-- [ ] Framework preset: Next.js.
-- [ ] Khai báo `DATABASE_URL`.
-- [ ] Khai báo `AUTH_SECRET` bằng chuỗi ngẫu nhiên dài.
-- [ ] Không cần giữ `ADMIN_PASSWORD` trên Vercel sau khi đã seed admin từ máy local.
-- [ ] Deploy Preview trước, kiểm thử, sau đó mới promote Production.
+- [ ] Kiểm tra `DATABASE_URL`.
+- [ ] Kiểm tra `AUTH_SECRET`.
+- [ ] Chỉ redeploy sau khi migration Neon hoàn tất.
+- [ ] Kiểm tra deployment ở trạng thái `Ready`.
 
-## Dữ liệu
+## Kiểm thử quyền
 
-- [ ] Chạy import Excel ở chế độ `--dry-run`.
-- [ ] Kiểm tra bảng `import_issues`.
-- [ ] Chốt các mã/nhóm bất thường trước khi import chính thức.
-- [ ] Không tự động nhập lịch sử cấp phát/sửa chữa cũ chưa đối chiếu.
+- [ ] Nhân viên tạo được Mượn máy.
+- [ ] Nhân viên tạo được Mượn nhanh.
+- [ ] Nhân viên không duyệt được phiếu.
+- [ ] Operator đúng nhóm cho duyệt được.
+- [ ] Operator nhóm khác không duyệt được.
+- [ ] Nhân viên nhóm cho xác nhận nhận lại được.
+- [ ] Người tạo không tự duyệt phiếu của chính mình.

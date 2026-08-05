@@ -1,20 +1,22 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 DO $$ BEGIN CREATE TYPE account_status AS ENUM ('pending','active','rejected','blocked'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE permission_level AS ENUM ('operator','manager'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE permission_level AS ENUM ('viewer','operator','manager'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE equipment_status AS ENUM ('in_use_owner','wait_handover','on_loan','return_requested','wait_inspection','repairing','wait_repair_confirm','wait_disposal','disposal_warehouse','inactive'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE equipment_condition AS ENUM ('good','limited','minor_damage','major_damage','awaiting_assessment','irreparable','unknown'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE machine_loan_status AS ENUM ('pending_owner','approved','wait_handover','on_loan','return_requested','completed','rejected','cancelled','incident'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE transfer_status AS ENUM ('pending_source','pending_target','pending_ws','wait_handover','completed','rejected','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE quick_loan_status AS ENUM ('pending_receipt','borrowed','return_reported','completed','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE quick_loan_status AS ENUM ('pending_approval','pending_receipt','borrowed','return_reported','completed','rejected','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE repair_status AS ENUM ('pending_acceptance','repairing','wait_owner_confirm','completed','irreparable','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE disposal_status AS ENUM ('pending_group','pending_ws','wait_warehouse','completed','rejected','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE notification_type AS ENUM ('info','success','warning','danger'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE equipment_record_status AS ENUM ('draft','active'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   code varchar(30) NOT NULL UNIQUE,
   name varchar(120) NOT NULL,
+  equipment_prefix varchar(16) NOT NULL,
   is_system boolean NOT NULL DEFAULT false,
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -71,6 +73,10 @@ CREATE TABLE IF NOT EXISTS equipment (
   code varchar(60) NOT NULL UNIQUE,
   name varchar(180) NOT NULL,
   equipment_type varchar(120) NOT NULL,
+  category_code varchar(40) NOT NULL DEFAULT 'KHAC',
+  specification varchar(240),
+  unit varchar(30) NOT NULL DEFAULT 'cái',
+  record_status equipment_record_status NOT NULL DEFAULT 'active',
   model varchar(180), serial varchar(120), brand varchar(120),
   owner_group_id uuid NOT NULL REFERENCES groups(id),
   current_group_id uuid NOT NULL REFERENCES groups(id),
@@ -81,6 +87,8 @@ CREATE TABLE IF NOT EXISTS equipment (
   purchase_date date,
   purchase_price numeric(18,2),
   notes text,
+  created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
   version integer NOT NULL DEFAULT 1,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -92,19 +100,26 @@ CREATE INDEX IF NOT EXISTS equipment_current_group_idx ON equipment(current_grou
 CREATE TABLE IF NOT EXISTS tool_catalog (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id uuid NOT NULL REFERENCES groups(id),
+  code varchar(60),
+  category_code varchar(40) NOT NULL DEFAULT 'KHAC',
+  equipment_type varchar(120) NOT NULL DEFAULT 'Dụng cụ khác',
+  record_status equipment_record_status NOT NULL DEFAULT 'active',
   name varchar(180) NOT NULL,
   specification varchar(180),
   unit varchar(30) NOT NULL DEFAULT 'cái',
   quantity_on_hand numeric(12,2) NOT NULL DEFAULT 0 CHECK (quantity_on_hand >= 0),
   is_active boolean NOT NULL DEFAULT true,
   notes text,
+  created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS tool_catalog_group_idx ON tool_catalog(group_id, is_active);
+CREATE UNIQUE INDEX IF NOT EXISTS tool_catalog_code_unique ON tool_catalog(code) WHERE code IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS workflow_counters (
-  key varchar(30) PRIMARY KEY,
+  key varchar(80) PRIMARY KEY,
   value integer NOT NULL DEFAULT 0,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -170,10 +185,13 @@ CREATE TABLE IF NOT EXISTS quick_loans (
   lost_quantity numeric(12,2) NOT NULL DEFAULT 0,
   source_group_id uuid NOT NULL REFERENCES groups(id),
   borrower_group_id uuid NOT NULL REFERENCES groups(id),
-  lender_user_id uuid NOT NULL REFERENCES users(id),
+  requested_by uuid NOT NULL REFERENCES users(id),
+  approved_by uuid REFERENCES users(id), approved_at timestamptz,
+  lender_user_id uuid REFERENCES users(id),
   borrower_user_id uuid REFERENCES users(id),
+  closed_by uuid REFERENCES users(id),
   expected_return_at timestamptz, received_at timestamptz, return_reported_at timestamptz, closed_at timestamptz,
-  status quick_loan_status NOT NULL DEFAULT 'pending_receipt',
+  status quick_loan_status NOT NULL DEFAULT 'pending_approval',
   lender_note text, borrower_note text, return_note text,
   created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -267,23 +285,49 @@ CREATE TABLE IF NOT EXISTS import_issues (
 );
 CREATE INDEX IF NOT EXISTS import_issues_batch_idx ON import_issues(batch_id, severity);
 
-INSERT INTO groups(code, name, is_system) VALUES
-  ('COI', 'Bảo trì cơ - Nhóm Cối', false),
-  ('CBL', 'Bảo trì cơ - Nhóm CBL', false),
-  ('NBS', 'Bảo trì cơ - Nghiền BS-NT', false),
-  ('LO', 'Bảo trì cơ - Nhóm Lò', false),
-  ('NXM', 'Bảo trì cơ - Nhóm NXM', false),
-  ('WORKSHOP', 'Bảo trì cơ - Nhóm Workshop', false),
-  ('BOI_TRON', 'Bảo trì cơ - Nhóm Bôi trơn', false),
-  ('BANG_TAI', 'Bảo trì cơ - Nhóm Băng tải', false),
-  ('DIEN_MO', 'Bảo trì điện - Nhóm điện Mỏ', false),
-  ('DIEN_CBL_NT', 'Bảo trì điện - Nhóm điện CBL - NT', false),
-  ('DIEN_NBS_LO', 'Bảo trì điện - Nhóm Nghiền BS - Lò nung', false),
-  ('DIEN_NXM_TD_PT', 'Bảo trì điện - Nhóm Nghiền XM - Trạm điện - Phụ trợ', false),
-  ('NHOM_KHAC', 'Nhóm khác (Đơn vị khác; nhà thầu,...)', false),
-  ('KHO_TL', 'Kho thanh lý', true)
+-- Tương thích khi nâng cấp từ V1.2.x: bảng groups cũ chưa có equipment_prefix.
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS equipment_prefix varchar(16);
+UPDATE groups
+SET equipment_prefix = CASE code
+  WHEN 'COI' THEN 'COI'
+  WHEN 'CBL' THEN 'CBL'
+  WHEN 'NBS' THEN 'NBSNT'
+  WHEN 'LO' THEN 'LO'
+  WHEN 'NXM' THEN 'NXM'
+  WHEN 'WORKSHOP' THEN 'WS'
+  WHEN 'BOI_TRON' THEN 'BT'
+  WHEN 'BANG_TAI' THEN 'BTAI'
+  WHEN 'DIEN_MO' THEN 'DMO'
+  WHEN 'DIEN_CBL_NT' THEN 'DCBLNT'
+  WHEN 'DIEN_NBS_LO' THEN 'DNBSLO'
+  WHEN 'DIEN_NXM_TD_PT' THEN 'DNXMTP'
+  WHEN 'NHOM_KHAC' THEN 'KHAC'
+  WHEN 'KHO_TL' THEN 'TL'
+  ELSE left(regexp_replace(upper(code), '[^A-Z0-9]+', '', 'g'), 16)
+END
+WHERE equipment_prefix IS NULL OR equipment_prefix = '';
+UPDATE groups SET equipment_prefix = 'GEN' WHERE equipment_prefix IS NULL OR equipment_prefix = '';
+ALTER TABLE groups ALTER COLUMN equipment_prefix SET DEFAULT 'GEN';
+ALTER TABLE groups ALTER COLUMN equipment_prefix SET NOT NULL;
+
+INSERT INTO groups(code, name, equipment_prefix, is_system) VALUES
+  ('COI', 'Bảo trì cơ - Nhóm Cối', 'COI', false),
+  ('CBL', 'Bảo trì cơ - Nhóm CBL', 'CBL', false),
+  ('NBS', 'Bảo trì cơ - Nghiền BS-NT', 'NBSNT', false),
+  ('LO', 'Bảo trì cơ - Nhóm Lò', 'LO', false),
+  ('NXM', 'Bảo trì cơ - Nhóm NXM', 'NXM', false),
+  ('WORKSHOP', 'Bảo trì cơ - Nhóm Workshop', 'WS', false),
+  ('BOI_TRON', 'Bảo trì cơ - Nhóm Bôi trơn', 'BT', false),
+  ('BANG_TAI', 'Bảo trì cơ - Nhóm Băng tải', 'BTAI', false),
+  ('DIEN_MO', 'Bảo trì điện - Nhóm điện Mỏ', 'DMO', false),
+  ('DIEN_CBL_NT', 'Bảo trì điện - Nhóm điện CBL - NT', 'DCBLNT', false),
+  ('DIEN_NBS_LO', 'Bảo trì điện - Nhóm Nghiền BS - Lò nung', 'DNBSLO', false),
+  ('DIEN_NXM_TD_PT', 'Bảo trì điện - Nhóm Nghiền XM - Trạm điện - Phụ trợ', 'DNXMTP', false),
+  ('NHOM_KHAC', 'Nhóm khác (Đơn vị khác; nhà thầu,...)', 'KHAC', false),
+  ('KHO_TL', 'Kho thanh lý', 'TL', true)
 ON CONFLICT (code) DO UPDATE SET
   name = EXCLUDED.name,
+  equipment_prefix = EXCLUDED.equipment_prefix,
   is_system = EXCLUDED.is_system,
   is_active = true,
   updated_at = now();

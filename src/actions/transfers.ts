@@ -27,6 +27,7 @@ export async function createTransferAction(formData: FormData) {
 
   await db.transaction(async (tx) => {
     const item = await lockEquipment(tx, equipmentId);
+    if (item.record_status !== "active") throw new Error("Dụng cụ chưa hoàn thành hồ sơ nên chưa thể thực hiện nghiệp vụ.");
     const sourceGroupId = item.owner_group_id;
     if (sourceGroupId === targetGroupId) throw new Error("Nhóm nhận phải khác nhóm quản lý hiện tại.");
     if (actingGroupId !== sourceGroupId && actingGroupId !== targetGroupId) throw new Error("Nhóm đại diện phải là nhóm giao hoặc nhóm nhận.");

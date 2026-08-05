@@ -14,17 +14,18 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { formatNumber } from "@/lib/utils";
 import { acceptRepairAction, completeRepairAction, confirmRepairByOwnerAction, createRepairAction } from "@/actions/repairs";
+import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 
 export default async function RepairsPage() {
   const auth = await requireUser();
   const [groupRows, equipmentRows, rows] = await Promise.all([
     db.select({ id: groups.id, name: groups.name }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
-    db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId, currentGroupId: equipment.currentGroupId }).from(equipment).orderBy(asc(equipment.code)),
+    db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId, currentGroupId: equipment.currentGroupId }).from(equipment).where(eq(equipment.recordStatus, "active")).orderBy(asc(equipment.code)),
     db.select().from(repairs).orderBy(desc(repairs.createdAt)).limit(100),
   ]);
   const groupMap = new Map(groupRows.map((g) => [g.id, g.name]));
   const equipmentMap = new Map(equipmentRows.map((e) => [e.id, e]));
-  const actingGroups = auth.permissions.filter((p) => p.groupCode !== "KHO_TL");
+  const actingGroups = auth.permissions.filter((p) => p.groupCode !== "KHO_TL" && p.level !== "viewer" && isOfficialOperationalGroupCode(p.groupCode));
   const pending = rows.filter((row) => row.status === "pending_acceptance").length;
   const repairing = rows.filter((row) => row.status === "repairing").length;
   const waitingOwner = rows.filter((row) => row.status === "wait_owner_confirm").length;

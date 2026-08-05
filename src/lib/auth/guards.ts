@@ -24,14 +24,15 @@ export async function requireWsManager() {
 export function hasGroupPermission(
   auth: AuthContext,
   groupId: string,
-  required: "operator" | "manager" = "operator",
+  required: "viewer" | "operator" | "manager" = "operator",
 ) {
   const found = auth.permissions.find((p) => p.groupId === groupId);
   if (!found) return false;
-  return required === "operator" || found.level === "manager";
+  const rank = { viewer: 0, operator: 1, manager: 2 } as const;
+  return rank[found.level] >= rank[required];
 }
 
-export async function requireGroupPermission(groupId: string, required: "operator" | "manager" = "operator") {
+export async function requireGroupPermission(groupId: string, required: "viewer" | "operator" | "manager" = "operator") {
   const auth = await requireUser();
   if (!hasGroupPermission(auth, groupId, required)) {
     throw new Error("Bạn không có quyền thao tác tại nhóm này.");

@@ -25,6 +25,7 @@ export async function createRepairAction(formData: FormData) {
 
   await db.transaction(async (tx) => {
     const item = await lockEquipment(tx, equipmentId);
+    if (item.record_status !== "active") throw new Error("Dụng cụ chưa hoàn thành hồ sơ nên chưa thể thực hiện nghiệp vụ.");
     const raw = item as unknown as { owner_group_id: string; current_group_id: string; status: string; code: string };
     if (reportingGroupId !== raw.owner_group_id && reportingGroupId !== raw.current_group_id) throw new Error("Nhóm này không đang quản lý hoặc sử dụng máy.");
     if (!["in_use_owner", "on_loan", "return_requested", "wait_inspection"].includes(raw.status)) throw new Error("Trạng thái máy hiện tại không cho phép tạo phiếu sửa chữa.");

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { count, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   Activity,
   ArrowLeftRight,
@@ -33,9 +33,9 @@ const modules = [
 
 export default async function DashboardPage() {
   const [[equipmentCount], [loanCount], [quickCount], [repairCount], [transferCount], [disposalCount], recent] = await Promise.all([
-    db.select({ value: count() }).from(equipment).where(isNull(equipment.archivedAt)),
+    db.select({ value: count() }).from(equipment).where(and(isNull(equipment.archivedAt), eq(equipment.recordStatus, "active"))),
     db.select({ value: count() }).from(machineLoans).where(inArray(machineLoans.status, ["pending_owner", "approved", "wait_handover", "on_loan", "return_requested", "incident"])),
-    db.select({ value: count() }).from(quickLoans).where(inArray(quickLoans.status, ["pending_receipt", "borrowed", "return_reported"])),
+    db.select({ value: count() }).from(quickLoans).where(inArray(quickLoans.status, ["pending_approval", "pending_receipt", "borrowed", "return_reported"])),
     db.select({ value: count() }).from(repairs).where(inArray(repairs.status, ["pending_acceptance", "repairing", "wait_owner_confirm"])),
     db.select({ value: count() }).from(transfers).where(inArray(transfers.status, ["pending_source", "pending_target", "pending_ws", "wait_handover"])),
     db.select({ value: count() }).from(disposals).where(inArray(disposals.status, ["pending_group", "pending_ws", "wait_warehouse"])),

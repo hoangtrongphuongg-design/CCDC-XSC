@@ -7,6 +7,7 @@ import { groups, users } from "@/lib/db/schema";
 import { registerSchema } from "@/lib/validation";
 import { hashPassword } from "@/lib/auth/password";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 
 export type RegisterState = { error?: string; success?: string };
 
@@ -28,7 +29,7 @@ export async function registerAction(_: RegisterState, formData: FormData): Prom
 
   const { confirmPassword: _ignore, ...data } = parsed.data;
   const [requestedGroup] = await db.select().from(groups).where(eq(groups.id, data.requestedGroupId)).limit(1);
-  if (!requestedGroup || !requestedGroup.isActive || requestedGroup.isSystem) return { error: "Nhóm đăng ký không hợp lệ." };
+  if (!requestedGroup || !requestedGroup.isActive || requestedGroup.isSystem || !isOfficialOperationalGroupCode(requestedGroup.code)) return { error: "Nhóm đăng ký không hợp lệ." };
   const [duplicate] = await db.select({ id: users.id }).from(users).where(or(
     eq(users.username, data.username),
     eq(users.employeeCode, data.employeeCode),
