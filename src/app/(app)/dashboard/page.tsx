@@ -61,9 +61,15 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className="dashboard-health">
-          <div className="health-head"><strong>Công việc cần theo dõi</strong><span className="health-badge"><i /> Dữ liệu trực tiếp</span></div>
-          <div className="health-value">{openWork}</div>
-          <div className="health-caption">Tổng phiếu và giao dịch chưa kết thúc trong toàn xưởng.</div>
+          <div className="health-head"><strong>Công việc cần theo dõi</strong><span className="health-badge"><i /> Trực tiếp</span></div>
+          <div className="health-orbit" aria-label={`${openWork} công việc đang mở`}>
+            <div className="health-orbit-core">
+              <span>ĐANG MỞ</span>
+              <strong>{openWork}</strong>
+              <small>công việc</small>
+            </div>
+          </div>
+          <div className="health-caption">Các phiếu chưa kết thúc cần tiếp tục theo dõi.</div>
           <div className="health-breakdown">
             <span><b>{loanCount.value}</b> mượn máy</span>
             <span><b>{repairCount.value}</b> sửa chữa</span>

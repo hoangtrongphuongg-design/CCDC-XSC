@@ -20,8 +20,11 @@ export function StatCard({
   return (
     <Card className="stat-card" data-tone={tone}>
       <div className="stat-card-top">
-        <div className="stat-icon"><Icon size={20} strokeWidth={2} aria-hidden="true" /></div>
-        <ArrowUpRight className="stat-corner" size={16} aria-hidden="true" />
+        <div className="stat-icon" aria-hidden="true">
+          <span className="stat-icon-ring" />
+          <Icon size={19} strokeWidth={2} />
+        </div>
+        <ArrowUpRight className="stat-corner" size={15} aria-hidden="true" />
       </div>
       <div className="stat-copy">
         <span>{title}</span>

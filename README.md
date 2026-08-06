@@ -1,6 +1,6 @@
 # QUẢN LÝ CCDC - XSC
 
-**Phiên bản:** 1.3.2  
+**Phiên bản:** 1.4.0  
 **Kiến trúc:** GitHub → Vercel → Neon PostgreSQL
 
 ## Nội dung chính
@@ -16,6 +16,22 @@
 - Nhân viên thuộc nhóm cho được xác nhận đã nhận lại máy/dụng cụ.
 - Người tạo phiếu không được tự duyệt phiếu của chính mình.
 - **Quản trị hệ thống** và **Quản lý Xưởng** là hai vai trò độc lập; một vai trò không tự động cấp vai trò còn lại.
+
+
+## Giao diện V1.4.0
+
+Phiên bản này áp dụng bộ tiêu chuẩn giao diện V3:
+
+- Mobile là tham chiếu thị giác chính.
+- Desktop dùng cùng palette sáng và accent indigo với mobile.
+- Sidebar desktop chuyển sang nền sáng; không còn mảng navy/đen.
+- Card trắng, viền mảnh, bóng nhẹ và bo góc mềm.
+- Dashboard có chỉ số vòng tròn, KPI gọn và lối tắt nghiệp vụ.
+- Mobile dùng bottom navigation với hành động trung tâm nổi bật.
+- Bảng desktop đặt trong card; trên mobile tự chuyển thành thẻ.
+- Form, modal, trang đăng nhập và trạng thái dùng chung một ngôn ngữ thị giác.
+
+Nâng cấp V1.4.0 **không thay đổi schema Neon**. Nếu hệ thống đã chạy V1.3.2 thì chỉ cần cập nhật code và redeploy Vercel.
 
 ## Cơ cấu nhóm chính thức
 
@@ -111,9 +127,9 @@ npm run dev
 
 Tài khoản do `db:seed` tạo chỉ có vai trò **Quản trị hệ thống**, không tự động là **Quản lý Xưởng**.
 
-## Nâng cấp từ V1.3.1
+## Migration nghiệp vụ từ các bản trước
 
-Sau khi cập nhật code, chạy migration mới:
+Khi nâng cấp dữ liệu từ V1.3.1 lên nền V1.3.2 trở lên, chạy migration:
 
 ```text
 drizzle/0004_separate_system_roles.sql
@@ -139,12 +155,12 @@ Cấp riêng **Quản lý Xưởng** cho đúng người phụ trách nghiệp v
 
 1. Giải nén bộ code và chép toàn bộ nội dung vào repo hiện tại.
 2. Không đưa `.env` lên GitHub.
-3. Chạy migration trên Neon trước khi redeploy.
+3. Không cần migration mới cho giao diện V1.4.0. Chỉ chạy migration cũ nếu database chưa được nâng lên V1.3.2.
 4. Commit và push:
 
 ```bash
 git add .
-git commit -m "Upgrade CCDC XSC to V1.3.2"
+git commit -m "Upgrade CCDC XSC to V1.4.0 UI"
 git push origin main
 ```
 
