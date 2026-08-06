@@ -1,6 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LockKeyhole, Wrench } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
 import { getAuthContext } from "@/lib/auth/session";
 import { APP_NAME } from "@/lib/constants";
 import { AuthShowcase } from "@/components/auth-showcase";
@@ -16,19 +17,26 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <main className="auth-page">
       <AuthShowcase />
       <section className="auth-form-panel">
+        <div className="auth-mobile-brand" aria-hidden="true">
+          <Image src="/brand/company-symbol.png" alt="" width={96} height={125} priority />
+          <strong>{APP_NAME}</strong>
+          <span>Hệ thống quản lý dụng cụ xưởng</span>
+          <Image src="/brand/company-slogan.png" alt="" width={250} height={46} priority />
+        </div>
         <div className="auth-card">
           <div className="auth-brand">
-            <div className="auth-form-logo"><Wrench size={22} /></div>
             <h1>Đăng nhập hệ thống</h1>
-            <p>{APP_NAME} · Sử dụng tài khoản nội bộ đã được phê duyệt.</p>
+            <p>Vui lòng đăng nhập để tiếp tục.</p>
           </div>
           {params.status === "pending" ? <p className="notice warning">Tài khoản đang chờ quản trị viên duyệt.</p> : null}
           {params.status === "blocked" || params.status === "rejected" ? <p className="notice danger">Tài khoản đã bị khóa hoặc từ chối.</p> : null}
           {params.passwordChanged ? <p className="notice success">Đã đổi mật khẩu. Vui lòng đăng nhập lại.</p> : null}
           <LoginForm />
-          <p className="auth-note">Chưa có tài khoản? <Link href="/register">Đăng ký tài khoản</Link></p>
-          <div className="auth-security-note"><LockKeyhole size={13} /> Phiên đăng nhập được bảo vệ bằng khóa hệ thống.</div>
+          <div className="auth-divider"><span>hoặc</span></div>
+          <Link href="/register" className="auth-secondary-action">Đăng ký tài khoản nội bộ</Link>
+          <div className="auth-security-note"><LockKeyhole size={13} /> Phiên đăng nhập được bảo vệ trong 8 giờ.</div>
         </div>
+        <p className="auth-copyright">© 2026 XSC. Hệ thống nội bộ.</p>
       </section>
     </main>
   );

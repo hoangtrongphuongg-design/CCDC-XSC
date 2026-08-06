@@ -1,0 +1,32 @@
+import { ShieldCheck, UserRound } from "lucide-react";
+import { requireUser } from "@/lib/auth/guards";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRoleSummary } from "@/lib/auth/roles";
+
+export default async function ProfilePage() {
+  const auth = await requireUser();
+  return (
+    <>
+      <PageHeader title="Thông tin cá nhân" description="Tài khoản và phạm vi được phân quyền trong hệ thống." />
+      <div className="profile-grid">
+        <Card>
+          <CardHeader><CardTitle>Thông tin tài khoản</CardTitle><UserRound size={18} /></CardHeader>
+          <CardContent><dl className="profile-details">
+            <div><dt>Họ và tên</dt><dd>{auth.fullName}</dd></div>
+            <div><dt>Tên đăng nhập</dt><dd>{auth.username}</dd></div>
+            <div><dt>Mã nhân viên</dt><dd>{auth.employeeCode}</dd></div>
+            <div><dt>Nhóm chính</dt><dd>{auth.primaryGroupName || "Chưa gán"}</dd></div>
+            <div><dt>Vai trò hệ thống</dt><dd>{getRoleSummary(auth)}</dd></div>
+          </dl></CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Phạm vi nhóm</CardTitle><ShieldCheck size={18} /></CardHeader>
+          <CardContent><div className="permission-list">
+            {auth.permissions.map((permission) => <div key={permission.groupId}><strong>{permission.groupName}</strong><span>{permission.level === "viewer" ? "Nhân viên" : permission.level === "operator" ? "Operator" : "Manager"}</span></div>)}
+          </div></CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}

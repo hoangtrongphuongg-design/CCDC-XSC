@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -45,12 +46,7 @@ const insightItems = [
 ] as const satisfies readonly NavItem[];
 
 function initials(name: string) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(-2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "XS";
+  return name.trim().split(/\s+/).slice(-2).map((part) => part[0]?.toUpperCase()).join("") || "XS";
 }
 
 export function Sidebar({ auth }: { auth: AuthContext }) {
@@ -78,38 +74,25 @@ export function Sidebar({ auth }: { auth: AuthContext }) {
   return (
     <aside className="sidebar" data-slot="sidebar">
       <div className="brand-block">
-        <div className="brand-mark" aria-hidden="true">
-          <Wrench size={22} strokeWidth={2.2} />
-        </div>
-        <div className="brand-copy">
-          <strong>{APP_NAME}</strong>
-          <span>Hệ thống quản lý dụng cụ xưởng</span>
-        </div>
+        <div className="brand-symbol" aria-hidden="true"><Image src="/brand/company-symbol.png" alt="" width={38} height={50} /></div>
+        <div className="brand-copy"><strong>{APP_NAME}</strong><span>Hệ thống quản lý dụng cụ xưởng</span></div>
       </div>
 
       <nav aria-label="Điều hướng chính" className="sidebar-nav">
         {renderGroup("TỔNG QUAN", operationItems)}
         {renderGroup("NGHIỆP VỤ", workflowItems)}
         {renderGroup("THEO DÕI", insightItems)}
-        {auth.isAdmin
-          ? renderGroup("QUẢN TRỊ", [
-              ["/groups", "Cơ cấu nhóm Xưởng", Network],
-              ["/users", "Người dùng & phân quyền", ShieldCheck],
-            ])
-          : null}
+        {auth.isAdmin ? renderGroup("QUẢN TRỊ", [
+          ["/groups", "Cơ cấu nhóm Xưởng", Network],
+          ["/users", "Người dùng & phân quyền", ShieldCheck],
+        ]) : null}
       </nav>
 
       <div className="sidebar-footer">
-        <div className="workshop-signature">
-          <span className="signature-dot" />
-          <div><strong>Xưởng Sửa chữa</strong><span>Hệ thống đang hoạt động</span></div>
-        </div>
+        <div className="workshop-signature"><span className="signature-dot" /><div><strong>Xưởng Sửa chữa</strong><span>Hệ thống đang hoạt động</span></div></div>
         <div className="sidebar-user">
           <div className="user-avatar">{initials(auth.fullName)}</div>
-          <div className="user-meta">
-            <strong>{auth.fullName}</strong>
-            <span>{auth.primaryGroupName || "Chưa gán nhóm"} · {roleLabel}</span>
-          </div>
+          <div className="user-meta"><strong>{auth.fullName}</strong><span>{auth.primaryGroupName || "Chưa gán nhóm"} · {roleLabel}</span></div>
         </div>
       </div>
     </aside>

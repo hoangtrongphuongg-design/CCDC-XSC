@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { LogIn } from "lucide-react";
 import { loginAction, type LoginState } from "./actions";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -15,10 +16,10 @@ export function LoginForm() {
   useEffect(() => { if (state.success) router.replace("/dashboard"); }, [state.success, router]);
   return (
     <form action={action} className="auth-form" noValidate>
-      <FormField label="Tên đăng nhập" required><input name="username" autoComplete="username" placeholder="Ví dụ: phuong_xsc" /></FormField>
+      <FormField label="Tên đăng nhập" required><input name="username" autoComplete="username" placeholder="Nhập tên đăng nhập" /></FormField>
       <FormField label="Mật khẩu" required><PasswordInput name="password" autoComplete="current-password" placeholder="Nhập mật khẩu" /></FormField>
       {state.error ? <p className="form-message error" role="alert">{state.error}</p> : null}
-      <Button type="submit" size="lg" disabled={pending}>{pending ? "Đang đăng nhập..." : "Đăng nhập"}</Button>
+      <Button type="submit" size="lg" disabled={pending}><LogIn size={16} />{pending ? "Đang đăng nhập..." : "Đăng nhập"}</Button>
     </form>
   );
 }

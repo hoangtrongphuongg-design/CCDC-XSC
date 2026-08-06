@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { Boxes, Edit3, PackageOpen, Plus, Search, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Boxes, Edit3, Filter, MoreHorizontal, PackageOpen, Plus, Search, ShieldCheck, Wrench, X } from "lucide-react";
 import { saveEquipmentRecordAction, type EquipmentFormState } from "@/actions/equipment";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
@@ -217,6 +217,8 @@ export function EquipmentWorkspace({
   const [search, setSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [mobileTab, setMobileTab] = useState<"all" | "in_use_owner" | "on_loan" | "repairing">("all");
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const actionablePermissions = permissions.filter((permission) => permissionRank(permission.level) >= 1);
   const permissionByGroup = useMemo(() => new Map(permissions.map((permission) => [permission.groupId, permission])), [permissions]);
@@ -226,13 +228,15 @@ export function EquipmentWorkspace({
     const matchesSearch = !normalizedSearch || `${row.code} ${row.name} ${row.equipmentType} ${row.ownerGroupName}`.toLocaleLowerCase("vi").includes(normalizedSearch);
     const matchesGroup = groupFilter === "all" || row.ownerGroupId === groupFilter;
     const matchesStatus = statusFilter === "all" || row.recordStatus === statusFilter;
-    return matchesSearch && matchesGroup && matchesStatus;
+    const matchesMobileTab = mobileTab === "all" || row.status === mobileTab;
+    return matchesSearch && matchesGroup && matchesStatus && matchesMobileTab;
   });
   const filteredTools = toolRows.filter((row) => {
     const matchesSearch = !normalizedSearch || `${row.code || ""} ${row.name} ${row.equipmentType} ${row.ownerGroupName}`.toLocaleLowerCase("vi").includes(normalizedSearch);
     const matchesGroup = groupFilter === "all" || row.ownerGroupId === groupFilter;
     const matchesStatus = statusFilter === "all" || row.recordStatus === statusFilter;
-    return matchesSearch && matchesGroup && matchesStatus;
+    const matchesMobileTab = mobileTab === "all" || mobileTab === "in_use_owner";
+    return matchesSearch && matchesGroup && matchesStatus && matchesMobileTab;
   });
 
   function openNew() {
@@ -252,78 +256,132 @@ export function EquipmentWorkspace({
     setSelectedRecord(null);
   }
 
+  const mobileRows: EditableRecord[] = [...filteredEquipment, ...filteredTools];
+
   return (
     <>
-      <div className="equipment-toolbar">
-        <div className="equipment-filter-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã, tên, loại dụng cụ..." aria-label="Tìm dụng cụ" /></div>
-        <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} aria-label="Lọc nhóm">
-          <option value="all">Tất cả nhóm được phân quyền</option>
-          {permissions.map((permission) => <option key={permission.groupId} value={permission.groupId}>{permission.groupName}</option>)}
-        </select>
-        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Lọc trạng thái hồ sơ">
-          <option value="all">Tất cả hồ sơ</option>
-          <option value="active">Đã hoàn thành</option>
-          <option value="draft">Bản nháp</option>
-        </select>
-        {actionablePermissions.length ? <Button type="button" onClick={openNew}><Plus size={16} /> Thêm dụng cụ</Button> : null}
+      <div className="mobile-equipment-shell">
+        <header className="mobile-equipment-header">
+          <button type="button" aria-label="Quay lại" onClick={() => window.history.back()}><ArrowLeft size={20} /></button>
+          <strong>Dụng cụ nhóm tôi</strong>
+          <div>
+            <button type="button" aria-label="Tìm kiếm" onClick={() => setMobileSearchOpen((value) => !value)}><Search size={19} /></button>
+            <button type="button" aria-label="Bộ lọc"><Filter size={18} /></button>
+          </div>
+        </header>
+        {mobileSearchOpen ? <div className="mobile-equipment-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã hoặc tên dụng cụ..." autoFocus /></div> : null}
+        <div className="mobile-equipment-tabs" role="tablist" aria-label="Lọc trạng thái">
+          {([
+            ["all", "Tất cả"],
+            ["in_use_owner", "Đang sử dụng"],
+            ["on_loan", "Đang mượn"],
+            ["repairing", "Sửa chữa"],
+          ] as const).map(([value, label]) => (
+            <button key={value} type="button" className={mobileTab === value ? "is-active" : ""} onClick={() => setMobileTab(value)}>{label}</button>
+          ))}
+        </div>
+        <div className="mobile-equipment-list">
+          {mobileRows.length ? mobileRows.map((row) => {
+            const permission = permissionByGroup.get(row.ownerGroupId);
+            const canEdit = Boolean(permission && permissionRank(permission.level) >= 1);
+            const isIndividual = row.managementMode === "individual";
+            const statusLabel = isIndividual
+              ? row.recordStatus === "active" ? EQUIPMENT_STATUS_LABELS[row.status] : "Bản nháp"
+              : row.recordStatus === "active" ? "Sẵn sàng" : "Bản nháp";
+            const tone: "neutral" | "info" | "success" | "warning" | "danger" = isIndividual
+              ? row.status === "in_use_owner" ? "success" : row.status === "on_loan" ? "info" : row.status === "repairing" ? "warning" : "neutral"
+              : "neutral";
+            return (
+              <article className="mobile-equipment-item" key={`${row.managementMode}-${row.id}`}>
+                <div className="mobile-equipment-thumb"><Wrench size={23} /></div>
+                <div className="mobile-equipment-copy">
+                  <strong>{row.name}</strong>
+                  <span>{row.code || "Chưa cấp mã"} <i /> {row.ownerGroupName}</span>
+                </div>
+                <div className="mobile-equipment-state">
+                  <StatusBadge label={statusLabel} tone={tone} />
+                  {isIndividual && row.condition !== "good" ? <small>{CONDITION_LABELS[row.condition]}</small> : null}
+                </div>
+                {canEdit ? <button type="button" className="mobile-equipment-more" onClick={() => openEdit(row)} aria-label={`Chỉnh sửa ${row.name}`}><MoreHorizontal size={18} /></button> : null}
+              </article>
+            );
+          }) : <EmptyState title="Chưa có dụng cụ" description="Không có dữ liệu phù hợp với bộ lọc hiện tại." />}
+        </div>
+        {actionablePermissions.length ? <button type="button" className="mobile-add-asset" onClick={openNew} aria-label="Thêm dụng cụ"><Plus size={24} /></button> : null}
       </div>
 
-      {!actionablePermissions.length ? (
-        <div className="viewer-banner"><ShieldCheck size={18} /><div><strong>Nhân viên — Xem & mượn</strong><span>Không được sửa danh mục, nhưng vẫn có thể lập thủ tục Mượn máy và Mượn nhanh.</span></div></div>
-      ) : null}
+      <div className="desktop-equipment-workspace">
+        <div className="equipment-toolbar">
+          <div className="equipment-filter-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã, tên, loại dụng cụ..." aria-label="Tìm dụng cụ" /></div>
+          <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} aria-label="Lọc nhóm">
+            <option value="all">Tất cả nhóm được phân quyền</option>
+            {permissions.map((permission) => <option key={permission.groupId} value={permission.groupId}>{permission.groupName}</option>)}
+          </select>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Lọc trạng thái hồ sơ">
+            <option value="all">Tất cả hồ sơ</option>
+            <option value="active">Đã hoàn thành</option>
+            <option value="draft">Bản nháp</option>
+          </select>
+          {actionablePermissions.length ? <Button type="button" onClick={openNew}><Plus size={16} /> Thêm dụng cụ</Button> : null}
+        </div>
 
-      <div className="equipment-summary-strip">
-        <span><Boxes size={16} /> <strong>{filteredEquipment.length}</strong> máy/CCDC có mã</span>
-        <span><PackageOpen size={16} /> <strong>{filteredTools.length}</strong> dụng cụ theo số lượng</span>
-        <span><i /> Mã được cấp tự động theo nhóm</span>
+        {!actionablePermissions.length ? (
+          <div className="viewer-banner"><ShieldCheck size={18} /><div><strong>Nhân viên — Xem & mượn</strong><span>Không được sửa danh mục, nhưng vẫn có thể lập thủ tục Mượn máy và Mượn nhanh.</span></div></div>
+        ) : null}
+
+        <div className="equipment-summary-strip">
+          <span><Boxes size={16} /> <strong>{filteredEquipment.length}</strong> máy/CCDC có mã</span>
+          <span><PackageOpen size={16} /> <strong>{filteredTools.length}</strong> dụng cụ theo số lượng</span>
+          <span><i /> Mã được cấp tự động theo nhóm</span>
+        </div>
+
+        <section className="card table-card">
+          <div className="card-header"><div><h2 className="card-title">Máy/CCDC quản lý từng thiết bị</h2><p className="card-subtitle">Mỗi thiết bị có một mã cố định trong toàn bộ vòng đời.</p></div></div>
+          <div className="card-content">
+            <DataTable
+              headers={["Mã", "Tên dụng cụ", "Loại", "Nhóm quản lý", "Vị trí", "Tình trạng", "Hồ sơ", "Thao tác"]}
+              rows={filteredEquipment.map((row) => {
+                const permission = permissionByGroup.get(row.ownerGroupId);
+                const canEdit = permission && permissionRank(permission.level) >= 1;
+                return [
+                  <strong key="code">{row.code}</strong>,
+                  <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.specification || "Chưa có thông số"}</small></div>,
+                  row.equipmentType,
+                  row.ownerGroupName,
+                  row.currentLocation || "—",
+                  <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={row.condition === "good" ? "success" : row.condition === "irreparable" ? "danger" : "warning"} />,
+                  <StatusBadge key="record" label={row.recordStatus === "active" ? EQUIPMENT_STATUS_LABELS[row.status] : "Bản nháp"} tone={row.recordStatus === "active" ? (row.status === "in_use_owner" ? "success" : "info") : "neutral"} />,
+                  canEdit ? <Button key="edit" type="button" size="sm" variant="ghost" onClick={() => openEdit(row)}><Edit3 size={14} /> Chỉnh sửa</Button> : <span key="view">Chỉ xem</span>,
+                ];
+              })}
+              empty={<EmptyState title="Chưa có máy/CCDC" description="Dùng nút Thêm dụng cụ để tạo hồ sơ đầu tiên cho nhóm." />}
+            />
+          </div>
+        </section>
+
+        <section className="card table-card section-gap">
+          <div className="card-header"><div><h2 className="card-title">Dụng cụ quản lý theo số lượng</h2><p className="card-subtitle">Một mã danh mục đại diện cho nhiều dụng cụ đồng loại.</p></div></div>
+          <div className="card-content">
+            <DataTable
+              headers={["Mã", "Tên dụng cụ", "Loại", "Nhóm quản lý", "Số lượng", "Hồ sơ", "Thao tác"]}
+              rows={filteredTools.map((row) => {
+                const permission = permissionByGroup.get(row.ownerGroupId);
+                const canEdit = permission && permissionRank(permission.level) >= 1;
+                return [
+                  <strong key="code">{row.code || "Chưa cấp mã"}</strong>,
+                  <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.specification || "Chưa có quy cách"}</small></div>,
+                  row.equipmentType,
+                  row.ownerGroupName,
+                  <span key="quantity" className="numeric"><strong>{row.quantityOnHand}</strong> {row.unit}</span>,
+                  <StatusBadge key="record" label={row.recordStatus === "active" ? "Đã hoàn thành" : "Bản nháp"} tone={row.recordStatus === "active" ? "success" : "neutral"} />,
+                  canEdit ? <Button key="edit" type="button" size="sm" variant="ghost" onClick={() => openEdit(row)}><Edit3 size={14} /> Chỉnh sửa</Button> : <span key="view">Chỉ xem</span>,
+                ];
+              })}
+              empty={<EmptyState title="Chưa có dụng cụ theo số lượng" description="Mũi khoan, taro, dụng cụ đo và dụng cụ đồng loại có thể quản lý tại đây." />}
+            />
+          </div>
+        </section>
       </div>
-
-      <section className="card table-card">
-        <div className="card-header"><div><h2 className="card-title">Máy/CCDC quản lý từng thiết bị</h2><p className="card-subtitle">Mỗi thiết bị có một mã cố định trong toàn bộ vòng đời.</p></div></div>
-        <div className="card-content">
-          <DataTable
-            headers={["Mã", "Tên dụng cụ", "Loại", "Nhóm quản lý", "Vị trí", "Tình trạng", "Hồ sơ", "Thao tác"]}
-            rows={filteredEquipment.map((row) => {
-              const permission = permissionByGroup.get(row.ownerGroupId);
-              const canEdit = permission && permissionRank(permission.level) >= 1;
-              return [
-                <strong key="code">{row.code}</strong>,
-                <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.specification || "Chưa có thông số"}</small></div>,
-                row.equipmentType,
-                row.ownerGroupName,
-                row.currentLocation || "—",
-                <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={row.condition === "good" ? "success" : row.condition === "irreparable" ? "danger" : "warning"} />,
-                <StatusBadge key="record" label={row.recordStatus === "active" ? EQUIPMENT_STATUS_LABELS[row.status] : "Bản nháp"} tone={row.recordStatus === "active" ? (row.status === "in_use_owner" ? "success" : "info") : "neutral"} />,
-                canEdit ? <Button key="edit" type="button" size="sm" variant="ghost" onClick={() => openEdit(row)}><Edit3 size={14} /> Chỉnh sửa</Button> : <span key="view">Chỉ xem</span>,
-              ];
-            })}
-            empty={<EmptyState title="Chưa có máy/CCDC" description="Dùng nút Thêm dụng cụ để tạo hồ sơ đầu tiên cho nhóm." />}
-          />
-        </div>
-      </section>
-
-      <section className="card table-card section-gap">
-        <div className="card-header"><div><h2 className="card-title">Dụng cụ quản lý theo số lượng</h2><p className="card-subtitle">Một mã danh mục đại diện cho nhiều dụng cụ đồng loại.</p></div></div>
-        <div className="card-content">
-          <DataTable
-            headers={["Mã", "Tên dụng cụ", "Loại", "Nhóm quản lý", "Số lượng", "Hồ sơ", "Thao tác"]}
-            rows={filteredTools.map((row) => {
-              const permission = permissionByGroup.get(row.ownerGroupId);
-              const canEdit = permission && permissionRank(permission.level) >= 1;
-              return [
-                <strong key="code">{row.code || "Chưa cấp mã"}</strong>,
-                <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.specification || "Chưa có quy cách"}</small></div>,
-                row.equipmentType,
-                row.ownerGroupName,
-                <span key="quantity" className="numeric"><strong>{row.quantityOnHand}</strong> {row.unit}</span>,
-                <StatusBadge key="record" label={row.recordStatus === "active" ? "Đã hoàn thành" : "Bản nháp"} tone={row.recordStatus === "active" ? "success" : "neutral"} />,
-                canEdit ? <Button key="edit" type="button" size="sm" variant="ghost" onClick={() => openEdit(row)}><Edit3 size={14} /> Chỉnh sửa</Button> : <span key="view">Chỉ xem</span>,
-              ];
-            })}
-            empty={<EmptyState title="Chưa có dụng cụ theo số lượng" description="Mũi khoan, taro, dụng cụ đo và dụng cụ đồng loại có thể quản lý tại đây." />}
-          />
-        </div>
-      </section>
 
       {dialogOpen ? (
         <div className="asset-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
