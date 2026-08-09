@@ -12,6 +12,8 @@ function makeAuth(overrides: Partial<AuthContext> = {}): AuthContext {
     accountStatus: "active",
     isAdmin: false,
     isWsManager: false,
+    isWorkshopAdmin: false,
+    isReadOnlyViewer: false,
     mustChangePassword: false,
     sessionVersion: 1,
     primaryGroupId: "g1",
@@ -27,22 +29,32 @@ function makeAuth(overrides: Partial<AuthContext> = {}): AuthContext {
   };
 }
 
-test("Admin không tự động là Quản lý Xưởng", () => {
-  const auth = makeAuth({ isAdmin: true, isWsManager: false });
-  assert.equal(hasSystemRole(auth, "admin"), true);
-  assert.equal(hasSystemRole(auth, "wsManager"), false);
-  assert.deepEqual(getSystemRoleLabels(auth), ["Quản trị hệ thống"]);
+test("Quản lý Xưởng / Admin là một vai trò hệ thống gộp", () => {
+  const auth = makeAuth({ isAdmin: true, isWorkshopAdmin: true });
+  assert.equal(hasSystemRole(auth, "workshopAdmin"), true);
+  assert.deepEqual(getSystemRoleLabels(auth), ["Quản lý Xưởng / Admin"]);
+  assert.match(getRoleSummary(auth), /Quản lý Xưởng \/ Admin/);
 });
 
-test("Quản lý Xưởng không tự động là Admin", () => {
-  const auth = makeAuth({ isAdmin: false, isWsManager: true });
-  assert.equal(hasSystemRole(auth, "admin"), false);
-  assert.equal(hasSystemRole(auth, "wsManager"), true);
-  assert.deepEqual(getSystemRoleLabels(auth), ["Quản lý Xưởng"]);
+test("Người xem toàn xưởng là vai trò đọc độc lập", () => {
+  const auth = makeAuth({
+    isReadOnlyViewer: true,
+    primaryGroupId: null,
+    primaryGroupName: null,
+    permissions: [],
+  });
+  assert.equal(hasSystemRole(auth, "readOnlyViewer"), true);
+  assert.deepEqual(getSystemRoleLabels(auth), ["Người xem toàn xưởng"]);
+  assert.equal(getRoleSummary(auth), "Người xem toàn xưởng");
 });
 
-test("Nếu một người được cấp cả hai vai trò thì giao diện hiển thị riêng cả hai", () => {
-  const auth = makeAuth({ isAdmin: true, isWsManager: true });
-  assert.match(getRoleSummary(auth), /Quản trị hệ thống/);
-  assert.match(getRoleSummary(auth), /Quản lý Xưởng/);
+test("vai trò nhóm hiển thị theo chức danh thực tế của Xưởng", () => {
+  const auth = makeAuth({ permissions: [{
+    groupId: "g1",
+    groupCode: "WORKSHOP",
+    groupName: "Bảo trì cơ - Nhóm Workshop",
+    level: "operator",
+    isPrimary: true,
+  }] });
+  assert.match(getRoleSummary(auth), /Kỹ sư giám sát/);
 });

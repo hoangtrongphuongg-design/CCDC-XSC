@@ -11,6 +11,7 @@ DO $$ BEGIN CREATE TYPE repair_status AS ENUM ('pending_acceptance','repairing',
 DO $$ BEGIN CREATE TYPE disposal_status AS ENUM ('pending_group','pending_ws','wait_warehouse','completed','rejected','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE notification_type AS ENUM ('info','success','warning','danger'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE equipment_record_status AS ENUM ('draft','active'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE equipment_origin_type AS ENUM ('existing','new_purchase','other'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
   account_status account_status NOT NULL DEFAULT 'pending',
   is_admin boolean NOT NULL DEFAULT false,
   is_ws_manager boolean NOT NULL DEFAULT false,
+  is_readonly_viewer boolean NOT NULL DEFAULT false,
   must_change_password boolean NOT NULL DEFAULT false,
   session_version integer NOT NULL DEFAULT 1,
   reviewed_at timestamptz,
@@ -71,21 +73,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_primary_group_per_user ON user_group_permi
 CREATE TABLE IF NOT EXISTS equipment (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   code varchar(60) NOT NULL UNIQUE,
-  name varchar(180) NOT NULL,
+  legacy_code varchar(100),
+  name varchar(200) NOT NULL,
   equipment_type varchar(120) NOT NULL,
   category_code varchar(40) NOT NULL DEFAULT 'KHAC',
   specification varchar(240),
+  technical_specs text,
+  technical_note text,
   unit varchar(30) NOT NULL DEFAULT 'cái',
   record_status equipment_record_status NOT NULL DEFAULT 'active',
-  model varchar(180), serial varchar(120), brand varchar(120),
+  origin_type equipment_origin_type NOT NULL DEFAULT 'existing',
+  recorded_date date NOT NULL DEFAULT CURRENT_DATE,
+  model varchar(180),
+  serial varchar(150),
+  brand varchar(150),
+  manufacture_year smallint,
+  commission_year smallint,
+  origin_group_id uuid NOT NULL REFERENCES groups(id),
   owner_group_id uuid NOT NULL REFERENCES groups(id),
   current_group_id uuid NOT NULL REFERENCES groups(id),
   current_holder_id uuid REFERENCES users(id) ON DELETE SET NULL,
-  current_location varchar(180),
+  current_location varchar(255),
   status equipment_status NOT NULL DEFAULT 'in_use_owner',
   condition equipment_condition NOT NULL DEFAULT 'unknown',
   purchase_date date,
+  po_contract_no varchar(150),
+  supplier_name varchar(200),
   purchase_price numeric(18,2),
+  warranty_until date,
+  purchase_note text,
   notes text,
   created_by uuid REFERENCES users(id) ON DELETE SET NULL,
   updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
@@ -96,6 +112,26 @@ CREATE TABLE IF NOT EXISTS equipment (
 );
 CREATE INDEX IF NOT EXISTS equipment_owner_status_idx ON equipment(owner_group_id, status);
 CREATE INDEX IF NOT EXISTS equipment_current_group_idx ON equipment(current_group_id);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'equipment' AND column_name = 'legacy_code') THEN
+    CREATE INDEX IF NOT EXISTS equipment_legacy_code_idx ON equipment(legacy_code);
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'equipment' AND column_name = 'serial') THEN
+    CREATE INDEX IF NOT EXISTS equipment_serial_idx ON equipment(serial);
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS equipment_type_catalog (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  category_code varchar(40) NOT NULL,
+  name varchar(120) NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(category_code, name)
+);
+CREATE INDEX IF NOT EXISTS equipment_type_catalog_active_idx ON equipment_type_catalog(category_code, is_active);
 
 CREATE TABLE IF NOT EXISTS tool_catalog (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -240,11 +276,13 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   actor_group_id uuid REFERENCES groups(id) ON DELETE SET NULL,
+  actor_role varchar(80),
   action varchar(80) NOT NULL,
   entity_type varchar(80) NOT NULL,
   entity_id uuid,
   description text NOT NULL,
   before_data jsonb, after_data jsonb,
+  reason text,
   ip_address varchar(80),
   created_at timestamptz NOT NULL DEFAULT now()
 );

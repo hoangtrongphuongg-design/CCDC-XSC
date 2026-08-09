@@ -63,7 +63,7 @@ export default async function MachineLoansPage() {
     <>
       <PageHeader
         title="Mượn máy"
-        description="Mọi nhân viên được lập đề nghị; Operator nhóm cho duyệt; nhân viên nhóm cho xác nhận nhận lại."
+        description="Công nhân kỹ thuật, Kỹ sư giám sát và Đốc công đều được lập đề nghị; Kỹ sư giám sát hoặc Đốc công nhóm cho mượn duyệt; thành viên nhóm cho mượn xác nhận nhận lại."
       />
 
       <section className="stat-grid">
@@ -157,7 +157,7 @@ export default async function MachineLoansPage() {
           <CardContent>
             {borrowerGroups.length ? (
               <form action={createMachineLoanAction} className="form-grid">
-                <FormField label="Nhóm mượn" required hint="Nhân viên có quyền viewer cũng được lập đề nghị.">
+                <FormField label="Nhóm mượn" required hint="Mọi thành viên nghiệp vụ của nhóm đều được lập đề nghị.">
                   <select name="borrowerGroupId">
                     {borrowerGroups.map((group) => <option key={group.groupId} value={group.groupId}>{group.groupName}</option>)}
                   </select>
@@ -176,7 +176,7 @@ export default async function MachineLoansPage() {
                 <Button type="submit">Gửi đề nghị mượn</Button>
               </form>
             ) : (
-              <EmptyState title="Chưa được gán nhóm" description="Tài khoản cần có ít nhất quyền Nhân viên tại một nhóm để lập đề nghị." />
+              <EmptyState title="Chưa được gán nhóm" description="Tài khoản cần thuộc ít nhất một nhóm nghiệp vụ để lập đề nghị." />
             )}
           </CardContent>
         </Card>

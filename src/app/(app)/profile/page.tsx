@@ -23,7 +23,7 @@ export default async function ProfilePage() {
         <Card>
           <CardHeader><CardTitle>Phạm vi nhóm</CardTitle><ShieldCheck size={18} /></CardHeader>
           <CardContent><div className="permission-list">
-            {auth.permissions.map((permission) => <div key={permission.groupId}><strong>{permission.groupName}</strong><span>{permission.level === "viewer" ? "Nhân viên" : permission.level === "operator" ? "Operator" : "Manager"}</span></div>)}
+            {auth.permissions.map((permission) => <div key={permission.groupId}><strong>{permission.groupName}</strong><span>{permission.level === "viewer" ? "Công nhân kỹ thuật" : permission.level === "operator" ? "Kỹ sư giám sát" : "Đốc công khu vực"}</span></div>)}
           </div></CardContent>
         </Card>
       </div>

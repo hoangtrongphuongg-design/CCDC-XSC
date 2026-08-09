@@ -6,7 +6,7 @@ async function source(relativePath: string) {
   return readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 }
 
-test("mượn máy: Nhân viên tạo/nhận/báo trả, Operator duyệt, Nhân viên nhóm cho nhận lại", async () => {
+test("mượn máy: mọi thành viên nhóm được tạo/nhận/báo trả, GS hoặc Đốc công nhóm cho duyệt", async () => {
   const text = await source("src/actions/machine-loans.ts");
   assert.match(text, /requireGroupPermission\(borrowerGroupId, "viewer"\)/);
   assert.match(text, /requireGroupPermission\(loan\.ownerGroupId, "operator"\)/);
@@ -14,7 +14,7 @@ test("mượn máy: Nhân viên tạo/nhận/báo trả, Operator duyệt, Nhân
   assert.match(text, /confirmMachineReturnAction[\s\S]*requireGroupPermission\(loan\.ownerGroupId, "viewer"\)/);
 });
 
-test("mượn nhanh có bước chờ Operator duyệt trước khi xác nhận nhận", async () => {
+test("mượn nhanh có bước chờ nhóm cho mượn duyệt trước khi xác nhận nhận", async () => {
   const text = await source("src/actions/quick-loans.ts");
   assert.match(text, /status: "pending_approval"/);
   assert.match(text, /approveQuickLoanAction/);

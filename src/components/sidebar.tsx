@@ -82,7 +82,7 @@ export function Sidebar({ auth }: { auth: AuthContext }) {
         {renderGroup("TỔNG QUAN", operationItems)}
         {renderGroup("NGHIỆP VỤ", workflowItems)}
         {renderGroup("THEO DÕI", insightItems)}
-        {auth.isAdmin ? renderGroup("QUẢN TRỊ", [
+        {auth.isWorkshopAdmin ? renderGroup("QUẢN TRỊ", [
           ["/groups", "Cơ cấu nhóm Xưởng", Network],
           ["/users", "Người dùng & phân quyền", ShieldCheck],
         ]) : null}

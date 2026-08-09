@@ -1,47 +1,43 @@
-# Checklist nâng cấp V1.3.2
+# Checklist triển khai bộ code hiện tại
 
 ## Neon
 
-- [ ] Sao lưu hoặc kiểm tra dữ liệu quan trọng trước khi nâng cấp.
-- [ ] Xác nhận `DATABASE_URL` là pooled connection string và có `sslmode=require`.
-- [ ] Chạy `drizzle/0004_separate_system_roles.sql` nếu nâng cấp từ V1.3.1.
-- [ ] Kiểm tra tài khoản `admin` có `is_admin = true` và `is_ws_manager = false`.
-- [ ] Kiểm tra quyền nhóm mặc định của `admin` tại Workshop là `viewer`.
-- [ ] Kiểm tra quyền Kho thanh lý của `admin` mặc định đã được thu hồi.
-- [ ] Không chạy lại `db:seed` nếu admin đã tồn tại.
+- [ ] Sao lưu dữ liệu quan trọng.
+- [ ] Xác nhận đúng `DATABASE_URL` production.
+- [ ] Chạy `database/update.sql` một lần trước khi deploy code mới.
+- [ ] Kiểm tra script hoàn tất mà không có `DROP TABLE` hoặc xóa dữ liệu.
 
-## GitHub
+## Kiểm tra source
 
-- [ ] Giải nén bộ code; không upload nguyên file ZIP vào repo.
-- [ ] Không commit `.env` hoặc `.env.local`.
-- [ ] Chạy `npm install`.
-- [ ] Chạy `npm run typecheck`.
-- [ ] Chạy `npm test`.
-- [ ] Chạy `npm run build`.
-- [ ] Commit và push nhánh `main`.
+- [ ] `npm install`
+- [ ] `npm run typecheck`
+- [ ] `npm test`
+- [ ] `npm run build`
+- [ ] Không commit `.env` / `.env.local`.
 
 ## Vercel
 
-- [ ] Kiểm tra `DATABASE_URL`.
-- [ ] Kiểm tra `AUTH_SECRET`.
-- [ ] Redeploy sau khi migration Neon hoàn tất.
-- [ ] Kiểm tra deployment ở trạng thái `Ready`.
+- [ ] `DATABASE_URL` đã cấu hình.
+- [ ] `AUTH_SECRET` đã cấu hình.
+- [ ] Push lên nhánh Vercel đang theo dõi.
+- [ ] Deployment ở trạng thái Ready.
 
 ## Kiểm thử vai trò
 
-- [ ] Admin vào được trang Người dùng và Cơ cấu nhóm.
-- [ ] Admin không duyệt điều chuyển hoặc thanh lý nếu không có vai trò Quản lý Xưởng.
-- [ ] Quản lý Xưởng duyệt nghiệp vụ cấp Xưởng nhưng không vào được trang quản trị user nếu không có Admin.
-- [ ] Cấp/thu hồi Quản lý Xưởng không làm thay đổi quyền Admin.
-- [ ] Cấp/thu hồi Admin không làm thay đổi vai trò Quản lý Xưởng.
-- [ ] Giao diện hiển thị riêng cả hai vai trò khi một người được cấp cả hai.
+- [ ] Người xem toàn xưởng xem được dữ liệu nhưng không tạo/sửa.
+- [ ] Công nhân kỹ thuật xem được CCDC nhưng không thấy quyền thêm/sửa.
+- [ ] Kỹ sư giám sát thêm/sửa CCDC nhóm mình.
+- [ ] Đốc công thêm/sửa CCDC nhóm mình và kế thừa quyền Kỹ sư.
+- [ ] Quản lý Xưởng / Admin thêm CCDC cho bất kỳ nhóm nào và vào trang quản trị user.
 
-## Kiểm thử quyền nhóm và mượn
+## Kiểm thử Dụng cụ nhóm tôi
 
-- [ ] Nhân viên tạo được Mượn máy và Mượn nhanh.
-- [ ] Nhân viên không duyệt được phiếu.
-- [ ] Operator đúng nhóm cho duyệt được.
-- [ ] Operator nhóm khác không duyệt được.
-- [ ] Manager nhóm có thể duyệt thay trong phạm vi nhóm.
-- [ ] Nhân viên nhóm cho xác nhận nhận lại được.
-- [ ] Người tạo không tự duyệt phiếu của chính mình.
+- [ ] Tạo CCDC hiện hữu sinh mã đúng prefix nhóm.
+- [ ] Tạo máy mới bởi Quản lý Xưởng / Admin chọn nhóm nhận và sinh mã theo nhóm nhận.
+- [ ] Mã hiện hữu và serial trùng tạo cảnh báo mềm.
+- [ ] Hai người tạo gần đồng thời không nhận cùng mã hệ thống.
+- [ ] `Lưu & thêm tiếp` hoạt động.
+- [ ] `Sao chép để tạo mới` không sao chép serial/mã hiện hữu.
+- [ ] Sửa dữ liệu lưu old/new trong lịch sử.
+- [ ] Hiệu chỉnh nhạy cảm bởi Quản lý Xưởng / Admin bắt nhập lý do.
+- [ ] Mobile không phát sinh cuộn ngang toàn trang.

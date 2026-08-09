@@ -59,7 +59,7 @@ function RoleToggle({
   disabledLabel,
 }: {
   userId: string;
-  role: "admin" | "ws_manager";
+  role: "workshop_admin" | "readonly_viewer";
   enabled: boolean;
   enabledLabel: string;
   disabledLabel: string;
@@ -123,7 +123,7 @@ export default async function UsersPage() {
     <>
       <PageHeader
         title="Người dùng & phân quyền"
-        description="Quyền nhóm, Quản lý Xưởng và Quản trị hệ thống được cấp độc lập. Admin không tự động có quyền duyệt nghiệp vụ toàn xưởng."
+        description="Phân quyền theo thực tế Xưởng: Công nhân kỹ thuật, Kỹ sư giám sát, Đốc công khu vực; Quản lý Xưởng / Admin là vai trò quản trị cao nhất. Người xem toàn xưởng chỉ có quyền đọc."
       />
 
       <Card className="table-card">
@@ -138,13 +138,17 @@ export default async function UsersPage() {
                 actions.push(
                   <form action={approveUserAction} key="approve" className="row-actions user-approval-form">
                     <input type="hidden" name="userId" value={user.id} />
+                    <select name="accountMode" aria-label="Loại tài khoản" className="field-inline-lg" defaultValue="group_user">
+                      <option value="group_user">User nghiệp vụ theo nhóm</option>
+                      <option value="readonly_viewer">Người xem toàn xưởng</option>
+                    </select>
                     <select name="groupId" aria-label="Nhóm chính" className="field-inline-lg">
                       <GroupOptions rows={operationalGroups} />
                     </select>
                     <select name="permissionLevel" aria-label="Mức quyền" className="field-inline-lg" defaultValue="viewer">
-                      <option value="viewer">Nhân viên — Xem & mượn</option>
-                      <option value="operator">Operator — Thao tác nhóm</option>
-                      <option value="manager">Manager — Quản lý nhóm</option>
+                      <option value="viewer">Công nhân kỹ thuật</option>
+                      <option value="operator">Kỹ sư giám sát</option>
+                      <option value="manager">Đốc công khu vực</option>
                     </select>
                     <Button size="sm">Duyệt</Button>
                   </form>,
@@ -172,8 +176,8 @@ export default async function UsersPage() {
               }
 
               const systemRoles = [
-                user.isWsManager ? "Quản lý Xưởng" : null,
-                user.isAdmin ? "Quản trị hệ thống" : null,
+                user.isAdmin || user.isWsManager ? "Quản lý Xưởng / Admin" : null,
+                user.isReadOnlyViewer ? "Người xem toàn xưởng" : null,
               ].filter(Boolean) as string[];
 
               return [
@@ -216,9 +220,9 @@ export default async function UsersPage() {
               </FormField>
               <FormField label="Mức quyền" required>
                 <select name="permissionLevel" defaultValue="viewer">
-                  <option value="viewer">Nhân viên — Xem & mượn</option>
-                  <option value="operator">Operator — Thao tác nhóm</option>
-                  <option value="manager">Manager — Quản lý nhóm</option>
+                  <option value="viewer">Công nhân kỹ thuật</option>
+                  <option value="operator">Kỹ sư giám sát</option>
+                  <option value="manager">Đốc công khu vực</option>
                 </select>
               </FormField>
               <Button type="submit">Gán quyền</Button>
@@ -230,37 +234,38 @@ export default async function UsersPage() {
           <CardHeader><CardTitle>Nguyên tắc vai trò</CardTitle></CardHeader>
           <CardContent>
             <div className="permission-list-cell">
-              <span><strong>Quản lý Xưởng:</strong> duyệt và điều phối nghiệp vụ toàn xưởng; không quản trị tài khoản.</span>
-              <span><strong>Quản trị hệ thống:</strong> quản lý user, nhóm và cấu hình; không tự động được duyệt nghiệp vụ.</span>
-              <span><strong>Operator:</strong> thao tác và duyệt công việc thường ngày của nhóm.</span>
-              <span><strong>Manager:</strong> quản lý nhóm và thực hiện các bước xác nhận cấp nhóm.</span>
+              <span><strong>Công nhân kỹ thuật:</strong> xem, mượn/trả và báo hỏng CCDC.</span>
+              <span><strong>Kỹ sư giám sát:</strong> quản lý CCDC và xử lý nghiệp vụ thường ngày của nhóm.</span>
+              <span><strong>Đốc công khu vực:</strong> cấp trên của Kỹ sư giám sát; có quyền điều chuyển và thanh lý cấp nhóm.</span>
+              <span><strong>Quản lý Xưởng / Admin:</strong> quản lý toàn Xưởng, cấp phát ban đầu, quản trị user và can thiệp dữ liệu khi cần.</span>
+              <span><strong>Người xem toàn xưởng:</strong> xem toàn bộ web nhưng không được ghi dữ liệu.</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
       <Card className="table-card section-gap">
-        <CardHeader><CardTitle>Vai trò cấp hệ thống — cấp riêng từng vai trò</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Vai trò cấp hệ thống</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            headers={["Người dùng", "Quản lý Xưởng", "Quản trị hệ thống"]}
+            headers={["Người dùng", "Quản lý Xưởng / Admin", "Người xem toàn xưởng"]}
             rows={activeUsers.map((user) => [
               <div key="user" className="permission-list-cell"><strong>{user.fullName}</strong><span>{user.username}</span></div>,
               <RoleToggle
-                key="ws"
+                key="workshop-admin"
                 userId={user.id}
-                role="ws_manager"
-                enabled={user.isWsManager}
-                enabledLabel="Thu hồi QL Xưởng"
-                disabledLabel="Cấp QL Xưởng"
+                role="workshop_admin"
+                enabled={user.isAdmin || user.isWsManager}
+                enabledLabel="Thu hồi quyền"
+                disabledLabel="Cấp QL Xưởng / Admin"
               />,
               <RoleToggle
-                key="admin"
+                key="readonly"
                 userId={user.id}
-                role="admin"
-                enabled={user.isAdmin}
-                enabledLabel="Thu hồi Admin"
-                disabledLabel="Cấp Admin"
+                role="readonly_viewer"
+                enabled={user.isReadOnlyViewer}
+                enabledLabel="Thu hồi quyền xem"
+                disabledLabel="Cấp quyền xem toàn xưởng"
               />,
             ])}
             empty={<EmptyState description="Chưa có tài khoản hoạt động." />}

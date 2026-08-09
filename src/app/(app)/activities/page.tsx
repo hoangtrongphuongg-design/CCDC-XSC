@@ -12,20 +12,38 @@ export default async function ActivitiesPage() {
   const rows = await db.select({
     createdAt: activityLogs.createdAt,
     actor: users.fullName,
+    actorRole: activityLogs.actorRole,
     groupName: groups.name,
     action: activityLogs.action,
     entityType: activityLogs.entityType,
     description: activityLogs.description,
+    reason: activityLogs.reason,
   }).from(activityLogs)
     .leftJoin(users, eq(activityLogs.actorUserId, users.id))
     .leftJoin(groups, eq(activityLogs.actorGroupId, groups.id))
     .orderBy(desc(activityLogs.createdAt)).limit(300);
+
   return (
     <>
       <PageHeader title="Lịch sử hoạt động" description="Nhật ký không xóa của các thao tác quan trọng trong hệ thống." />
       <Card className="table-card">
         <CardHeader><CardTitle>300 hoạt động gần nhất</CardTitle><Activity size={18} /></CardHeader>
-        <CardContent><DataTable headers={["Thời gian", "Người thực hiện", "Nhóm", "Hành động", "Đối tượng", "Nội dung"]} rows={rows.map((r) => [formatDateTime(r.createdAt), r.actor || "Hệ thống", r.groupName || "—", r.action, r.entityType, r.description])} empty={<EmptyState description="Chưa có lịch sử hoạt động." />} /></CardContent>
+        <CardContent>
+          <DataTable
+            headers={["Thời gian", "Người thực hiện", "Vai trò", "Nhóm", "Hành động", "Đối tượng", "Nội dung", "Lý do"]}
+            rows={rows.map((r) => [
+              formatDateTime(r.createdAt),
+              r.actor || "Hệ thống",
+              r.actorRole || "—",
+              r.groupName || "—",
+              r.action,
+              r.entityType,
+              r.description,
+              r.reason || "—",
+            ])}
+            empty={<EmptyState description="Chưa có lịch sử hoạt động." />}
+          />
+        </CardContent>
       </Card>
     </>
   );

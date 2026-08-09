@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { disposals, equipment, machineLoans, repairs, transfers } from "@/lib/db/schema";
+import { disposals, equipment, machineLoans, repairs, toolCatalog, transfers } from "@/lib/db/schema";
 
 export type DbTx = any; // Transaction object của Drizzle; giữ tương thích giữa các phiên bản Drizzle.
 
@@ -23,13 +23,42 @@ export async function nextAssetCode(
 ) {
   const counterKind = input.mode === "individual" ? "ASSET" : "TOOL";
   const key = `${counterKind}:${input.groupCode}`;
-  const result = (await tx.execute(sql`
-    insert into workflow_counters (key, value, updated_at)
-    values (${key}, 1, now())
-    on conflict (key) do update
-      set value = workflow_counters.value + 1, updated_at = now()
-    returning value
-  `)) as { rows: Array<{ value: number | string }> };
+  const prefix = input.mode === "individual"
+    ? `${input.equipmentPrefix}-`
+    : `${input.equipmentPrefix}-VT-`;
+  const serialPattern = "^.*-([0-9]+)$";
+  const serialReplacement = "\\1";
+
+  // Khởi tạo/đồng bộ counter từ mã đang tồn tại để DB cũ hoặc dữ liệu import
+  // không thể làm bộ đếm quay lại 0001. ON CONFLICT vẫn đảm bảo hai người
+  // tạo cùng lúc nhận hai số khác nhau.
+  const query = input.mode === "individual"
+    ? sql`
+        insert into workflow_counters (key, value, updated_at)
+        select ${key},
+               coalesce(max(nullif(regexp_replace(${equipment.code}, ${serialPattern}, ${serialReplacement}), ${equipment.code})::integer), 0) + 1,
+               now()
+        from ${equipment}
+        where ${equipment.code} like ${`${prefix}%`}
+        on conflict (key) do update
+          set value = greatest(workflow_counters.value + 1, excluded.value),
+              updated_at = now()
+        returning value
+      `
+    : sql`
+        insert into workflow_counters (key, value, updated_at)
+        select ${key},
+               coalesce(max(nullif(regexp_replace(${toolCatalog.code}, ${serialPattern}, ${serialReplacement}), ${toolCatalog.code})::integer), 0) + 1,
+               now()
+        from ${toolCatalog}
+        where ${toolCatalog.code} like ${`${prefix}%`}
+        on conflict (key) do update
+          set value = greatest(workflow_counters.value + 1, excluded.value),
+              updated_at = now()
+        returning value
+      `;
+
+  const result = (await tx.execute(query)) as { rows: Array<{ value: number | string }> };
   const value = Number(result.rows[0]?.value ?? 1);
   const serial = String(value).padStart(4, "0");
   return input.mode === "individual"

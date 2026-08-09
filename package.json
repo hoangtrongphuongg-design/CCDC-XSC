@@ -14,7 +14,8 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts",
     "import:excel": "tsx scripts/import-excel.ts",
-    "db:init": "tsx scripts/migrate.ts"
+    "db:init": "tsx scripts/migrate.ts",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -10,7 +10,7 @@ import { writeAudit } from "@/lib/audit";
 import { isOfficialOperationalGroupCode, STANDARD_GROUPS } from "@/lib/group-structure";
 
 type PermissionLevel = "viewer" | "operator" | "manager";
-type SystemRole = "admin" | "ws_manager";
+type SystemRole = "workshop_admin" | "readonly_viewer";
 
 function parsePermissionLevel(value: FormDataEntryValue | null): PermissionLevel {
   const raw = String(value || "viewer");
@@ -23,56 +23,69 @@ function parsePermissionLevel(value: FormDataEntryValue | null): PermissionLevel
 export async function approveUserAction(formData: FormData) {
   const auth = await requireAdmin();
   const userId = String(formData.get("userId") || "");
+  const accountMode = String(formData.get("accountMode") || "group_user") as "group_user" | "readonly_viewer";
   const groupId = String(formData.get("groupId") || "");
   const permissionLevel = parsePermissionLevel(formData.get("permissionLevel"));
 
-  if (!userId || !groupId) throw new Error("Thiếu user hoặc nhóm.");
-  const [primaryGroup] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
-  if (!primaryGroup || primaryGroup.isSystem || !primaryGroup.isActive || !isOfficialOperationalGroupCode(primaryGroup.code)) {
-    throw new Error("Nhóm chính không hợp lệ.");
+  if (!userId) throw new Error("Thiếu user.");
+
+  let primaryGroup: typeof groups.$inferSelect | null = null;
+  if (accountMode === "group_user") {
+    if (!groupId) throw new Error("Thiếu nhóm chính.");
+    const [foundGroup] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
+    if (!foundGroup || foundGroup.isSystem || !foundGroup.isActive || !isOfficialOperationalGroupCode(foundGroup.code)) {
+      throw new Error("Nhóm chính không hợp lệ.");
+    }
+    primaryGroup = foundGroup;
   }
 
   await db.transaction(async (tx) => {
     const [target] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!target) throw new Error("Không tìm thấy user.");
 
-    // Duyệt tài khoản chỉ kích hoạt tài khoản và gán quyền nhóm.
-    // Admin và Quản lý Xưởng được cấp riêng ở màn hình Vai trò cấp hệ thống.
     await tx.update(users).set({
       accountStatus: "active",
-      primaryGroupId: groupId,
+      primaryGroupId: accountMode === "readonly_viewer" ? null : primaryGroup!.id,
+      isReadOnlyViewer: accountMode === "readonly_viewer",
       reviewedBy: auth.userId,
       reviewedAt: new Date(),
       updatedAt: new Date(),
     }).where(eq(users.id, userId));
 
-    await tx.insert(userGroupPermissions).values({
-      userId,
-      groupId,
-      permissionLevel,
-      isPrimary: true,
-      assignedBy: auth.userId,
-    }).onConflictDoUpdate({
-      target: [userGroupPermissions.userId, userGroupPermissions.groupId],
-      set: {
+    if (accountMode === "group_user") {
+      await tx.insert(userGroupPermissions).values({
+        userId,
+        groupId: primaryGroup!.id,
         permissionLevel,
         isPrimary: true,
-        isActive: true,
         assignedBy: auth.userId,
-        assignedAt: new Date(),
-        revokedAt: null,
-        revokedBy: null,
-      },
-    });
+      }).onConflictDoUpdate({
+        target: [userGroupPermissions.userId, userGroupPermissions.groupId],
+        set: {
+          permissionLevel,
+          isPrimary: true,
+          isActive: true,
+          assignedBy: auth.userId,
+          assignedAt: new Date(),
+          revokedAt: null,
+          revokedBy: null,
+        },
+      });
+    }
 
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
+      actorRole: "Quản lý Xưởng / Admin",
       action: "user.approve",
       entityType: "user",
       entityId: userId,
-      description: `Duyệt tài khoản ${target.username}`,
+      description: accountMode === "readonly_viewer"
+        ? `Duyệt ${target.username} với vai trò Người xem toàn xưởng`
+        : `Duyệt tài khoản ${target.username}`,
       beforeData: target,
-      afterData: { accountStatus: "active", groupId, permissionLevel },
+      afterData: accountMode === "readonly_viewer"
+        ? { accountStatus: "active", isReadOnlyViewer: true }
+        : { accountStatus: "active", groupId: primaryGroup!.id, permissionLevel },
     });
   });
 
@@ -219,8 +232,8 @@ export async function resetTemporaryPasswordAction(formData: FormData) {
 }
 
 /**
- * Admin hệ thống và Quản lý Xưởng là hai vai trò độc lập.
- * Thao tác với một vai trò không được làm thay đổi vai trò còn lại.
+ * Vai trò cấp Xưởng được gộp thành Quản lý Xưởng / Admin.
+ * Người xem toàn xưởng là vai trò đọc độc lập và không cần thuộc nhóm.
  */
 export async function setSystemRoleAction(formData: FormData) {
   const auth = await requireAdmin();
@@ -229,17 +242,17 @@ export async function setSystemRoleAction(formData: FormData) {
   const enabled = String(formData.get("enabled") || "false") === "true";
 
   if (!userId) throw new Error("Thiếu user.");
-  if (!(["admin", "ws_manager"] as const).includes(role)) throw new Error("Vai trò hệ thống không hợp lệ.");
-  if (role === "admin" && userId === auth.userId && !enabled) {
-    throw new Error("Không thể tự gỡ quyền admin của chính mình.");
+  if (!( ["workshop_admin", "readonly_viewer"] as const).includes(role)) throw new Error("Vai trò hệ thống không hợp lệ.");
+  if (role === "workshop_admin" && userId === auth.userId && !enabled) {
+    throw new Error("Không thể tự gỡ quyền Quản lý Xưởng / Admin của chính mình.");
   }
 
   const [before] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!before) throw new Error("Không tìm thấy user.");
 
-  const changes = role === "admin"
-    ? { isAdmin: enabled }
-    : { isWsManager: enabled };
+  const changes = role === "workshop_admin"
+    ? { isAdmin: enabled, isWsManager: enabled, isReadOnlyViewer: enabled ? false : before.isReadOnlyViewer }
+    : { isReadOnlyViewer: enabled, isAdmin: enabled ? false : before.isAdmin, isWsManager: enabled ? false : before.isWsManager };
 
   await db.transaction(async (tx) => {
     await tx.update(users).set({
@@ -250,18 +263,17 @@ export async function setSystemRoleAction(formData: FormData) {
 
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
-      action: role === "admin" ? "user.role.admin.update" : "user.role.ws_manager.update",
+      actorRole: "Quản lý Xưởng / Admin",
+      action: role === "workshop_admin" ? "user.role.workshop_admin.update" : "user.role.readonly_viewer.update",
       entityType: "user",
       entityId: userId,
-      description: `${enabled ? "Cấp" : "Thu hồi"} vai trò ${role === "admin" ? "Quản trị hệ thống" : "Quản lý Xưởng"} cho ${before.username}`,
-      beforeData: { isAdmin: before.isAdmin, isWsManager: before.isWsManager },
-      afterData: {
-        isAdmin: role === "admin" ? enabled : before.isAdmin,
-        isWsManager: role === "ws_manager" ? enabled : before.isWsManager,
-      },
+      description: `${enabled ? "Cấp" : "Thu hồi"} vai trò ${role === "workshop_admin" ? "Quản lý Xưởng / Admin" : "Người xem toàn xưởng"} cho ${before.username}`,
+      beforeData: { isAdmin: before.isAdmin, isWsManager: before.isWsManager, isReadOnlyViewer: before.isReadOnlyViewer },
+      afterData: changes,
     });
   });
 
   revalidatePath("/users");
   revalidatePath("/dashboard");
 }
+

@@ -7,6 +7,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -84,6 +85,7 @@ export const disposalStatusEnum = pgEnum("disposal_status", [
 ]);
 export const notificationTypeEnum = pgEnum("notification_type", ["info", "success", "warning", "danger"]);
 export const equipmentRecordStatusEnum = pgEnum("equipment_record_status", ["draft", "active"]);
+export const equipmentOriginTypeEnum = pgEnum("equipment_origin_type", ["existing", "new_purchase", "other"]);
 
 export const groups = pgTable(
   "groups",
@@ -113,6 +115,7 @@ export const users = pgTable(
     accountStatus: accountStatusEnum("account_status").notNull().default("pending"),
     isAdmin: boolean("is_admin").notNull().default(false),
     isWsManager: boolean("is_ws_manager").notNull().default(false),
+    isReadOnlyViewer: boolean("is_readonly_viewer").notNull().default(false),
     mustChangePassword: boolean("must_change_password").notNull().default(false),
     sessionVersion: integer("session_version").notNull().default(1),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
@@ -153,23 +156,35 @@ export const equipment = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     code: varchar("code", { length: 60 }).notNull(),
-    name: varchar("name", { length: 180 }).notNull(),
+    legacyCode: varchar("legacy_code", { length: 100 }),
+    name: varchar("name", { length: 200 }).notNull(),
     equipmentType: varchar("equipment_type", { length: 120 }).notNull(),
     categoryCode: varchar("category_code", { length: 40 }).notNull().default("KHAC"),
     specification: varchar("specification", { length: 240 }),
+    technicalSpecs: text("technical_specs"),
+    technicalNote: text("technical_note"),
     unit: varchar("unit", { length: 30 }).notNull().default("cái"),
     recordStatus: equipmentRecordStatusEnum("record_status").notNull().default("active"),
+    originType: equipmentOriginTypeEnum("origin_type").notNull().default("existing"),
+    recordedDate: date("recorded_date").notNull(),
     model: varchar("model", { length: 180 }),
-    serial: varchar("serial", { length: 120 }),
-    brand: varchar("brand", { length: 120 }),
+    serial: varchar("serial", { length: 150 }),
+    brand: varchar("brand", { length: 150 }),
+    manufactureYear: smallint("manufacture_year"),
+    commissionYear: smallint("commission_year"),
+    originGroupId: uuid("origin_group_id").notNull().references(() => groups.id),
     ownerGroupId: uuid("owner_group_id").notNull().references(() => groups.id),
     currentGroupId: uuid("current_group_id").notNull().references(() => groups.id),
     currentHolderId: uuid("current_holder_id").references(() => users.id, { onDelete: "set null" }),
-    currentLocation: varchar("current_location", { length: 180 }),
+    currentLocation: varchar("current_location", { length: 255 }),
     status: equipmentStatusEnum("status").notNull().default("in_use_owner"),
     condition: conditionEnum("condition").notNull().default("unknown"),
     purchaseDate: date("purchase_date"),
+    poContractNo: varchar("po_contract_no", { length: 150 }),
+    supplierName: varchar("supplier_name", { length: 200 }),
     purchasePrice: numeric("purchase_price", { precision: 18, scale: 2 }),
+    warrantyUntil: date("warranty_until"),
+    purchaseNote: text("purchase_note"),
     notes: text("notes"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -182,6 +197,26 @@ export const equipment = pgTable(
     uniqueIndex("equipment_code_unique").on(t.code),
     index("equipment_owner_status_idx").on(t.ownerGroupId, t.status),
     index("equipment_current_group_idx").on(t.currentGroupId),
+    index("equipment_legacy_code_idx").on(t.legacyCode),
+    index("equipment_serial_idx").on(t.serial),
+  ],
+);
+
+
+export const equipmentTypeCatalog = pgTable(
+  "equipment_type_catalog",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    categoryCode: varchar("category_code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("equipment_type_catalog_category_name_unique").on(t.categoryCode, t.name),
+    index("equipment_type_catalog_active_idx").on(t.categoryCode, t.isActive),
   ],
 );
 
@@ -378,12 +413,14 @@ export const activityLogs = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
     actorGroupId: uuid("actor_group_id").references(() => groups.id, { onDelete: "set null" }),
+    actorRole: varchar("actor_role", { length: 80 }),
     action: varchar("action", { length: 80 }).notNull(),
     entityType: varchar("entity_type", { length: 80 }).notNull(),
     entityId: uuid("entity_id"),
     description: text("description").notNull(),
     beforeData: jsonb("before_data"),
     afterData: jsonb("after_data"),
+    reason: text("reason"),
     ipAddress: varchar("ip_address", { length: 80 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

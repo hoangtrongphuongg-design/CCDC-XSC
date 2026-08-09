@@ -25,6 +25,8 @@ export type AuthContext = {
   accountStatus: "pending" | "active" | "rejected" | "blocked";
   isAdmin: boolean;
   isWsManager: boolean;
+  isWorkshopAdmin: boolean;
+  isReadOnlyViewer: boolean;
   mustChangePassword: boolean;
   sessionVersion: number;
   primaryGroupId: string | null;
@@ -76,6 +78,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
         accountStatus: users.accountStatus,
         isAdmin: users.isAdmin,
         isWsManager: users.isWsManager,
+        isReadOnlyViewer: users.isReadOnlyViewer,
         mustChangePassword: users.mustChangePassword,
         sessionVersion: users.sessionVersion,
         primaryGroupId: users.primaryGroupId,
@@ -100,7 +103,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
       .innerJoin(groups, eq(userGroupPermissions.groupId, groups.id))
       .where(and(eq(userGroupPermissions.userId, profile.userId), eq(userGroupPermissions.isActive, true), eq(groups.isActive, true)));
 
-    return { ...profile, permissions };
+    return { ...profile, isWorkshopAdmin: profile.isAdmin || profile.isWsManager, permissions };
   } catch {
     return null;
   }

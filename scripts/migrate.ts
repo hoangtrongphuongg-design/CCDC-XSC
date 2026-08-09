@@ -12,8 +12,10 @@ const pool = new Pool({
 
 try {
   const schema = await readFile(resolve("database/current_schema.sql"), "utf8");
+  const update = await readFile(resolve("database/update.sql"), "utf8");
   await pool.query(schema);
-  console.log("Cấu trúc database hiện tại đã được đồng bộ.");
+  await pool.query(update);
+  console.log("Cấu trúc database hiện tại và cập nhật milestone đã được đồng bộ.");
 } finally {
   await pool.end();
 }

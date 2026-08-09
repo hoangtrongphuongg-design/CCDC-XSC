@@ -15,8 +15,8 @@ function refresh() {
 }
 
 /**
- * Nhân viên của nhóm mượn lập đề nghị. Chưa trừ tồn kho tại bước này vì
- * Operator nhóm cho vẫn phải kiểm tra và duyệt.
+ * Thành viên nghiệp vụ của nhóm mượn lập đề nghị. Chưa trừ tồn kho tại bước này vì
+ * Kỹ sư giám sát hoặc Đốc công nhóm cho mượn vẫn phải kiểm tra và duyệt.
  */
 export async function createQuickLoanAction(formData: FormData) {
   const sourceGroupId = String(formData.get("sourceGroupId") || "");
@@ -87,7 +87,7 @@ export async function createQuickLoanAction(formData: FormData) {
   refresh();
 }
 
-/** Operator nhóm cho duyệt; Manager nhóm có thể duyệt thay khi cần. */
+/** Kỹ sư giám sát hoặc Đốc công nhóm cho mượn đều có quyền duyệt. */
 export async function approveQuickLoanAction(formData: FormData) {
   const loanId = String(formData.get("loanId") || "");
   const lenderNote = String(formData.get("lenderNote") || "").trim();
@@ -134,7 +134,7 @@ export async function approveQuickLoanAction(formData: FormData) {
       action: "quick_loan.approve",
       entityType: "quick_loan",
       entityId: loan.id,
-      description: `Operator nhóm cho duyệt phiếu ${loan.code}`,
+      description: `Nhóm cho mượn duyệt phiếu ${loan.code}`,
       beforeData: loan,
       afterData: updated,
     });
@@ -161,7 +161,7 @@ export async function confirmQuickLoanReceiptAction(formData: FormData) {
       updatedAt: new Date(),
     }).where(and(eq(quickLoans.id, loanId), eq(quickLoans.status, "pending_receipt"))).returning();
 
-    if (!updated) throw new Error("Giao dịch chưa được Operator nhóm cho duyệt hoặc đã được xử lý.");
+    if (!updated) throw new Error("Giao dịch chưa được nhóm cho mượn duyệt hoặc đã được xử lý.");
 
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
@@ -258,7 +258,7 @@ export async function closeQuickLoanAction(formData: FormData) {
       action: "quick_loan.complete",
       entityType: "quick_loan",
       entityId: loan.id,
-      description: `Nhân viên nhóm cho xác nhận nhận lại phiếu ${loan.code}`,
+      description: `Thành viên nhóm cho mượn xác nhận nhận lại phiếu ${loan.code}`,
       afterData: { returnedGood, returnedDamaged, lostQuantity, returnNote },
     });
   });

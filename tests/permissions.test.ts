@@ -12,6 +12,8 @@ function makeAuth(level: "viewer" | "operator" | "manager"): AuthContext {
     accountStatus: "active",
     isAdmin: false,
     isWsManager: false,
+    isWorkshopAdmin: false,
+    isReadOnlyViewer: false,
     mustChangePassword: false,
     sessionVersion: 1,
     primaryGroupId: "g1",
@@ -26,20 +28,20 @@ function makeAuth(level: "viewer" | "operator" | "manager"): AuthContext {
   };
 }
 
-test("Nhân viên có quyền viewer nhưng không có quyền operator", () => {
+test("Công nhân kỹ thuật có quyền cơ bản nhưng không có quyền Kỹ sư giám sát", () => {
   const auth = makeAuth("viewer");
   assert.equal(hasGroupPermission(auth, "g1", "viewer"), true);
   assert.equal(hasGroupPermission(auth, "g1", "operator"), false);
 });
 
-test("Operator kế thừa quyền viewer nhưng không có quyền manager", () => {
+test("Kỹ sư giám sát kế thừa quyền cơ bản nhưng chưa có quyền Đốc công", () => {
   const auth = makeAuth("operator");
   assert.equal(hasGroupPermission(auth, "g1", "viewer"), true);
   assert.equal(hasGroupPermission(auth, "g1", "operator"), true);
   assert.equal(hasGroupPermission(auth, "g1", "manager"), false);
 });
 
-test("Manager có quyền viewer, operator và manager trong đúng nhóm", () => {
+test("Đốc công có quyền Công nhân, Kỹ sư giám sát và Đốc công trong đúng nhóm", () => {
   const auth = makeAuth("manager");
   assert.equal(hasGroupPermission(auth, "g1", "viewer"), true);
   assert.equal(hasGroupPermission(auth, "g1", "operator"), true);
@@ -48,4 +50,15 @@ test("Manager có quyền viewer, operator và manager trong đúng nhóm", () =
 
 test("Không có quyền ở nhóm khác", () => {
   assert.equal(hasGroupPermission(makeAuth("manager"), "g2", "viewer"), false);
+});
+
+test("Người xem toàn xưởng không có quyền ghi theo nhóm", () => {
+  const auth = { ...makeAuth("manager"), isReadOnlyViewer: true };
+  assert.equal(hasGroupPermission(auth, "g1", "viewer"), false);
+  assert.equal(hasGroupPermission(auth, "g1", "operator"), false);
+});
+
+test("Quản lý Xưởng / Admin có quyền nghiệp vụ ở mọi nhóm", () => {
+  const auth = { ...makeAuth("viewer"), isWorkshopAdmin: true };
+  assert.equal(hasGroupPermission(auth, "g2", "manager"), true);
 });

@@ -20,6 +20,7 @@ export default async function EquipmentPage() {
     db.select({
       id: equipment.id,
       code: equipment.code,
+      legacyCode: equipment.legacyCode,
       name: equipment.name,
       type: equipment.equipmentType,
       categoryCode: equipment.categoryCode,
@@ -69,16 +70,17 @@ export default async function EquipmentPage() {
         <StatCard title="Máy/CCDC có mã" value={rows.length} icon={Boxes} tone="primary" />
         <StatCard title="Sẵn sàng tại nhóm" value={rows.filter((row) => row.status === "in_use_owner").length} icon={CircleCheck} tone="success" />
         <StatCard title="Đang trong quy trình" value={rows.filter((row) => !["in_use_owner", "disposal_warehouse"].includes(row.status)).length} icon={Wrench} tone="warning" />
-        <StatCard title="Danh mục theo số lượng" value={toolRows.length} icon={PackageOpen} tone="violet" />
+        <StatCard title="Danh mục theo số lượng" value={toolRows.length} icon={PackageOpen} tone="primary" />
       </section>
 
       <Card className="table-card">
         <CardHeader><CardTitle>Danh mục máy/CCDC có mã</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            headers={["Mã", "Tên máy", "Nhóm thiết bị", "Loại", "Nhóm quản lý", "Nhóm đang dùng", "Người giữ", "Vị trí", "Tình trạng", "Trạng thái"]}
+            headers={["Mã", "Mã hiện hữu", "Tên máy", "Nhóm thiết bị", "Loại", "Nhóm quản lý", "Nhóm đang dùng", "Người giữ", "Vị trí", "Tình trạng", "Trạng thái"]}
             rows={rows.map((row) => [
               <strong key="code">{row.code}</strong>,
+              row.legacyCode || "—",
               <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.model || "Chưa có model"}</small></div>,
               getEquipmentCategoryLabel(row.categoryCode),
               row.type,

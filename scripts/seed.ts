@@ -37,7 +37,7 @@ async function main() {
       requestedGroupId: workshop.id,
       accountStatus: "active",
       isAdmin: true,
-      isWsManager: false,
+      isWsManager: true,
       mustChangePassword: true,
       reviewedAt: new Date(),
     }).returning();
@@ -48,7 +48,7 @@ async function main() {
       isPrimary: true,
       assignedBy: admin.id,
     });
-    console.log(`Đã tạo admin ${username}. Tài khoản chỉ có vai trò Quản trị hệ thống; không tự động là Quản lý Xưởng.`);
+    console.log(`Đã tạo ${username} với vai trò Quản lý Xưởng / Admin.`);
   }
 }
 
