@@ -1,5 +1,5 @@
 export const APP_NAME = "QUẢN LÝ CCDC - XSC";
-export const SESSION_COOKIE = "ccdc_xsc_session";
+export const SESSION_COOKIE = "ccdc_xsc_session_v2";
 export const SESSION_TTL_SECONDS = 8 * 60 * 60;
 export const USERNAME_PATTERN = /^(?!.*\.\.)[a-z0-9][a-z0-9._]{2,28}[a-z0-9]$/;
 

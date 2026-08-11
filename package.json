@@ -1,6 +1,6 @@
 {
   "name": "quan-ly-ccdc-xsc",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "private": true,
   "engines": {
     "node": ">=20"

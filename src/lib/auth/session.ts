@@ -34,6 +34,17 @@ export type AuthContext = {
   permissions: GroupPermission[];
 };
 
+export type AuthFailureReason =
+  | "missing_cookie"
+  | "invalid_token"
+  | "missing_subject"
+  | "user_not_found"
+  | "session_version_mismatch";
+
+export type AuthResult =
+  | { auth: AuthContext; reason: null }
+  | { auth: null; reason: AuthFailureReason };
+
 export async function createSessionToken(userId: string, sessionVersion: number) {
   return new SignJWT({ sessionVersion })
     .setProtectedHeader({ alg: "HS256" })
@@ -46,35 +57,49 @@ export async function createSessionToken(userId: string, sessionVersion: number)
 export async function setSessionCookie(userId: string, sessionVersion: number) {
   const token = await createSessionToken(userId, sessionVersion);
   const store = await cookies();
+  const expires = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+
+  // V2 dùng tên cookie mới để loại trừ cookie cũ/stale từ các bản trước.
+  // Lax vẫn bảo vệ tốt cho ứng dụng nội bộ và ổn định hơn Strict với điều hướng/refresh.
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
+    expires,
+    priority: "high",
   });
 }
 
 export async function clearSessionCookie() {
   const store = await cookies();
-  store.delete(SESSION_COOKIE);
+  store.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  });
 }
 
-export async function getAuthContext(): Promise<AuthContext | null> {
+export async function getAuthResult(): Promise<AuthResult> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
+  if (!token) return { auth: null, reason: "missing_cookie" };
 
   let payload: JWTPayload;
   try {
     ({ payload } = await jwtVerify(token, secret));
-  } catch {
-    // Chỉ JWT/cookie không hợp lệ mới được xem là chưa đăng nhập.
-    // Lỗi DB/Neon phải nổi lên để chẩn đoán, không được biến thành logout giả.
-    return null;
+  } catch (error) {
+    console.warn("[auth] JWT verification failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+    });
+    return { auth: null, reason: "invalid_token" };
   }
 
-  if (!payload.sub) return null;
+  if (!payload.sub) return { auth: null, reason: "missing_subject" };
 
   const [profile] = await db
     .select({
@@ -96,7 +121,17 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     .where(eq(users.id, payload.sub))
     .limit(1);
 
-  if (!profile || profile.sessionVersion !== Number(payload.sessionVersion)) return null;
+  if (!profile) return { auth: null, reason: "user_not_found" };
+
+  const tokenVersion = Number(payload.sessionVersion);
+  if (!Number.isInteger(tokenVersion) || profile.sessionVersion !== tokenVersion) {
+    console.warn("[auth] Session version mismatch", {
+      userId: profile.userId,
+      databaseVersion: profile.sessionVersion,
+      tokenVersion: Number.isFinite(tokenVersion) ? tokenVersion : null,
+    });
+    return { auth: null, reason: "session_version_mismatch" };
+  }
 
   const permissions = await db
     .select({
@@ -110,5 +145,10 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     .innerJoin(groups, eq(userGroupPermissions.groupId, groups.id))
     .where(and(eq(userGroupPermissions.userId, profile.userId), eq(userGroupPermissions.isActive, true), eq(groups.isActive, true)));
 
-  return { ...profile, isWorkshopAdmin: profile.isAdmin || profile.isWsManager, permissions };
+  return { auth: { ...profile, isWorkshopAdmin: profile.isAdmin || profile.isWsManager, permissions }, reason: null };
+}
+
+export async function getAuthContext(): Promise<AuthContext | null> {
+  const result = await getAuthResult();
+  return result.auth;
 }

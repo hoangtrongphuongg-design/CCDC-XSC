@@ -35,7 +35,10 @@ export async function loginAction(_: LoginState, formData: FormData): Promise<Lo
   if (user.accountStatus === "blocked" || user.accountStatus === "rejected") return { error: "Tài khoản đã bị khóa hoặc từ chối." };
 
   await resetRateLimit(`login:user:${username}`);
-  await db.update(users).set({ lastLoginAt: new Date(), updatedAt: new Date() }).where(eq(users.id, user.id));
-  await setSessionCookie(user.id, user.sessionVersion);
+  const [loginUser] = await db.update(users)
+    .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+    .where(eq(users.id, user.id))
+    .returning({ sessionVersion: users.sessionVersion });
+  await setSessionCookie(user.id, loginUser?.sessionVersion ?? user.sessionVersion);
   redirect("/dashboard");
 }

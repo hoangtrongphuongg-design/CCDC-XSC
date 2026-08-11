@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { getAuthContext, type AuthContext } from "./session";
+import { getAuthResult, type AuthContext } from "./session";
 
 export async function requireUser(): Promise<AuthContext> {
-  const auth = await getAuthContext();
-  if (!auth) redirect("/login");
+  const result = await getAuthResult();
+  if (!result.auth) redirect(`/login?reason=${result.reason}`);
+  const auth = result.auth;
   if (auth.accountStatus !== "active") redirect("/login?status=" + auth.accountStatus);
   if (auth.mustChangePassword) redirect("/change-password");
   return auth;
@@ -17,7 +18,6 @@ export async function requireWorkshopAdmin() {
   return auth;
 }
 
-// Giữ alias để các module cũ không phải đổi đồng loạt trong milestone này.
 export const requireAdmin = requireWorkshopAdmin;
 export const requireWsManager = requireWorkshopAdmin;
 

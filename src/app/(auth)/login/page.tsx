@@ -31,6 +31,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           {params.status === "pending" ? <p className="notice warning">Tài khoản đang chờ quản trị viên duyệt.</p> : null}
           {params.status === "blocked" || params.status === "rejected" ? <p className="notice danger">Tài khoản đã bị khóa hoặc từ chối.</p> : null}
           {params.passwordChanged ? <p className="notice success">Đã đổi mật khẩu. Vui lòng đăng nhập lại.</p> : null}
+          {params.reason === "missing_cookie" ? <p className="notice warning">Phiên đăng nhập không được trình duyệt gửi lại (AUTH-C01).</p> : null}
+          {params.reason === "invalid_token" ? <p className="notice warning">Cookie còn nhưng chữ ký/thời hạn phiên không hợp lệ (AUTH-C02).</p> : null}
+          {params.reason === "session_version_mismatch" ? <p className="notice warning">Phiên đã bị vô hiệu do phiên bản quyền/tài khoản thay đổi (AUTH-C03).</p> : null}
+          {params.reason === "user_not_found" || params.reason === "missing_subject" ? <p className="notice warning">Phiên đăng nhập không còn khớp tài khoản (AUTH-C04).</p> : null}
           <LoginForm />
           <div className="auth-divider"><span>hoặc</span></div>
           <Link href="/register" className="auth-secondary-action">Đăng ký tài khoản nội bộ</Link>
