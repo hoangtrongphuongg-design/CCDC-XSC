@@ -2,6 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { checkRateLimit, resetRateLimit } from "@/lib/auth/rate-limit";
@@ -9,7 +10,7 @@ import { verifyPassword } from "@/lib/auth/password";
 import { setSessionCookie } from "@/lib/auth/session";
 import { loginSchema } from "@/lib/validation";
 
-export type LoginState = { error?: string; success?: boolean };
+export type LoginState = { error?: string };
 
 export async function loginAction(_: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = loginSchema.safeParse({
@@ -36,5 +37,5 @@ export async function loginAction(_: LoginState, formData: FormData): Promise<Lo
   await resetRateLimit(`login:user:${username}`);
   await db.update(users).set({ lastLoginAt: new Date(), updatedAt: new Date() }).where(eq(users.id, user.id));
   await setSessionCookie(user.id, user.sessionVersion);
-  return { success: true };
+  redirect("/dashboard");
 }

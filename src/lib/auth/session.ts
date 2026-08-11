@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { groups, userGroupPermissions, users } from "@/lib/db/schema";
@@ -65,46 +65,50 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
+  let payload: JWTPayload;
   try {
-    const { payload } = await jwtVerify(token, secret);
-    if (!payload.sub) return null;
-
-    const [profile] = await db
-      .select({
-        userId: users.id,
-        username: users.username,
-        fullName: users.fullName,
-        employeeCode: users.employeeCode,
-        accountStatus: users.accountStatus,
-        isAdmin: users.isAdmin,
-        isWsManager: users.isWsManager,
-        isReadOnlyViewer: users.isReadOnlyViewer,
-        mustChangePassword: users.mustChangePassword,
-        sessionVersion: users.sessionVersion,
-        primaryGroupId: users.primaryGroupId,
-        primaryGroupName: groups.name,
-      })
-      .from(users)
-      .leftJoin(groups, eq(users.primaryGroupId, groups.id))
-      .where(eq(users.id, payload.sub))
-      .limit(1);
-
-    if (!profile || profile.sessionVersion !== Number(payload.sessionVersion)) return null;
-
-    const permissions = await db
-      .select({
-        groupId: userGroupPermissions.groupId,
-        groupCode: groups.code,
-        groupName: groups.name,
-        level: userGroupPermissions.permissionLevel,
-        isPrimary: userGroupPermissions.isPrimary,
-      })
-      .from(userGroupPermissions)
-      .innerJoin(groups, eq(userGroupPermissions.groupId, groups.id))
-      .where(and(eq(userGroupPermissions.userId, profile.userId), eq(userGroupPermissions.isActive, true), eq(groups.isActive, true)));
-
-    return { ...profile, isWorkshopAdmin: profile.isAdmin || profile.isWsManager, permissions };
+    ({ payload } = await jwtVerify(token, secret));
   } catch {
+    // Chỉ JWT/cookie không hợp lệ mới được xem là chưa đăng nhập.
+    // Lỗi DB/Neon phải nổi lên để chẩn đoán, không được biến thành logout giả.
     return null;
   }
+
+  if (!payload.sub) return null;
+
+  const [profile] = await db
+    .select({
+      userId: users.id,
+      username: users.username,
+      fullName: users.fullName,
+      employeeCode: users.employeeCode,
+      accountStatus: users.accountStatus,
+      isAdmin: users.isAdmin,
+      isWsManager: users.isWsManager,
+      isReadOnlyViewer: users.isReadOnlyViewer,
+      mustChangePassword: users.mustChangePassword,
+      sessionVersion: users.sessionVersion,
+      primaryGroupId: users.primaryGroupId,
+      primaryGroupName: groups.name,
+    })
+    .from(users)
+    .leftJoin(groups, eq(users.primaryGroupId, groups.id))
+    .where(eq(users.id, payload.sub))
+    .limit(1);
+
+  if (!profile || profile.sessionVersion !== Number(payload.sessionVersion)) return null;
+
+  const permissions = await db
+    .select({
+      groupId: userGroupPermissions.groupId,
+      groupCode: groups.code,
+      groupName: groups.name,
+      level: userGroupPermissions.permissionLevel,
+      isPrimary: userGroupPermissions.isPrimary,
+    })
+    .from(userGroupPermissions)
+    .innerJoin(groups, eq(userGroupPermissions.groupId, groups.id))
+    .where(and(eq(userGroupPermissions.userId, profile.userId), eq(userGroupPermissions.isActive, true), eq(groups.isActive, true)));
+
+  return { ...profile, isWorkshopAdmin: profile.isAdmin || profile.isWsManager, permissions };
 }
