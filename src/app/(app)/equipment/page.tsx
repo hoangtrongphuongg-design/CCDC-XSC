@@ -32,6 +32,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
       status: equipment.status,
       condition: equipment.condition,
       ownerGroup: groups.name,
+      ownerGroupId: equipment.ownerGroupId,
       currentGroupId: equipment.currentGroupId,
       currentLocation: equipment.currentLocation,
     })
@@ -85,6 +86,15 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
     tool.unit,
   ));
 
+  const searchGroupStats = Array.from(
+    filteredRows.reduce((map, row) => {
+      map.set(row.ownerGroup, (map.get(row.ownerGroup) || 0) + 1);
+      return map;
+    }, new Map<string, number>()),
+  )
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "vi"));
+
   return (
     <>
       <PageHeader
@@ -92,23 +102,48 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         description="Trang tra cứu tập trung, chỉ xem. Việc thêm và cập nhật dụng cụ được thực hiện tại Dụng cụ nhóm tôi."
         actions={
           <form className="workshop-equipment-search" action="/equipment" method="get" role="search">
-            <Search size={18} aria-hidden="true" />
+            <span className="workshop-search-icon" aria-hidden="true"><Search size={18} /></span>
             <input
               name="q"
               defaultValue={searchText}
-              placeholder="Tìm theo mã, tên máy, loại, nhóm, vị trí..."
+              placeholder="Mã, tên máy, loại, nhóm, vị trí..."
               aria-label="Tìm dụng cụ toàn xưởng"
             />
             <button type="submit">Tìm</button>
           </form>
         }
       />
+
       <section className="stat-grid">
         <StatCard title="Máy/CCDC có mã" value={rows.length} icon={Boxes} tone="primary" />
         <StatCard title="Sẵn sàng tại nhóm" value={rows.filter((row) => row.status === "in_use_owner").length} icon={CircleCheck} tone="success" />
         <StatCard title="Đang trong quy trình" value={rows.filter((row) => !["in_use_owner", "disposal_warehouse"].includes(row.status)).length} icon={Wrench} tone="warning" />
         <StatCard title="Danh mục theo số lượng" value={toolRows.length} icon={PackageOpen} tone="primary" />
       </section>
+
+      {searchText ? (
+        <section className="search-group-dashboard" aria-label="Thống kê kết quả tìm kiếm theo nhóm quản lý">
+          <div className="search-group-dashboard__header">
+            <div>
+              <span>Kết quả tìm “{searchText}”</span>
+              <strong>Phân bố Máy/CCDC có mã theo nhóm quản lý</strong>
+            </div>
+            <b>{filteredRows.length} máy/CCDC</b>
+          </div>
+          {searchGroupStats.length ? (
+            <div className="search-group-dashboard__items">
+              {searchGroupStats.map((item) => (
+                <div className="search-group-chip" key={item.name}>
+                  <span>{item.name}</span>
+                  <strong>{item.count}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="search-group-dashboard__empty">Không có Máy/CCDC có mã phù hợp để thống kê theo nhóm.</p>
+          )}
+        </section>
+      ) : null}
 
       <Card className="table-card">
         <CardHeader><CardTitle>Danh mục máy/CCDC có mã</CardTitle></CardHeader>

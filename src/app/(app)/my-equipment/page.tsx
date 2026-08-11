@@ -1,6 +1,6 @@
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { activityLogs, equipment, equipmentTypeCatalog, groups, users } from "@/lib/db/schema";
+import { activityLogs, equipment, equipmentTypeCatalog, groups, machineLoans, repairs, transfers, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -56,46 +56,129 @@ export default async function MyEquipmentPage() {
           });
 
   const visibleGroupIds = permissions.map((permission) => permission.groupId);
+
+  const [relevantLoanRows, relevantTransferRows] = visibleGroupIds.length
+    ? await Promise.all([
+        db.select({
+          equipmentId: machineLoans.equipmentId,
+          ownerGroupId: machineLoans.ownerGroupId,
+          borrowerGroupId: machineLoans.borrowerGroupId,
+          status: machineLoans.status,
+          updatedAt: machineLoans.updatedAt,
+        }).from(machineLoans)
+          .where(or(inArray(machineLoans.ownerGroupId, visibleGroupIds), inArray(machineLoans.borrowerGroupId, visibleGroupIds)))
+          .orderBy(desc(machineLoans.updatedAt)),
+        db.select({
+          equipmentId: transfers.equipmentId,
+          sourceGroupId: transfers.sourceGroupId,
+          targetGroupId: transfers.targetGroupId,
+          status: transfers.status,
+          updatedAt: transfers.updatedAt,
+        }).from(transfers)
+          .where(or(inArray(transfers.sourceGroupId, visibleGroupIds), inArray(transfers.targetGroupId, visibleGroupIds)))
+          .orderBy(desc(transfers.updatedAt)),
+      ])
+    : [[], []];
+
+  const openTransferEquipmentIds = Array.from(new Set(
+    relevantTransferRows
+      .filter((row) => !["completed", "rejected", "cancelled"].includes(row.status))
+      .map((row) => row.equipmentId),
+  ));
+
   const rawEquipmentRows = visibleGroupIds.length
     ? await db.select().from(equipment)
-        .where(inArray(equipment.ownerGroupId, visibleGroupIds))
+        .where(openTransferEquipmentIds.length
+          ? or(
+              inArray(equipment.ownerGroupId, visibleGroupIds),
+              inArray(equipment.currentGroupId, visibleGroupIds),
+              inArray(equipment.id, openTransferEquipmentIds),
+            )
+          : or(
+              inArray(equipment.ownerGroupId, visibleGroupIds),
+              inArray(equipment.currentGroupId, visibleGroupIds),
+            ))
         .orderBy(asc(equipment.code))
     : [];
 
   const groupNameById = new Map(groupRows.map((group) => [group.id, group.name]));
-  const equipmentRows: IndividualEquipmentRow[] = rawEquipmentRows.map((row) => ({
-    id: row.id,
-    code: row.code,
-    legacyCode: row.legacyCode,
-    name: row.name,
-    equipmentType: row.equipmentType,
-    categoryCode: row.categoryCode,
-    technicalSpecs: row.technicalSpecs || row.specification,
-    technicalNote: row.technicalNote,
-    model: row.model,
-    serial: row.serial,
-    brand: row.brand,
-    manufactureYear: row.manufactureYear,
-    commissionYear: row.commissionYear,
-    originType: row.originType,
-    recordedDate: row.recordedDate,
-    originGroupId: row.originGroupId,
-    originGroupName: groupNameById.get(row.originGroupId) || "—",
-    ownerGroupId: row.ownerGroupId,
-    ownerGroupName: groupNameById.get(row.ownerGroupId) || "—",
-    currentLocation: row.currentLocation,
-    status: row.status,
-    condition: row.condition,
-    purchaseDate: row.purchaseDate,
-    poContractNo: row.poContractNo,
-    supplierName: row.supplierName,
-    purchasePrice: row.purchasePrice,
-    warrantyUntil: row.warrantyUntil,
-    purchaseNote: row.purchaseNote,
-    notes: row.notes,
-    recordStatus: row.recordStatus,
-    updatedAt: row.updatedAt.toISOString(),
-  }));
+  const equipmentIds = rawEquipmentRows.map((row) => row.id);
+
+  const repairRows = equipmentIds.length
+    ? await db.select({
+        equipmentId: repairs.equipmentId,
+        status: repairs.status,
+        updatedAt: repairs.updatedAt,
+      }).from(repairs)
+        .where(inArray(repairs.equipmentId, equipmentIds))
+        .orderBy(desc(repairs.updatedAt))
+    : [];
+
+  const activeLoanByEquipment = new Map<string, (typeof relevantLoanRows)[number]>();
+  relevantLoanRows.forEach((row) => {
+    if (["completed", "rejected", "cancelled"].includes(row.status) || activeLoanByEquipment.has(row.equipmentId)) return;
+    activeLoanByEquipment.set(row.equipmentId, row);
+  });
+
+  const activeTransferByEquipment = new Map<string, (typeof relevantTransferRows)[number]>();
+  relevantTransferRows.forEach((row) => {
+    if (["completed", "rejected", "cancelled"].includes(row.status) || activeTransferByEquipment.has(row.equipmentId)) return;
+    activeTransferByEquipment.set(row.equipmentId, row);
+  });
+
+  const activeRepairByEquipment = new Map<string, (typeof repairRows)[number]>();
+  repairRows.forEach((row) => {
+    if (["completed", "cancelled", "irreparable"].includes(row.status) || activeRepairByEquipment.has(row.equipmentId)) return;
+    activeRepairByEquipment.set(row.equipmentId, row);
+  });
+
+  const equipmentRows: IndividualEquipmentRow[] = rawEquipmentRows.map((row) => {
+    const loan = activeLoanByEquipment.get(row.id);
+    const transfer = activeTransferByEquipment.get(row.id);
+    const repair = activeRepairByEquipment.get(row.id);
+    return {
+      id: row.id,
+      code: row.code,
+      legacyCode: row.legacyCode,
+      name: row.name,
+      equipmentType: row.equipmentType,
+      categoryCode: row.categoryCode,
+      technicalSpecs: row.technicalSpecs || row.specification,
+      technicalNote: row.technicalNote,
+      model: row.model,
+      serial: row.serial,
+      brand: row.brand,
+      manufactureYear: row.manufactureYear,
+      commissionYear: row.commissionYear,
+      originType: row.originType,
+      recordedDate: row.recordedDate,
+      originGroupId: row.originGroupId,
+      originGroupName: groupNameById.get(row.originGroupId) || "—",
+      ownerGroupId: row.ownerGroupId,
+      ownerGroupName: groupNameById.get(row.ownerGroupId) || "—",
+      currentGroupId: row.currentGroupId,
+      currentGroupName: groupNameById.get(row.currentGroupId) || "—",
+      currentLocation: row.currentLocation,
+      status: row.status,
+      condition: row.condition,
+      purchaseDate: row.purchaseDate,
+      poContractNo: row.poContractNo,
+      supplierName: row.supplierName,
+      purchasePrice: row.purchasePrice,
+      warrantyUntil: row.warrantyUntil,
+      purchaseNote: row.purchaseNote,
+      notes: row.notes,
+      recordStatus: row.recordStatus,
+      activeLoanOwnerGroupId: loan?.ownerGroupId || null,
+      activeLoanBorrowerGroupId: loan?.borrowerGroupId || null,
+      activeLoanStatus: loan?.status || null,
+      activeTransferSourceGroupId: transfer?.sourceGroupId || null,
+      activeTransferTargetGroupId: transfer?.targetGroupId || null,
+      activeTransferStatus: transfer?.status || null,
+      activeRepairStatus: repair?.status || null,
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
 
   const typeRows = await db.select({
     categoryCode: equipmentTypeCatalog.categoryCode,
@@ -104,7 +187,6 @@ export default async function MyEquipmentPage() {
     .where(eq(equipmentTypeCatalog.isActive, true))
     .orderBy(asc(equipmentTypeCatalog.categoryCode), asc(equipmentTypeCatalog.name));
 
-  const equipmentIds = equipmentRows.map((row) => row.id);
   const rawAuditRows = equipmentIds.length
     ? await db.select({
         id: activityLogs.id,

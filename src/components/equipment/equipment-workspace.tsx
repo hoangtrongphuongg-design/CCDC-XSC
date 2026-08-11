@@ -58,6 +58,8 @@ export type IndividualEquipmentRow = {
   originGroupName: string;
   ownerGroupId: string;
   ownerGroupName: string;
+  currentGroupId: string;
+  currentGroupName: string;
   currentLocation: string | null;
   status: keyof typeof EQUIPMENT_STATUS_LABELS;
   condition: keyof typeof CONDITION_LABELS;
@@ -69,6 +71,13 @@ export type IndividualEquipmentRow = {
   purchaseNote: string | null;
   notes: string | null;
   recordStatus: "draft" | "active";
+  activeLoanOwnerGroupId: string | null;
+  activeLoanBorrowerGroupId: string | null;
+  activeLoanStatus: string | null;
+  activeTransferSourceGroupId: string | null;
+  activeTransferTargetGroupId: string | null;
+  activeTransferStatus: string | null;
+  activeRepairStatus: string | null;
   updatedAt: string;
 };
 
@@ -89,6 +98,7 @@ export type EquipmentAuditRow = {
 type EquipmentTypeRow = { categoryCode: string; name: string };
 type EditorMode = "create" | "edit" | "clone";
 type DetailTab = "detail" | "history";
+type KpiFilter = "all" | "available" | "borrowed" | "lent" | "repair" | "transfer";
 
 const initialState: EquipmentFormState = { status: "idle" };
 const disciplineOrder: EquipmentDiscipline[] = ["mechanical", "electrical", "other"];
@@ -128,7 +138,7 @@ const auditFieldLabels: Record<string, string> = {
   purchaseDate: "Ngày mua / tiếp nhận",
   poContractNo: "Số PO/HĐ",
   supplierName: "Nhà cung cấp",
-  purchasePrice: "Giá mua",
+  purchasePrice: "Đơn giá mua",
   warrantyUntil: "Bảo hành đến",
   purchaseNote: "Ghi chú mua sắm",
   notes: "Ghi chú",
@@ -163,6 +173,16 @@ function formatMoney(value: string | null) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return value;
   return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(numeric) + " đ";
+}
+
+function normalizePurchasePrice(value: string | null | undefined) {
+  if (!value) return "";
+  const integerPart = value.split(".")[0]?.replace(/\D/g, "") || "";
+  return integerPart.replace(/^0+(?=\d)/, "").slice(0, 16);
+}
+
+function formatPurchasePriceInput(value: string) {
+  return value ? value.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
 }
 
 function normalizeAuditObject(value: unknown): Record<string, unknown> {
@@ -245,6 +265,7 @@ function AssetForm({
   const [originType, setOriginType] = useState<IndividualEquipmentRow["originType"]>(isClone && !isWorkshopAdmin ? "existing" : record?.originType || "existing");
   const [condition, setCondition] = useState<string>(record?.condition || "unknown");
   const [status, setStatus] = useState<string>(record?.status || "in_use_owner");
+  const [purchasePrice, setPurchasePrice] = useState(() => normalizePurchasePrice(record?.purchasePrice));
 
   const selectedGroup = permissions.find((permission) => permission.groupId === ownerGroupId);
   const codePreview = isEditing && record
@@ -263,6 +284,7 @@ function AssetForm({
     if (state.status !== "success") return;
     if (state.afterSave === "add_next" && !isEditing) {
       formRef.current?.reset();
+      setPurchasePrice("");
       setCondition(originType === "new_purchase" ? "good" : "unknown");
       setStatus("in_use_owner");
       onSaved("add_next");
@@ -288,6 +310,7 @@ function AssetForm({
       <input type="hidden" name="originType" value={originType} />
       <input type="hidden" name="condition" value={condition} />
       <input type="hidden" name="status" value={status} />
+      <input type="hidden" name="purchasePrice" value={purchasePrice} />
 
       <section className="asset-form-section">
         <div className="asset-section-heading">
@@ -323,6 +346,16 @@ function AssetForm({
           <FormField label="Serial"><input name="serial" defaultValue={defaultSerial} /></FormField>
           <FormField label="Năm sản xuất"><input name="manufactureYear" type="number" min="1900" max="2200" defaultValue={record?.manufactureYear || ""} /></FormField>
           <FormField label="Năm đưa vào sử dụng"><input name="commissionYear" type="number" min="1900" max="2200" defaultValue={record?.commissionYear || ""} /></FormField>
+          <FormField label="Đơn giá mua (VNĐ)" hint="Giá mua của 01 máy/CCDC; để trống nếu chưa có thông tin.">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={formatPurchasePriceInput(purchasePrice)}
+              onChange={(event) => setPurchasePrice(event.target.value.replace(/\D/g, "").slice(0, 16))}
+              placeholder="Ví dụ: 25.000.000"
+              aria-label="Đơn giá mua"
+            />
+          </FormField>
         </div>
       </section>
 
@@ -379,7 +412,6 @@ function AssetForm({
             <FormField label="Ngày mua / tiếp nhận"><input name="purchaseDate" type="date" defaultValue={record?.purchaseDate || ""} /></FormField>
             <FormField label="Số PO/HĐ"><input name="poContractNo" defaultValue={record?.poContractNo || ""} /></FormField>
             <FormField label="Nhà cung cấp"><input name="supplierName" defaultValue={record?.supplierName || ""} /></FormField>
-            <FormField label="Giá mua"><input name="purchasePrice" type="number" min="0" step="1" defaultValue={record?.purchasePrice || ""} /></FormField>
             <FormField label="Bảo hành đến"><input name="warrantyUntil" type="date" defaultValue={record?.warrantyUntil || ""} /></FormField>
             <FormField label="Ghi chú mua sắm"><textarea name="purchaseNote" rows={3} defaultValue={record?.purchaseNote || ""} /></FormField>
           </div>
@@ -495,7 +527,7 @@ function DetailModal({
                 <div><dt>Ngày mua / tiếp nhận</dt><dd>{formatDate(row.purchaseDate)}</dd></div>
                 <div><dt>Số PO/HĐ</dt><dd>{row.poContractNo || "—"}</dd></div>
                 <div><dt>Nhà cung cấp</dt><dd>{row.supplierName || "—"}</dd></div>
-                <div><dt>Giá mua</dt><dd>{formatMoney(row.purchasePrice)}</dd></div>
+                <div><dt>Đơn giá mua</dt><dd>{formatMoney(row.purchasePrice)}</dd></div>
                 <div><dt>Bảo hành đến</dt><dd>{formatDate(row.warrantyUntil)}</dd></div>
               </dl>{row.purchaseNote ? <div className="detail-long-text"><strong>Ghi chú mua sắm</strong><p>{row.purchaseNote}</p></div> : null}</section>
               {row.notes ? <section><h3>Ghi chú</h3><p>{row.notes}</p></section> : null}
@@ -550,6 +582,7 @@ export function EquipmentWorkspace({
   const [typeFilter, setTypeFilter] = useState("all");
   const [conditionFilter, setConditionFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [kpiFilter, setKpiFilter] = useState<KpiFilter>("all");
   const [mobileTab, setMobileTab] = useState<"all" | "in_use_owner" | "on_loan" | "repairing">("all");
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -566,10 +599,19 @@ export function EquipmentWorkspace({
   const normalizedSearch = search.trim().toLocaleLowerCase("vi");
   const canAdd = !isReadOnlyViewer && (isWorkshopAdmin || actionablePermissions.length > 0);
 
-  const filteredEquipment = equipmentRows.filter((row) => {
-    const haystack = `${row.code} ${row.legacyCode || ""} ${row.name} ${row.equipmentType} ${row.brand || ""} ${row.model || ""} ${row.serial || ""} ${row.ownerGroupName}`.toLocaleLowerCase("vi");
+  const scopeGroupIds = useMemo(() => new Set(groupFilter === "all" ? permissions.map((permission) => permission.groupId) : [groupFilter]), [groupFilter, permissions]);
+  const inScope = (groupId: string | null | undefined) => Boolean(groupId && scopeGroupIds.has(groupId));
+  const physicalLoanStatuses = new Set(["on_loan", "return_requested", "incident"]);
+
+  const baseFilteredEquipment = equipmentRows.filter((row) => {
+    const haystack = `${row.code} ${row.legacyCode || ""} ${row.name} ${row.equipmentType} ${row.brand || ""} ${row.model || ""} ${row.serial || ""} ${row.ownerGroupName} ${row.currentGroupName}`.toLocaleLowerCase("vi");
+    const matchesGroup = groupFilter === "all"
+      || row.ownerGroupId === groupFilter
+      || row.currentGroupId === groupFilter
+      || row.activeTransferSourceGroupId === groupFilter
+      || row.activeTransferTargetGroupId === groupFilter;
     return (!normalizedSearch || haystack.includes(normalizedSearch))
-      && (groupFilter === "all" || row.ownerGroupId === groupFilter)
+      && matchesGroup
       && (categoryFilter === "all" || row.categoryCode === categoryFilter)
       && (typeFilter === "all" || row.equipmentType === typeFilter)
       && (conditionFilter === "all" || row.condition === conditionFilter)
@@ -577,13 +619,41 @@ export function EquipmentWorkspace({
       && (mobileTab === "all" || row.status === mobileTab);
   });
 
+  const isBorrowedByScope = (row: IndividualEquipmentRow) => Boolean(
+    row.activeLoanStatus
+      && physicalLoanStatuses.has(row.activeLoanStatus)
+      && inScope(row.activeLoanBorrowerGroupId),
+  );
+  const isLentByScope = (row: IndividualEquipmentRow) => Boolean(
+    row.activeLoanStatus
+      && physicalLoanStatuses.has(row.activeLoanStatus)
+      && inScope(row.activeLoanOwnerGroupId),
+  );
+  const isRepairInScope = (row: IndividualEquipmentRow) => Boolean(
+    row.activeRepairStatus && (inScope(row.ownerGroupId) || inScope(row.currentGroupId)),
+  );
+  const isTransferInScope = (row: IndividualEquipmentRow) => Boolean(
+    row.activeTransferStatus
+      && (inScope(row.activeTransferSourceGroupId) || inScope(row.activeTransferTargetGroupId)),
+  );
+
   const summary = {
-    total: filteredEquipment.length,
-    available: filteredEquipment.filter((row) => row.status === "in_use_owner").length,
-    borrowed: filteredEquipment.filter((row) => row.status === "on_loan").length,
-    repair: filteredEquipment.filter((row) => ["repairing", "wait_repair_confirm"].includes(row.status)).length,
-    other: filteredEquipment.filter((row) => !["in_use_owner", "on_loan", "repairing", "wait_repair_confirm"].includes(row.status)).length,
+    total: baseFilteredEquipment.length,
+    available: baseFilteredEquipment.filter((row) => row.status === "in_use_owner" && row.ownerGroupId === row.currentGroupId && inScope(row.ownerGroupId)).length,
+    borrowed: baseFilteredEquipment.filter(isBorrowedByScope).length,
+    lent: baseFilteredEquipment.filter(isLentByScope).length,
+    repair: baseFilteredEquipment.filter(isRepairInScope).length,
+    transfer: baseFilteredEquipment.filter(isTransferInScope).length,
   };
+
+  const filteredEquipment = baseFilteredEquipment.filter((row) => {
+    if (kpiFilter === "all") return true;
+    if (kpiFilter === "available") return row.status === "in_use_owner" && row.ownerGroupId === row.currentGroupId && inScope(row.ownerGroupId);
+    if (kpiFilter === "borrowed") return isBorrowedByScope(row);
+    if (kpiFilter === "lent") return isLentByScope(row);
+    if (kpiFilter === "repair") return isRepairInScope(row);
+    return isTransferInScope(row);
+  });
 
   function canEditRow(row: IndividualEquipmentRow) {
     if (isReadOnlyViewer) return false;
@@ -672,12 +742,13 @@ export function EquipmentWorkspace({
           {canAdd ? <Button type="button" onClick={openNew}><Plus size={16} /> {isWorkshopAdmin ? "Thêm / cấp phát CCDC" : "Thêm dụng cụ"}</Button> : null}
         </div>
 
-        <div className="equipment-kpi-grid">
-          <div><span>Tổng CCDC</span><strong>{summary.total}</strong></div>
-          <div><span>Sẵn sàng</span><strong>{summary.available}</strong></div>
-          <div><span>Đang mượn</span><strong>{summary.borrowed}</strong></div>
-          <div><span>Đang sửa chữa</span><strong>{summary.repair}</strong></div>
-          <div><span>Khác</span><strong>{summary.other}</strong></div>
+        <div className="equipment-kpi-grid" aria-label="Thống kê nhanh CCDC theo nghiệp vụ">
+          <button type="button" className={`equipment-kpi-card ${kpiFilter === "all" ? "is-active" : ""}`} onClick={() => setKpiFilter("all")} aria-pressed={kpiFilter === "all"}><span>Tổng CCDC</span><strong>{summary.total}</strong></button>
+          <button type="button" className={`equipment-kpi-card ${kpiFilter === "available" ? "is-active" : ""}`} onClick={() => setKpiFilter("available")} aria-pressed={kpiFilter === "available"}><span>Sẵn sàng</span><strong>{summary.available}</strong></button>
+          <button type="button" className={`equipment-kpi-card ${kpiFilter === "borrowed" ? "is-active" : ""}`} onClick={() => setKpiFilter("borrowed")} aria-pressed={kpiFilter === "borrowed"}><span>Đang mượn</span><strong>{summary.borrowed}</strong></button>
+          <button type="button" className={`equipment-kpi-card ${kpiFilter === "lent" ? "is-active" : ""}`} onClick={() => setKpiFilter("lent")} aria-pressed={kpiFilter === "lent"}><span>Cho mượn</span><strong>{summary.lent}</strong></button>
+          <button type="button" className={`equipment-kpi-card ${kpiFilter === "repair" ? "is-active" : ""}`} onClick={() => setKpiFilter("repair")} aria-pressed={kpiFilter === "repair"}><span>Sửa chữa</span><strong>{summary.repair}</strong></button>
+          <button type="button" className={`equipment-kpi-card ${kpiFilter === "transfer" ? "is-active" : ""}`} onClick={() => setKpiFilter("transfer")} aria-pressed={kpiFilter === "transfer"}><span>Điều chuyển</span><strong>{summary.transfer}</strong></button>
         </div>
 
         <section className="card table-card">
