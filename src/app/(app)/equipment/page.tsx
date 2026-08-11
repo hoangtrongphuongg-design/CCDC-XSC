@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
-import { Boxes, CircleCheck, PackageOpen, Wrench } from "lucide-react";
+import { Boxes, CircleCheck, PackageOpen, Search, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
-import { equipment, groups, toolCatalog, users } from "@/lib/db/schema";
+import { equipment, groups, toolCatalog } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { EQUIPMENT_STATUS_LABELS, CONDITION_LABELS } from "@/lib/constants";
 import { getEquipmentCategoryLabel } from "@/lib/equipment-categories";
@@ -14,9 +14,13 @@ import { StatusBadge } from "@/components/ui/status-badge";
 
 export const dynamic = "force-dynamic";
 
-export default async function EquipmentPage() {
+export default async function EquipmentPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   await requireUser();
-  const [rows, groupRows, toolRows, holderRows] = await Promise.all([
+  const { q = "" } = await searchParams;
+  const searchText = q.trim();
+  const normalizedSearch = searchText.toLocaleLowerCase("vi-VN");
+
+  const [rows, groupRows, toolRows] = await Promise.all([
     db.select({
       id: equipment.id,
       code: equipment.code,
@@ -28,9 +32,7 @@ export default async function EquipmentPage() {
       status: equipment.status,
       condition: equipment.condition,
       ownerGroup: groups.name,
-      ownerGroupId: groups.id,
       currentGroupId: equipment.currentGroupId,
-      currentHolderId: equipment.currentHolderId,
       currentLocation: equipment.currentLocation,
     })
       .from(equipment)
@@ -54,17 +56,52 @@ export default async function EquipmentPage() {
       .innerJoin(groups, eq(toolCatalog.groupId, groups.id))
       .where(and(eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active")))
       .orderBy(asc(groups.name), asc(toolCatalog.code), asc(toolCatalog.name)),
-    db.select({ id: users.id, fullName: users.fullName }).from(users),
   ]);
 
   const groupMap = new Map(groupRows.map((group) => [group.id, group.name]));
-  const holderMap = new Map(holderRows.map((user) => [user.id, user.fullName]));
+  const containsSearch = (...values: Array<string | null | undefined>) => !normalizedSearch || values.some((value) =>
+    value?.toLocaleLowerCase("vi-VN").includes(normalizedSearch),
+  );
+  const filteredRows = rows.filter((row) => containsSearch(
+    row.code,
+    row.legacyCode,
+    row.name,
+    row.model,
+    row.type,
+    getEquipmentCategoryLabel(row.categoryCode),
+    row.ownerGroup,
+    groupMap.get(row.currentGroupId),
+    row.currentLocation,
+    CONDITION_LABELS[row.condition],
+    EQUIPMENT_STATUS_LABELS[row.status],
+  ));
+  const filteredToolRows = toolRows.filter((tool) => containsSearch(
+    tool.code,
+    tool.name,
+    tool.equipmentType,
+    getEquipmentCategoryLabel(tool.categoryCode),
+    tool.specification,
+    tool.groupName,
+    tool.unit,
+  ));
 
   return (
     <>
       <PageHeader
         title="Dụng cụ toàn xưởng"
         description="Trang tra cứu tập trung, chỉ xem. Việc thêm và cập nhật dụng cụ được thực hiện tại Dụng cụ nhóm tôi."
+        actions={
+          <form className="workshop-equipment-search" action="/equipment" method="get" role="search">
+            <Search size={18} aria-hidden="true" />
+            <input
+              name="q"
+              defaultValue={searchText}
+              placeholder="Tìm theo mã, tên máy, loại, nhóm, vị trí..."
+              aria-label="Tìm dụng cụ toàn xưởng"
+            />
+            <button type="submit">Tìm</button>
+          </form>
+        }
       />
       <section className="stat-grid">
         <StatCard title="Máy/CCDC có mã" value={rows.length} icon={Boxes} tone="primary" />
@@ -77,8 +114,8 @@ export default async function EquipmentPage() {
         <CardHeader><CardTitle>Danh mục máy/CCDC có mã</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            headers={["Mã", "Mã hiện hữu", "Tên máy", "Nhóm thiết bị", "Loại", "Nhóm quản lý", "Nhóm đang dùng", "Người giữ", "Vị trí", "Tình trạng", "Trạng thái"]}
-            rows={rows.map((row) => [
+            headers={["Mã", "Mã hiện hữu", "Tên máy", "Nhóm thiết bị", "Loại", "Nhóm quản lý", "Nhóm đang dùng", "Vị trí", "Tình trạng", "Trạng thái"]}
+            rows={filteredRows.map((row) => [
               <strong key="code">{row.code}</strong>,
               row.legacyCode || "—",
               <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.model || "Chưa có model"}</small></div>,
@@ -86,12 +123,11 @@ export default async function EquipmentPage() {
               row.type,
               row.ownerGroup,
               groupMap.get(row.currentGroupId) || "—",
-              row.currentHolderId ? holderMap.get(row.currentHolderId) || "—" : "—",
               row.currentLocation || "—",
               <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={row.condition === "good" ? "success" : row.condition === "irreparable" ? "danger" : "warning"} />,
               <StatusBadge key="status" label={EQUIPMENT_STATUS_LABELS[row.status]} tone={row.status === "in_use_owner" ? "success" : row.status === "disposal_warehouse" ? "danger" : "info"} />,
             ])}
-            empty={<EmptyState description="Chưa có máy/CCDC đã hoàn thành hồ sơ." />}
+            empty={<EmptyState description={searchText ? `Không tìm thấy máy/CCDC phù hợp với “${searchText}”.` : "Chưa có máy/CCDC đã hoàn thành hồ sơ."} />}
           />
         </CardContent>
       </Card>
@@ -101,7 +137,7 @@ export default async function EquipmentPage() {
         <CardContent>
           <DataTable
             headers={["Mã", "Tên dụng cụ", "Nhóm thiết bị", "Loại", "Quy cách", "Nhóm quản lý", "Số lượng"]}
-            rows={toolRows.map((tool) => [
+            rows={filteredToolRows.map((tool) => [
               <strong key="code">{tool.code || "—"}</strong>,
               tool.name,
               getEquipmentCategoryLabel(tool.categoryCode),
@@ -110,7 +146,7 @@ export default async function EquipmentPage() {
               tool.groupName,
               <span key="quantity" className="numeric"><strong>{tool.quantity}</strong> {tool.unit}</span>,
             ])}
-            empty={<EmptyState description="Chưa có dụng cụ theo số lượng đã hoàn thành hồ sơ." />}
+            empty={<EmptyState description={searchText ? `Không tìm thấy dụng cụ theo số lượng phù hợp với “${searchText}”.` : "Chưa có dụng cụ theo số lượng đã hoàn thành hồ sơ."} />}
           />
         </CardContent>
       </Card>

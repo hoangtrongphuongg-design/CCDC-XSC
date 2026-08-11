@@ -1,6 +1,6 @@
-# QUẢN LÝ CCDC - XSC — V1.5.2
+# QUẢN LÝ CCDC - XSC — V1.5.3
 
-Bản vá session khi tải lại trang (F5). Không thay đổi schema/database và không đụng dữ liệu CCDC đã nhập.
+Bản V1.5.3 kế thừa bản vá session V1.5.2 và bổ sung tra cứu/đơn giá mua. Không thay đổi schema/database và không đụng dữ liệu CCDC đã nhập.
 
 ## Thay đổi auth
 - Dùng cookie mới `ccdc_xsc_session_v2` để loại trừ cookie stale của bản cũ.
@@ -23,4 +23,12 @@ KHÔNG chạy:
 - `npm run db:seed`
 - migration/SQL cũ
 
-Sau deploy V1.5.2, cần đăng nhập lại 1 lần vì tên cookie đã đổi.
+Nếu nâng trực tiếp từ V1.5.1 hoặc cũ hơn, cần đăng nhập lại 1 lần vì V1.5.2 đã đổi tên cookie. Nâng từ V1.5.2 lên V1.5.3 không đổi cơ chế session.
+
+
+## V1.5.3 - cập nhật 11/08/2026
+
+- Trang **Dụng cụ toàn xưởng** có ô tìm kiếm ở phía trên bên phải; tìm theo mã, tên, loại, nhóm, vị trí và trạng thái.
+- Bảng **Danh mục máy/CCDC có mã** đã bỏ cột **Người giữ**.
+- Form **Thêm/Cập nhật máy-CCDC** có trường **Đơn giá mua (VNĐ)** cho mọi nguồn hình thành. Trường này dùng lại cột `equipment.purchase_price` đã có sẵn nên **không cần migration và không ảnh hưởng dữ liệu hiện có**.
+- Khi cập nhật bản này: **không chạy `db:push`, `db:init`, `db:seed` hoặc SQL khởi tạo cũ**.
