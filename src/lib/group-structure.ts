@@ -1,6 +1,7 @@
 export const GROUP_CATEGORY_LABELS = {
   mechanical: "Bảo trì cơ",
   electrical: "Bảo trì điện",
+  management: "Khối quản lý",
   external: "Nhóm khác",
   system: "Hệ thống",
 } as const;
@@ -20,6 +21,8 @@ export const STANDARD_GROUPS = [
   { code: "DIEN_CBL_NT", name: "Bảo trì điện - Nhóm điện CBL - NT", category: "electrical", equipmentPrefix: "DCBLNT", isSystem: false },
   { code: "DIEN_NBS_LO", name: "Bảo trì điện - Nhóm Nghiền BS - Lò nung", category: "electrical", equipmentPrefix: "DNBSLO", isSystem: false },
   { code: "DIEN_NXM_TD_PT", name: "Bảo trì điện - Nhóm Nghiền XM - Trạm điện - Phụ trợ", category: "electrical", equipmentPrefix: "DNXMTP", isSystem: false },
+  { code: "KHBT", name: "KHBT", category: "management", equipmentPrefix: "KHBT", isSystem: false },
+  { code: "BAN_QUAN_DOC", name: "Ban Quản Đốc", category: "management", equipmentPrefix: "BQD", isSystem: false },
   { code: "NHOM_KHAC", name: "Nhóm khác (Đơn vị khác; nhà thầu,...)", category: "external", equipmentPrefix: "KHAC", isSystem: false },
   { code: "KHO_TL", name: "Kho thanh lý", category: "system", equipmentPrefix: "TL", isSystem: true },
 ] as const satisfies readonly {

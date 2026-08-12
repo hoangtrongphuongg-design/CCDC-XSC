@@ -51,13 +51,13 @@ export default async function GroupsPage() {
         description="Khai báo nhóm quản lý CCDC, kiểm soát trạng thái sử dụng và tách riêng các nhóm hệ thống. Mã nhóm được giữ cố định để bảo toàn lịch sử dữ liệu."
         actions={
           <form action={syncStandardGroupsAction}>
-            <Button type="submit"><Network size={16} /> Đồng bộ 13 nhóm chính thức</Button>
+            <Button type="submit"><Network size={16} /> Đồng bộ 15 nhóm chính thức</Button>
           </form>
         }
       />
 
       <div className="stat-grid">
-        <StatCard title="Nhóm nghiệp vụ đang hoạt động" value={activeOperationalGroups.length} note="8 cơ · 4 điện · 1 nhóm khác" icon={Building2} tone="primary" />
+        <StatCard title="Nhóm nghiệp vụ đang hoạt động" value={activeOperationalGroups.length} note="8 cơ · 4 điện · 2 quản lý · 1 nhóm khác" icon={Building2} tone="primary" />
         <StatCard title="Nhóm hệ thống" value={systemGroups.length} note="Được khóa để bảo vệ quy trình" icon={ShieldCheck} tone="violet" />
         <StatCard title="Nhân sự đang hoạt động" value={totalUsers} note="Tính theo nhóm chính của tài khoản" icon={UsersRound} tone="success" />
         <StatCard title="Máy/CCDC đã gán nhóm" value={totalEquipment} note="Tính theo nhóm quản lý hiện tại" icon={Boxes} tone="cyan" />
@@ -143,7 +143,7 @@ export default async function GroupsPage() {
               </div>
               <div className="structure-note">
                 <strong>Quy tắc dữ liệu</strong>
-                <p>Hệ thống áp dụng đúng 13 nhóm nghiệp vụ: 8 nhóm Bảo trì cơ, 4 nhóm Bảo trì điện và 1 Nhóm khác. Kho thanh lý là nhóm hệ thống riêng, không dùng làm nhóm công tác khi đăng ký tài khoản.</p>
+                <p>Hệ thống áp dụng 15 nhóm nghiệp vụ: 8 nhóm Bảo trì cơ, 4 nhóm Bảo trì điện, KHBT, Ban Quản Đốc và 1 Nhóm khác. Kho thanh lý là nhóm hệ thống riêng, không dùng làm nhóm công tác khi đăng ký tài khoản.</p>
               </div>
             </CardContent>
           </Card>

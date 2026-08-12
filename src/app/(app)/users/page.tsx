@@ -25,7 +25,7 @@ import {
   type GroupCategory,
 } from "@/lib/group-structure";
 
-const categoryOrder: GroupCategory[] = ["mechanical", "electrical", "external", "system"];
+const categoryOrder: GroupCategory[] = ["mechanical", "electrical", "management", "external", "system"];
 
 type GroupRow = {
   id: string;
@@ -109,6 +109,7 @@ export default async function UsersPage() {
     });
   const operationalGroups = groupRows.filter((group) => !group.isSystem);
   const activeUsers = userRows.filter((user) => user.accountStatus === "active");
+  const groupAssignableUsers = activeUsers.filter((user) => !user.isReadOnlyViewer);
   const permissionMap = new Map<string, string[]>();
 
   permissionRows.forEach((permission) => {
@@ -136,22 +137,28 @@ export default async function UsersPage() {
 
               if (user.accountStatus === "pending") {
                 actions.push(
-                  <form action={approveUserAction} key="approve" className="row-actions user-approval-form">
-                    <input type="hidden" name="userId" value={user.id} />
-                    <select name="accountMode" aria-label="Loại tài khoản" className="field-inline-lg" defaultValue="group_user">
-                      <option value="group_user">User nghiệp vụ theo nhóm</option>
-                      <option value="readonly_viewer">Người xem toàn xưởng</option>
-                    </select>
-                    <select name="groupId" aria-label="Nhóm chính" className="field-inline-lg">
-                      <GroupOptions rows={operationalGroups} />
-                    </select>
-                    <select name="permissionLevel" aria-label="Mức quyền" className="field-inline-lg" defaultValue="viewer">
-                      <option value="viewer">Công nhân kỹ thuật</option>
-                      <option value="operator">Kỹ sư giám sát</option>
-                      <option value="manager">Đốc công khu vực</option>
-                    </select>
-                    <Button size="sm">Duyệt</Button>
-                  </form>,
+                  <div key="approve" className="user-approval-stack">
+                    <form action={approveUserAction} className="row-actions user-approval-form">
+                      <input type="hidden" name="userId" value={user.id} />
+                      <input type="hidden" name="accountMode" value="group_user" />
+                      <select name="groupId" aria-label="Nhóm chính" className="field-inline-lg" required>
+                        <option value="">Chọn nhóm</option>
+                        <GroupOptions rows={operationalGroups} />
+                      </select>
+                      <select name="permissionLevel" aria-label="Mức quyền" className="field-inline-lg" defaultValue="viewer">
+                        <option value="viewer">Công nhân kỹ thuật</option>
+                        <option value="operator">Kỹ sư giám sát</option>
+                        <option value="manager">Đốc công khu vực</option>
+                      </select>
+                      <Button size="sm">Duyệt theo nhóm</Button>
+                    </form>
+                    <form action={approveUserAction} className="row-actions">
+                      <input type="hidden" name="userId" value={user.id} />
+                      <input type="hidden" name="accountMode" value="readonly_viewer" />
+                      <input type="hidden" name="permissionLevel" value="viewer" />
+                      <Button size="sm" variant="secondary">Duyệt xem toàn xưởng</Button>
+                    </form>
+                  </div>,
                 );
               }
 
@@ -212,7 +219,7 @@ export default async function UsersPage() {
             <form action={assignGroupPermissionAction} className="form-grid">
               <FormField label="Người dùng" required>
                 <select name="userId">
-                  {activeUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} · {user.username}</option>)}
+                  {groupAssignableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} · {user.username}</option>)}
                 </select>
               </FormField>
               <FormField label="Nhóm" required hint="Danh sách được đồng bộ với trang Cơ cấu nhóm Xưởng.">
@@ -238,7 +245,7 @@ export default async function UsersPage() {
               <span><strong>Kỹ sư giám sát:</strong> quản lý CCDC và xử lý nghiệp vụ thường ngày của nhóm.</span>
               <span><strong>Đốc công khu vực:</strong> cấp trên của Kỹ sư giám sát; có quyền điều chuyển và thanh lý cấp nhóm.</span>
               <span><strong>Quản lý Xưởng / Admin:</strong> quản lý toàn Xưởng, cấp phát ban đầu, quản trị user và can thiệp dữ liệu khi cần.</span>
-              <span><strong>Người xem toàn xưởng:</strong> xem toàn bộ web nhưng không được ghi dữ liệu.</span>
+              <span><strong>Người xem toàn xưởng:</strong> xem toàn bộ web nhưng không được ghi dữ liệu; không cần gán nhóm.</span>
             </div>
           </CardContent>
         </Card>

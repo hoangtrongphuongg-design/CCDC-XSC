@@ -14,7 +14,7 @@ type RegistrationGroup = {
   category: GroupCategory;
 };
 
-const registrationCategoryOrder: GroupCategory[] = ["mechanical", "electrical", "external"];
+const registrationCategoryOrder: GroupCategory[] = ["mechanical", "electrical", "management", "external"];
 
 export function RegisterForm({ groups }: { groups: RegistrationGroup[] }) {
   const [state, action, pending] = useActionState<RegisterState, FormData>(registerAction, {});
@@ -24,7 +24,7 @@ export function RegisterForm({ groups }: { groups: RegistrationGroup[] }) {
         <FormField label="Họ và tên" required><input name="fullName" autoComplete="name" /></FormField>
         <FormField label="Mã nhân viên" required><input name="employeeCode" autoComplete="off" /></FormField>
       </div>
-      <FormField label="Nhóm công tác" required hint="Danh sách được chia theo Bảo trì cơ, Bảo trì điện và Nhóm khác.">
+      <FormField label="Nhóm công tác" required hint="Danh sách được chia theo Bảo trì cơ, Bảo trì điện, Khối quản lý và Nhóm khác.">
         <select name="requestedGroupId" defaultValue="">
           <option value="" disabled>Chọn nhóm</option>
           {registrationCategoryOrder.map((category) => {

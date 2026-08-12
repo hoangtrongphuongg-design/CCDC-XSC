@@ -68,7 +68,7 @@ export async function syncStandardGroupsAction() {
       actorUserId: auth.userId,
       action: "group.structure.sync",
       entityType: "group_structure",
-      description: "Đồng bộ 13 nhóm nghiệp vụ chính thức của Xưởng Sửa chữa",
+      description: "Đồng bộ 15 nhóm nghiệp vụ chính thức của Xưởng Sửa chữa",
       afterData: {
         groups: STANDARD_GROUPS,
         deactivatedLegacyCodes,
