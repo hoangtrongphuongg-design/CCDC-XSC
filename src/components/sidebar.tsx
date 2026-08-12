@@ -26,6 +26,14 @@ import { getRoleSummary } from "@/lib/auth/roles";
 
 type NavItem = readonly [href: string, label: string, icon: LucideIcon];
 
+function hasAnyGroupPermission(auth: AuthContext) {
+  return auth.permissions.length > 0;
+}
+
+function hasManagerGroupPermission(auth: AuthContext) {
+  return auth.permissions.some((permission) => permission.level === "manager");
+}
+
 const operationItems = [
   ["/dashboard", "Tổng quan", Gauge],
   ["/equipment", "Dụng cụ toàn xưởng", Boxes],
@@ -52,6 +60,17 @@ function initials(name: string) {
 export function Sidebar({ auth }: { auth: AuthContext }) {
   const pathname = usePathname();
   const roleLabel = getRoleSummary(auth);
+  const canUseGroupWorkflows = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasAnyGroupPermission(auth));
+  const canTransfer = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasManagerGroupPermission(auth));
+  const canDispose = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasManagerGroupPermission(auth));
+
+  const visibleOperationItems = operationItems.filter(([href]) => href !== "/my-equipment" || (!auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasAnyGroupPermission(auth))));
+  const visibleWorkflowItems = workflowItems.filter(([href]) => {
+    if (href === "/transfers") return canTransfer;
+    if (href === "/disposals") return canDispose;
+    if (["/machine-loans", "/quick-loans", "/repairs"].includes(href)) return canUseGroupWorkflows;
+    return false;
+  });
 
   const renderGroup = (label: string, items: readonly NavItem[]) => (
     <div className="nav-section" key={label}>
@@ -79,8 +98,8 @@ export function Sidebar({ auth }: { auth: AuthContext }) {
       </div>
 
       <nav aria-label="Điều hướng chính" className="sidebar-nav">
-        {renderGroup("TỔNG QUAN", operationItems)}
-        {renderGroup("NGHIỆP VỤ", workflowItems)}
+        {renderGroup("TỔNG QUAN", visibleOperationItems)}
+        {visibleWorkflowItems.length ? renderGroup("NGHIỆP VỤ", visibleWorkflowItems) : null}
         {renderGroup("THEO DÕI", insightItems)}
         {auth.isAdmin ? renderGroup("QUẢN TRỊ", [
           ["/groups", "Cơ cấu nhóm Xưởng", Network],

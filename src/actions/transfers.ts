@@ -21,7 +21,7 @@ export async function createTransferAction(formData: FormData) {
   const targetGroupId = String(formData.get("targetGroupId") || "");
   const reason = String(formData.get("reason") || "").trim();
   if (!equipmentId || !actingGroupId || !targetGroupId || !reason) throw new Error("Thiếu thông tin điều chuyển.");
-  const auth = await requireGroupPermission(actingGroupId, "operator");
+  const auth = await requireGroupPermission(actingGroupId, "manager");
   const [targetGroup] = await db.select().from(groups).where(eq(groups.id, targetGroupId)).limit(1);
   if (!targetGroup || targetGroup.isSystem || !targetGroup.isActive) throw new Error("Nhóm nhận không hợp lệ.");
 
@@ -29,26 +29,16 @@ export async function createTransferAction(formData: FormData) {
     const item = await lockEquipment(tx, equipmentId);
     if (item.record_status !== "active") throw new Error("Dụng cụ chưa hoàn thành hồ sơ nên chưa thể thực hiện nghiệp vụ.");
     const sourceGroupId = item.owner_group_id;
-    if (sourceGroupId === targetGroupId) throw new Error("Nhóm nhận phải khác nhóm quản lý hiện tại.");
-    if (actingGroupId !== sourceGroupId && actingGroupId !== targetGroupId) throw new Error("Nhóm đại diện phải là nhóm giao hoặc nhóm nhận.");
-
-    let linkedLoanId: string | null = null;
-    if (["on_loan", "return_requested", "incident"].includes(item.status)) {
-      if (item.current_group_id !== targetGroupId) throw new Error("Máy đang được nhóm khác mượn; chỉ có thể đề xuất giao luôn cho chính nhóm đang giữ máy.");
-      const [activeLoan] = await tx.select().from(machineLoans).where(and(
-        eq(machineLoans.equipmentId, equipmentId),
-        eq(machineLoans.borrowerGroupId, targetGroupId),
-      )).limit(1);
-      if (!activeLoan || !["on_loan", "return_requested", "incident"].includes(activeLoan.status)) throw new Error("Không tìm thấy phiếu mượn đang mở để liên kết.");
-      linkedLoanId = activeLoan.id;
-      await assertEquipmentHasNoOtherOpenWorkflow(tx, equipmentId, { machineLoanId: activeLoan.id });
-    } else {
-      if (item.status !== "in_use_owner") throw new Error("Máy hiện không sẵn sàng để điều chuyển.");
-      await assertEquipmentHasNoOtherOpenWorkflow(tx, equipmentId);
+    if (actingGroupId !== sourceGroupId) {
+      throw new Error("Bạn chỉ được đề xuất điều chuyển máy thuộc nhóm mình đang quản lý.");
     }
+    if (sourceGroupId === targetGroupId) throw new Error("Nhóm nhận phải khác nhóm quản lý hiện tại.");
+    if (item.status !== "in_use_owner") throw new Error("Máy hiện không sẵn sàng để điều chuyển.");
+    await assertEquipmentHasNoOtherOpenWorkflow(tx, equipmentId);
 
+    const linkedLoanId: string | null = null;
     const code = await nextWorkflowCode(tx, "DC");
-    const initialStatus = actingGroupId === sourceGroupId ? "pending_target" : "pending_source";
+    const initialStatus = "pending_target";
     const [created] = await tx.insert(transfers).values({
       code,
       equipmentId,

@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { ArrowLeftRight, CheckCircle2, Clock3, PackageCheck, Plus } from "lucide-react";
 import { db } from "@/lib/db";
-import { equipment, groups, transfers } from "@/lib/db/schema";
+import { disposals, equipment, groups, machineLoans, repairs, transfers } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { WORKFLOW_LABELS } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   acceptTransferCounterpartAction,
   approveTransferByWsAction,
@@ -23,14 +24,23 @@ import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 
 export default async function TransfersPage() {
   const auth = await requireUser();
-  const [groupRows, equipmentRows, rows] = await Promise.all([
+  const [groupRows, equipmentRows, rows, openLoans, openRepairs, openTransfers, openDisposals] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name, isSystem: groups.isSystem }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
-    db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId }).from(equipment).where(and(inArray(equipment.status, ["in_use_owner", "on_loan", "return_requested"]), eq(equipment.recordStatus, "active"))).orderBy(asc(equipment.code)),
+    db.select({
+      id: equipment.id, code: equipment.code, legacyCode: equipment.legacyCode, name: equipment.name,
+      model: equipment.model, equipmentType: equipment.equipmentType, ownerGroupId: equipment.ownerGroupId,
+    }).from(equipment).where(and(eq(equipment.status, "in_use_owner"), eq(equipment.recordStatus, "active"))).orderBy(asc(equipment.code)),
     db.select().from(transfers).orderBy(desc(transfers.createdAt)).limit(100),
+    db.select({ equipmentId: machineLoans.equipmentId }).from(machineLoans).where(inArray(machineLoans.status, ["pending_owner", "approved", "wait_handover", "on_loan", "return_requested", "incident"])),
+    db.select({ equipmentId: repairs.equipmentId }).from(repairs).where(inArray(repairs.status, ["pending_acceptance", "repairing", "wait_owner_confirm"])),
+    db.select({ equipmentId: transfers.equipmentId }).from(transfers).where(inArray(transfers.status, ["pending_source", "pending_target", "pending_ws", "wait_handover"])),
+    db.select({ equipmentId: disposals.equipmentId }).from(disposals).where(inArray(disposals.status, ["pending_group", "pending_ws", "wait_warehouse"])),
   ]);
   const groupMap = new Map(groupRows.map((g) => [g.id, g.name]));
   const equipmentMap = new Map((await db.select({ id: equipment.id, code: equipment.code }).from(equipment)).map((e) => [e.id, e.code]));
-  const actingGroups = auth.permissions.filter((p) => p.groupCode !== "KHO_TL" && p.level !== "viewer" && isOfficialOperationalGroupCode(p.groupCode));
+  const busyEquipmentIds = new Set([...openLoans, ...openRepairs, ...openTransfers, ...openDisposals].map((row) => row.equipmentId));
+  const transferableEquipment = equipmentRows.filter((item) => !busyEquipmentIds.has(item.id));
+  const actingGroups = auth.permissions.filter((p) => p.groupCode !== "KHO_TL" && p.level === "manager" && isOfficialOperationalGroupCode(p.groupCode));
   const waitingGroups = rows.filter((row) => ["pending_source", "pending_target"].includes(row.status)).length;
   const waitingWs = rows.filter((row) => row.status === "pending_ws").length;
   const handover = rows.filter((row) => row.status === "wait_handover").length;
@@ -64,12 +74,28 @@ export default async function TransfersPage() {
           <CardHeader><CardTitle>Tạo đề xuất điều chuyển</CardTitle><Plus size={18} /></CardHeader>
           <CardContent>
             {actingGroups.length ? <form action={createTransferAction} className="form-grid">
-              <FormField label="Đại diện nhóm" required><select name="actingGroupId">{actingGroups.map((g) => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
-              <FormField label="Máy" required><select name="equipmentId">{equipmentRows.map((e) => <option key={e.id} value={e.id}>{e.code} — {e.name}</option>)}</select></FormField>
+              <FormField label="Đại diện nhóm" required hint="Chỉ các nhóm mà bạn có vai trò Đốc công khu vực."><select name="actingGroupId" id="transfer-acting-group">{actingGroups.map((g) => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
+              <FormField label="Máy" required hint="Chỉ hiển thị máy thuộc quyền quản lý của nhóm đại diện và không nằm trong quy trình khác.">
+                <SearchableSelect
+                  name="equipmentId"
+                  required
+                  controllerId="transfer-acting-group"
+                  includeControllerValue
+                  placeholder="Tìm máy của nhóm mình..."
+                  searchPlaceholder="Gõ mã, tên máy, model, loại..."
+                  emptyText="Nhóm này không có máy đủ điều kiện điều chuyển."
+                  options={transferableEquipment.map((item) => ({
+                    value: item.id,
+                    groupId: item.ownerGroupId,
+                    label: `${item.code} — ${item.name}`,
+                    description: [item.legacyCode, item.model, item.equipmentType, groupMap.get(item.ownerGroupId)].filter(Boolean).join(" · "),
+                  }))}
+                />
+              </FormField>
               <FormField label="Nhóm nhận" required><select name="targetGroupId">{groupRows.filter((g) => !g.isSystem && isOfficialOperationalGroupCode(g.code)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></FormField>
               <FormField label="Lý do điều chuyển" required><textarea name="reason" placeholder="Nêu rõ nhu cầu và lý do thay đổi nhóm quản lý" /></FormField>
               <Button type="submit">Gửi đề xuất</Button>
-            </form> : <EmptyState title="Chỉ xem" />}
+            </form> : <EmptyState title="Không có quyền tạo điều chuyển" description="Chỉ Đốc công khu vực của nhóm quản lý máy mới được lập đề xuất điều chuyển." />}
           </CardContent>
         </Card>
       </div>

@@ -1223,12 +1223,12 @@ body {
     top: 58px;
     z-index: 20;
     display: grid;
-    grid-template-columns: repeat(4, minmax(max-content,1fr));
-    overflow-x: auto;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    overflow-x: hidden;
     border-bottom: 1px solid var(--border);
     background: rgba(255,255,255,.97);
   }
-  .mobile-equipment-tabs button { position: relative; min-height: 47px; padding: 0 13px; border: 0; color: #64748b; background: transparent; font-size: 10px; white-space: nowrap; }
+  .mobile-equipment-tabs button { position: relative; min-height: 47px; padding: 0 13px; border: 0; color: #64748b; background: transparent; font-size: 10px; white-space: normal; line-height: 1.25; }
   .mobile-equipment-tabs button.is-active { color: var(--primary); font-weight: 700; }
   .mobile-equipment-tabs button.is-active::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 0; height: 2px; background: var(--primary); }
   .mobile-equipment-list { display: grid; }
@@ -1671,4 +1671,113 @@ body {
   .user-account-table .table-wrap table { table-layout: auto; }
   .user-account-table .table-wrap th,
   .user-account-table .table-wrap td { width: auto !important; }
+}
+
+/* V1.5.9 — searchable selectors, responsive workflows and dashboard analysis */
+.searchable-select { position: relative; min-width: 0; }
+.searchable-select-trigger {
+  display: grid;
+  grid-template-columns: 20px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.searchable-select-trigger > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.searchable-select-trigger svg { color: var(--primary); }
+.searchable-select-clear { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; color: var(--text-muted); }
+.searchable-select-menu {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 360px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(15,31,61,.16);
+}
+.searchable-select-mobile-title { display: none; }
+.searchable-select-search { display: grid; grid-template-columns: 20px minmax(0,1fr); align-items: center; gap: 8px; padding: 10px; border-bottom: 1px solid var(--border); }
+.searchable-select-search input { min-width: 0; min-height: 38px; border: 0; padding: 0; outline: 0; box-shadow: none; }
+.searchable-select-results { max-height: 300px; overflow-y: auto; overscroll-behavior: contain; }
+.searchable-select-option { display: grid; grid-template-columns: minmax(0,1fr) 20px; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border: 0; border-bottom: 1px solid #edf1f5; background: #fff; text-align: left; cursor: pointer; }
+.searchable-select-option:hover { background: var(--primary-softer); }
+.searchable-select-option span { min-width: 0; }
+.searchable-select-option strong, .searchable-select-option small { display: block; overflow-wrap: anywhere; }
+.searchable-select-option strong { font-size: 11px; }
+.searchable-select-option small { margin-top: 3px; color: var(--text-muted); font-size: 9px; line-height: 1.4; }
+.searchable-select-empty { margin: 0; padding: 18px 12px; color: var(--text-muted); text-align: center; font-size: 10px; }
+
+.dashboard-kpi-six { grid-template-columns: repeat(6, minmax(130px,1fr)); }
+.dashboard-search-analysis { margin-bottom: 14px; }
+.dashboard-search-analysis .card { min-height: 0; }
+.dashboard-search-form { display: grid; grid-template-columns: minmax(260px,1.5fr) minmax(150px,.55fr) minmax(150px,.55fr) auto auto; gap: 8px; align-items: center; }
+.dashboard-search-box { display: grid; grid-template-columns: 20px minmax(0,1fr); align-items: center; gap: 7px; min-height: 42px; padding: 0 11px; border: 1px solid var(--border-strong); border-radius: 10px; background: #fff; }
+.dashboard-search-box input { min-width: 0; min-height: 40px; padding: 0; border: 0; outline: 0; box-shadow: none; }
+.dashboard-search-box svg { color: var(--primary); }
+.dashboard-search-hint { margin: 10px 0 0; color: var(--text-muted); font-size: 10px; }
+.dynamic-analysis-panel { display: grid; gap: 12px; margin-top: 14px; padding: 14px; border: 1px solid #d9e4ef; border-radius: 12px; background: #f8fbfe; }
+.dynamic-analysis-kpis { display: grid; grid-template-columns: repeat(5,minmax(100px,1fr)); gap: 8px; }
+.dynamic-analysis-kpis > div { padding: 10px 12px; border: 1px solid #e2e9f0; border-radius: 9px; background: #fff; }
+.dynamic-analysis-kpis span, .dynamic-analysis-kpis strong { display: block; }
+.dynamic-analysis-kpis span { color: var(--text-muted); font-size: 9px; }
+.dynamic-analysis-kpis strong { margin-top: 3px; font-size: 20px; }
+.dynamic-group-summary { display: grid; gap: 8px; }
+.dynamic-group-summary > strong { font-size: 11px; }
+.dynamic-group-summary > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.dynamic-group-summary span { display: inline-flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1px solid #dce6ef; border-radius: 999px; background: #fff; color: var(--text-secondary); font-size: 9px; }
+.dynamic-group-summary span b { color: var(--primary); font-size: 11px; }
+.dynamic-group-summary em { color: var(--text-muted); font-size: 10px; }
+.dashboard-analysis-link { display: inline-flex; align-items: center; gap: 4px; width: max-content; max-width: 100%; color: var(--primary); font-size: 10px; font-weight: 700; }
+.dashboard-operations-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.dashboard-group-bars { display: grid; gap: 10px; }
+.dashboard-group-bars > div { display: grid; grid-template-columns: minmax(120px,.9fr) minmax(80px,1.6fr) 32px; align-items: center; gap: 8px; min-width: 0; }
+.dashboard-group-bars span { min-width: 0; color: var(--text-secondary); font-size: 9px; overflow-wrap: anywhere; }
+.dashboard-group-bars i { display: block; height: 7px; overflow: hidden; border-radius: 999px; background: #eaf0f5; }
+.dashboard-group-bars i b { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+.dashboard-group-bars strong { text-align: right; font-size: 10px; }
+
+@media (max-width: 1280px) {
+  .dashboard-kpi-six { grid-template-columns: repeat(3,minmax(140px,1fr)); }
+  .dashboard-search-form { grid-template-columns: minmax(220px,1fr) 1fr 1fr; }
+  .dashboard-search-form .btn { width: 100%; }
+}
+
+@media (max-width: 760px) {
+  .content-grid { grid-template-columns: 1fr; }
+  .side-panel { position: static; }
+  .dashboard-kpi-six { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .dashboard-search-form { grid-template-columns: 1fr; }
+  .dynamic-analysis-kpis { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .dynamic-analysis-kpis > div:first-child { grid-column: 1 / -1; }
+  .dashboard-operations-grid { grid-template-columns: 1fr; }
+  .dashboard-group-bars > div { grid-template-columns: minmax(92px,.9fr) minmax(70px,1.3fr) 28px; }
+
+  .searchable-select-menu {
+    position: fixed;
+    z-index: 120;
+    inset: 12px 12px calc(76px + env(safe-area-inset-bottom));
+    max-height: none;
+    display: grid;
+    grid-template-rows: auto auto minmax(0,1fr);
+    border-radius: 16px;
+  }
+  .searchable-select-menu::before { content: ""; position: fixed; inset: 0; z-index: -1; background: rgba(11,27,45,.46); }
+  .searchable-select-mobile-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px 8px; }
+  .searchable-select-mobile-title strong { font-size: 14px; }
+  .searchable-select-mobile-title button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 9px; background: #f2f5f8; }
+  .searchable-select-results { max-height: none; overflow-y: auto; }
+  .searchable-select-option { min-height: 58px; padding: 11px 13px; }
+  .searchable-select-option strong { font-size: 12px; }
+  .searchable-select-option small { font-size: 10px; }
 }

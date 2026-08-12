@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gt } from "drizzle-orm";
 import { CheckCircle2, Clock3, PackageCheck, Plus, ShieldCheck, Zap } from "lucide-react";
 import { db } from "@/lib/db";
 import { groups, quickLoans, toolCatalog } from "@/lib/db/schema";
@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
+import { SearchableSelect } from "@/components/searchable-select";
 import { formatDateTime } from "@/lib/utils";
 import {
   approveQuickLoanAction,
@@ -39,7 +40,7 @@ export default async function QuickLoansPage() {
       .where(eq(groups.isActive, true))
       .orderBy(asc(groups.name)),
     db.select().from(toolCatalog)
-      .where(and(eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active")))
+      .where(and(eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active"), gt(toolCatalog.quantityOnHand, "0")))
       .orderBy(asc(toolCatalog.name)),
     db.select().from(quickLoans).orderBy(desc(quickLoans.createdAt)).limit(100),
   ]);
@@ -147,20 +148,28 @@ export default async function QuickLoansPage() {
                   </select>
                 </FormField>
                 <FormField label="Nhóm cho mượn" required>
-                  <select name="sourceGroupId">
+                  <select name="sourceGroupId" id="quick-loan-source-group">
                     {operationalGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
                   </select>
                 </FormField>
-                <FormField label="Chọn từ danh mục nhóm cho" hint="Danh sách ghi rõ nhóm sở hữu; hệ thống sẽ kiểm tra lại khi gửi.">
-                  <select name="toolId" defaultValue="">
-                    <option value="">Vật dụng khác / nhập tự do</option>
-                    {tools.map((tool) => (
-                      <option key={tool.id} value={tool.id}>{groupMap.get(tool.groupId)} · {tool.code || "Không mã"} · {tool.name}</option>
-                    ))}
-                  </select>
+                <FormField label="Chọn dụng cụ" hint="Chỉ hiển thị dụng cụ còn số lượng tại Nhóm cho mượn. Gõ mã, tên hoặc quy cách để tìm nhanh.">
+                  <SearchableSelect
+                    name="toolId"
+                    controllerId="quick-loan-source-group"
+                    includeControllerValue
+                    placeholder="Tìm dụng cụ còn sẵn..."
+                    searchPlaceholder="Gõ mã, tên dụng cụ, quy cách..."
+                    emptyText="Nhóm này không có dụng cụ còn sẵn phù hợp."
+                    options={tools.map((tool) => ({
+                      value: tool.id,
+                      groupId: tool.groupId,
+                      label: `${tool.code || "Không mã"} — ${tool.name}`,
+                      description: [tool.specification, `${tool.quantityOnHand} ${tool.unit}`, groupMap.get(tool.groupId)].filter(Boolean).join(" · "),
+                    }))}
+                  />
                 </FormField>
-                <FormField label="Tên vật dụng" required><input name="itemName" placeholder="Ví dụ: Taro M20" /></FormField>
-                <FormField label="Quy cách"><input name="specification" /></FormField>
+                <FormField label="Tên vật dụng" hint="Chỉ cần nhập khi mượn vật dụng chưa có trong danh mục."><input name="itemName" placeholder="Ví dụ: Taro M20" /></FormField>
+                <FormField label="Quy cách"><input name="specification" placeholder="Có thể bỏ trống nếu đã chọn từ danh mục" /></FormField>
                 <div className="form-grid two">
                   <FormField label="Số lượng" required><input name="quantityBorrowed" type="number" min="0.01" step="0.01" /></FormField>
                   <FormField label="Đơn vị"><input name="unit" defaultValue="cái" /></FormField>

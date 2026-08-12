@@ -45,8 +45,8 @@ export async function createMachineLoanAction(formData: FormData) {
     if (item.owner_group_id === borrowerGroupId) {
       throw new Error("Không cần lập phiếu mượn cho máy thuộc chính nhóm.");
     }
-    if (item.status !== "in_use_owner") {
-      throw new Error("Máy hiện không sẵn sàng để cho mượn.");
+    if (item.status !== "in_use_owner" || item.condition !== "good") {
+      throw new Error("Máy hiện không còn ở trạng thái Sẵn sàng/Tốt để cho mượn. Vui lòng tải lại và chọn máy khác.");
     }
 
     await assertEquipmentHasNoOtherOpenWorkflow(tx, equipmentId);

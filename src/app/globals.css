@@ -623,14 +623,14 @@ input[type="checkbox"] { accent-color: var(--primary); }
 .table-wrap {
   width: 100%;
   min-width: 0;
-  overflow-x: auto;
+  overflow-x: hidden;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
   scrollbar-width: thin;
   scrollbar-color: #c7d2e1 transparent;
 }
-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: auto; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 th, td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; text-align: center; }
 th {
   position: sticky;
@@ -641,7 +641,8 @@ th {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .025em;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 th:first-child { border-radius: 11px 0 0 0; }
 th:last-child { border-radius: 0 11px 0 0; }

@@ -1,7 +1,7 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { CheckCircle2, Clock3, Handshake, Plus, RotateCcw, ShieldCheck } from "lucide-react";
 import { db } from "@/lib/db";
-import { equipment, groups, machineLoans } from "@/lib/db/schema";
+import { disposals, equipment, groups, machineLoans, repairs, transfers } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { WORKFLOW_LABELS } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
+import { SearchableSelect } from "@/components/searchable-select";
 import { formatDate } from "@/lib/utils";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import {
@@ -34,19 +35,30 @@ export const dynamic = "force-dynamic";
 
 export default async function MachineLoansPage() {
   const auth = await requireUser();
-  const [groupRows, availableEquipment, allEquipment, loans] = await Promise.all([
+  const [groupRows, availableEquipmentRows, allEquipment, loans, openLoanRows, openTransfers, openRepairs, openDisposals] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name, isSystem: groups.isSystem })
       .from(groups)
       .where(eq(groups.isActive, true))
       .orderBy(asc(groups.name)),
-    db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId })
+    db.select({
+        id: equipment.id, code: equipment.code, legacyCode: equipment.legacyCode, name: equipment.name,
+        model: equipment.model, equipmentType: equipment.equipmentType, ownerGroupId: equipment.ownerGroupId,
+        condition: equipment.condition,
+      })
       .from(equipment)
-      .where(and(eq(equipment.status, "in_use_owner"), eq(equipment.recordStatus, "active")))
+      .where(and(eq(equipment.status, "in_use_owner"), eq(equipment.condition, "good"), eq(equipment.recordStatus, "active")))
       .orderBy(asc(equipment.code)),
     db.select({ id: equipment.id, code: equipment.code, name: equipment.name })
       .from(equipment),
     db.select().from(machineLoans).orderBy(desc(machineLoans.createdAt)).limit(100),
+    db.select({ equipmentId: machineLoans.equipmentId }).from(machineLoans).where(inArray(machineLoans.status, ["pending_owner", "approved", "wait_handover", "on_loan", "return_requested", "incident"])),
+    db.select({ equipmentId: transfers.equipmentId }).from(transfers).where(inArray(transfers.status, ["pending_source", "pending_target", "pending_ws", "wait_handover"])),
+    db.select({ equipmentId: repairs.equipmentId }).from(repairs).where(inArray(repairs.status, ["pending_acceptance", "repairing", "wait_owner_confirm"])),
+    db.select({ equipmentId: disposals.equipmentId }).from(disposals).where(inArray(disposals.status, ["pending_group", "pending_ws", "wait_warehouse"])),
   ]);
+
+  const blockedEquipmentIds = new Set([...openLoanRows, ...openTransfers, ...openRepairs, ...openDisposals].map((row) => row.equipmentId));
+  const availableEquipment = availableEquipmentRows.filter((item) => !blockedEquipmentIds.has(item.id));
 
   const groupMap = new Map(groupRows.map((group) => [group.id, group.name]));
   const equipmentMap = new Map(allEquipment.map((item) => [item.id, item]));
@@ -158,16 +170,26 @@ export default async function MachineLoansPage() {
             {borrowerGroups.length ? (
               <form action={createMachineLoanAction} className="form-grid">
                 <FormField label="Nhóm mượn" required hint="Mọi thành viên nghiệp vụ của nhóm đều được lập đề nghị.">
-                  <select name="borrowerGroupId">
+                  <select name="borrowerGroupId" id="machine-loan-borrower-group">
                     {borrowerGroups.map((group) => <option key={group.groupId} value={group.groupId}>{group.groupName}</option>)}
                   </select>
                 </FormField>
-                <FormField label="Máy cần mượn" required>
-                  <select name="equipmentId">
-                    {availableEquipment.map((item) => (
-                      <option key={item.id} value={item.id}>{item.code} — {item.name} ({groupMap.get(item.ownerGroupId)})</option>
-                    ))}
-                  </select>
+                <FormField label="Máy cần mượn" required hint="Chỉ hiển thị máy đang Sẵn sàng và tình trạng Tốt. Gõ mã, tên máy, model hoặc nhóm để tìm nhanh.">
+                  <SearchableSelect
+                    name="equipmentId"
+                    required
+                    controllerId="machine-loan-borrower-group"
+                    excludeControllerValue
+                    placeholder="Tìm máy đang sẵn sàng..."
+                    searchPlaceholder="Gõ mã, tên máy, model, loại, nhóm..."
+                    emptyText="Không có máy sẵn sàng phù hợp."
+                    options={availableEquipment.map((item) => ({
+                      value: item.id,
+                      groupId: item.ownerGroupId,
+                      label: `${item.code} — ${item.name}`,
+                      description: [item.legacyCode, item.model, item.equipmentType, groupMap.get(item.ownerGroupId)].filter(Boolean).join(" · "),
+                    }))}
+                  />
                 </FormField>
                 <FormField label="Mục đích sử dụng" required><textarea name="purpose" placeholder="Nêu rõ công việc hoặc khu vực sử dụng" /></FormField>
                 <FormField label="Vị trí sử dụng"><input name="workLocation" placeholder="Ví dụ: Khu vực nghiền" /></FormField>

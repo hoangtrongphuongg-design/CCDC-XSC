@@ -29,7 +29,7 @@ export async function createQuickLoanAction(formData: FormData) {
   const expectedReturnAtRaw = String(formData.get("expectedReturnAt") || "");
   const borrowerNote = String(formData.get("borrowerNote") || "").trim();
 
-  if (!sourceGroupId || !borrowerGroupId || !itemName || quantityBorrowed <= 0) {
+  if (!sourceGroupId || !borrowerGroupId || (!toolId && !itemName) || quantityBorrowed <= 0) {
     throw new Error("Thông tin mượn nhanh chưa đầy đủ.");
   }
   if (sourceGroupId === borrowerGroupId) {
@@ -45,25 +45,32 @@ export async function createQuickLoanAction(formData: FormData) {
   }
 
   await db.transaction(async (tx) => {
+    let resolvedItemName = itemName;
+    let resolvedSpecification = specification;
+    let resolvedUnit = unit;
+
     if (toolId) {
       const [tool] = await tx.select().from(toolCatalog)
         .where(and(eq(toolCatalog.id, toolId), eq(toolCatalog.groupId, sourceGroupId)))
         .limit(1);
       if (!tool || !tool.isActive || tool.recordStatus !== "active") {
-        throw new Error("Không tìm thấy dụng cụ đã hoàn thành trong danh mục nhóm cho.");
+        throw new Error("Dụng cụ không còn sẵn sàng trong danh mục nhóm cho. Vui lòng tải lại.");
       }
-      if (Number(tool.quantityOnHand) < quantityBorrowed) {
-        throw new Error("Số lượng dụng cụ còn lại không đủ để lập đề nghị.");
+      if (Number(tool.quantityOnHand) <= 0 || Number(tool.quantityOnHand) < quantityBorrowed) {
+        throw new Error("Số lượng dụng cụ còn lại không đủ để lập đề nghị. Vui lòng chọn lại.");
       }
+      resolvedItemName = tool.name;
+      resolvedSpecification = tool.specification || "";
+      resolvedUnit = tool.unit;
     }
 
     const code = await nextWorkflowCode(tx, "CM");
     const [created] = await tx.insert(quickLoans).values({
       code,
       toolId,
-      itemName,
-      specification: specification || null,
-      unit,
+      itemName: resolvedItemName,
+      specification: resolvedSpecification || null,
+      unit: resolvedUnit,
       quantityBorrowed: String(quantityBorrowed),
       sourceGroupId,
       borrowerGroupId,
@@ -79,7 +86,7 @@ export async function createQuickLoanAction(formData: FormData) {
       action: "quick_loan.create",
       entityType: "quick_loan",
       entityId: created.id,
-      description: `Tạo đề nghị mượn nhanh ${itemName} - ${quantityBorrowed} ${unit}`,
+      description: `Tạo đề nghị mượn nhanh ${resolvedItemName} - ${quantityBorrowed} ${resolvedUnit}`,
       afterData: created,
     });
   });
