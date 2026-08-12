@@ -1612,3 +1612,63 @@ body {
 @media (max-width: 720px) {
   .user-filter-bar, .permission-add-row { grid-template-columns:1fr; }
 }
+
+
+/* V1.5.8 - Danh sách tài khoản vừa khung, không cuộn ngang trên desktop */
+.user-account-table .table-wrap {
+  width: 100%;
+  overflow-x: hidden;
+}
+.user-account-table .table-wrap table {
+  width: 100%;
+  table-layout: fixed;
+}
+.user-account-table .table-wrap th,
+.user-account-table .table-wrap td {
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.user-account-table .table-wrap th:nth-child(1),
+.user-account-table .table-wrap td:nth-child(1) { width: 14%; }
+.user-account-table .table-wrap th:nth-child(2),
+.user-account-table .table-wrap td:nth-child(2) { width: 15%; }
+.user-account-table .table-wrap th:nth-child(3),
+.user-account-table .table-wrap td:nth-child(3) { width: 15%; }
+.user-account-table .table-wrap th:nth-child(4),
+.user-account-table .table-wrap td:nth-child(4) { width: 26%; }
+.user-account-table .table-wrap th:nth-child(5),
+.user-account-table .table-wrap td:nth-child(5) { width: 15%; }
+.user-account-table .table-wrap th:nth-child(6),
+.user-account-table .table-wrap td:nth-child(6) { width: 8%; }
+.user-account-table .table-wrap th:nth-child(7),
+.user-account-table .table-wrap td:nth-child(7) { width: 7%; }
+.user-account-table .permission-list-cell {
+  width: 100%;
+  min-width: 0;
+}
+.user-account-table .permission-list-cell span,
+.user-account-table .permission-list-cell small {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.user-account-table .status-badge {
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.25;
+}
+.user-account-table .table-wrap td:last-child .btn {
+  max-width: 100%;
+  padding-left: 8px;
+  padding-right: 8px;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .user-account-table .table-wrap { overflow: visible; }
+  .user-account-table .table-wrap table { table-layout: auto; }
+  .user-account-table .table-wrap th,
+  .user-account-table .table-wrap td { width: auto !important; }
+}

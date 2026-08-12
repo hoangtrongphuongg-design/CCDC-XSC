@@ -111,7 +111,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
       description="Quản lý tập trung theo từng tài khoản. Vai trò hệ thống và quyền theo nhóm được tách rõ để tránh cấp nhầm quyền."
     />
 
-    <Card className="table-card">
+    <Card className="table-card user-account-table">
       <CardHeader><CardTitle>Danh sách tài khoản</CardTitle><ShieldCheck size={18} /></CardHeader>
       <CardContent>
         <form method="get" className="user-filter-bar">

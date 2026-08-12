@@ -1,6 +1,6 @@
-# QUẢN LÝ CCDC - XSC — V1.5.7
+# QUẢN LÝ CCDC - XSC — V1.5.8
 
-Bản V1.5.7 kế thừa toàn bộ V1.5.3 và bản vá session V1.5.2. Không thay đổi schema/database và không đụng dữ liệu CCDC đã nhập.
+Bản V1.5.6 kế thừa toàn bộ V1.5.3 và bản vá session V1.5.2. Không thay đổi schema/database và không đụng dữ liệu CCDC đã nhập.
 
 ## Nội dung đã gộp
 - Giữ nguyên sửa lỗi F5/session của V1.5.2.
@@ -36,7 +36,7 @@ Chỉ upload/deploy code. Giữ nguyên `DATABASE_URL` và `AUTH_SECRET` trên V
 Bản này không yêu cầu migration database.
 
 
-## V1.5.7 - Luồng sửa chữa nội bộ / thuê ngoài
+## V1.5.6 - Luồng sửa chữa nội bộ / thuê ngoài
 
 - Sau khi WS tiếp nhận, mặc định chuyển sang sửa chữa nội bộ.
 - Nếu sửa nội bộ đạt: hoàn tất, chạy thử và chờ nhóm quản lý nhận lại.
@@ -46,14 +46,15 @@ Bản này không yêu cầu migration database.
 - Không chạy db:push/db:init/db:seed khi cập nhật bản này trên database đang có dữ liệu.
 
 
-## V1.5.7
+## V1.5.6
 - Bổ sung nhóm KHBT và Ban Quản Đốc vào cơ cấu chuẩn.
 - Người xem toàn xưởng được duyệt độc lập, không cần chọn/gán nhóm.
 - Sau deploy, Admin vào Cơ cấu nhóm Xưởng và bấm “Đồng bộ 15 nhóm chính thức” một lần để thêm 2 nhóm vào DB hiện hữu. Thao tác dùng upsert, không xóa dữ liệu máy/CCDC.
 
-
-## V1.5.7 – Người dùng & phân quyền
-- Quản lý quyền theo từng tài khoản tại một màn hình tập trung.
-- Tách Admin hệ thống, Quản lý Xưởng, Người xem toàn xưởng và Người dùng theo nhóm.
-- Chặn Admin tự hạ quyền/tự khóa và chặn hạ quyền Admin active cuối cùng.
-- Không thay đổi schema/database, không cần migration.
+## V1.5.8 - Bảng Người dùng không cuộn ngang
+- Bảng **Danh sách tài khoản** dùng layout cố định theo khung nội dung trên desktop.
+- Chia lại tỷ lệ 7 cột để cột Quyền nhóm có đủ không gian.
+- Nội dung dài được phép xuống dòng; bỏ nguyên nhân `min-width` gây tràn ngang trong bảng người dùng.
+- Nút **Quản lý** giữ trên một hàng.
+- Mobile vẫn dùng giao diện card/responsive sẵn có.
+- Không thay database/schema/migration.
