@@ -7,17 +7,19 @@ export const GROUP_PERMISSION_LABELS = {
 } as const satisfies Record<GroupPermission["level"], string>;
 
 export const SYSTEM_ROLE_LABELS = {
-  workshopAdmin: "Quản lý Xưởng / Admin",
+  admin: "Admin hệ thống",
+  wsManager: "Quản lý Xưởng",
   readOnlyViewer: "Người xem toàn xưởng",
+  groupUser: "Người dùng theo nhóm",
 } as const;
 
 export function getSystemRoleLabels(
-  auth: Pick<AuthContext, "isWorkshopAdmin" | "isReadOnlyViewer">,
+  auth: Pick<AuthContext, "isAdmin" | "isWsManager" | "isReadOnlyViewer">,
 ): string[] {
-  const labels: string[] = [];
-  if (auth.isWorkshopAdmin) labels.push(SYSTEM_ROLE_LABELS.workshopAdmin);
-  if (auth.isReadOnlyViewer) labels.push(SYSTEM_ROLE_LABELS.readOnlyViewer);
-  return labels;
+  if (auth.isAdmin) return [SYSTEM_ROLE_LABELS.admin];
+  if (auth.isWsManager) return [SYSTEM_ROLE_LABELS.wsManager];
+  if (auth.isReadOnlyViewer) return [SYSTEM_ROLE_LABELS.readOnlyViewer];
+  return [SYSTEM_ROLE_LABELS.groupUser];
 }
 
 export function getHighestGroupRoleLabel(
@@ -30,17 +32,20 @@ export function getHighestGroupRoleLabel(
 }
 
 export function getRoleSummary(
-  auth: Pick<AuthContext, "isWorkshopAdmin" | "isReadOnlyViewer" | "permissions">,
+  auth: Pick<AuthContext, "isAdmin" | "isWsManager" | "isWorkshopAdmin" | "isReadOnlyViewer" | "permissions">,
 ): string {
-  const systemRoles = getSystemRoleLabels(auth);
+  const systemRole = getSystemRoleLabels(auth)[0];
   const groupRole = getHighestGroupRoleLabel(auth.permissions);
-  const labels = groupRole ? [...systemRoles, groupRole] : systemRoles;
-  return labels.length ? labels.join(" · ") : "Thành viên";
+  return groupRole && systemRole === SYSTEM_ROLE_LABELS.groupUser
+    ? `${systemRole} · ${groupRole}`
+    : systemRole;
 }
 
 export function hasSystemRole(
-  auth: Pick<AuthContext, "isWorkshopAdmin" | "isReadOnlyViewer">,
-  role: "workshopAdmin" | "readOnlyViewer",
+  auth: Pick<AuthContext, "isAdmin" | "isWsManager" | "isReadOnlyViewer">,
+  role: "admin" | "wsManager" | "readOnlyViewer",
 ): boolean {
-  return role === "workshopAdmin" ? auth.isWorkshopAdmin : auth.isReadOnlyViewer;
+  if (role === "admin") return auth.isAdmin;
+  if (role === "wsManager") return auth.isWsManager;
+  return auth.isReadOnlyViewer;
 }

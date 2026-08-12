@@ -10,7 +10,7 @@ import { writeAudit } from "@/lib/audit";
 import { isOfficialOperationalGroupCode, STANDARD_GROUPS } from "@/lib/group-structure";
 
 type PermissionLevel = "viewer" | "operator" | "manager";
-type SystemRole = "workshop_admin" | "readonly_viewer";
+type PrimarySystemRole = "group_user" | "readonly_viewer" | "ws_manager" | "admin";
 
 function parsePermissionLevel(value: FormDataEntryValue | null): PermissionLevel {
   const raw = String(value || "viewer");
@@ -97,10 +97,22 @@ export async function updateUserStatusAction(formData: FormData) {
   const userId = String(formData.get("userId") || "");
   const status = String(formData.get("status") || "blocked") as "active" | "blocked" | "rejected";
   if (!userId) throw new Error("Thiếu user.");
+  if (userId === auth.userId && status !== "active") {
+    throw new Error("Admin đang đăng nhập không thể tự khóa hoặc vô hiệu hóa chính mình.");
+  }
 
   await db.transaction(async (tx) => {
     const [before] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!before) throw new Error("Không tìm thấy user.");
+
+    if (before.isAdmin && before.accountStatus === "active" && status !== "active") {
+      const [adminCount] = await tx.select({ value: sql<number>`count(*)::int` }).from(users)
+        .where(and(eq(users.isAdmin, true), eq(users.accountStatus, "active")));
+      if ((adminCount?.value || 0) <= 1) {
+        throw new Error("Hệ thống phải luôn còn ít nhất một Admin hoạt động.");
+      }
+    }
+
     await tx.update(users).set({
       accountStatus: status,
       sessionVersion: before.sessionVersion + 1,
@@ -232,27 +244,40 @@ export async function resetTemporaryPasswordAction(formData: FormData) {
 }
 
 /**
- * Vai trò cấp Xưởng được gộp thành Quản lý Xưởng / Admin.
- * Người xem toàn xưởng là vai trò đọc độc lập và không cần thuộc nhóm.
+ * Mỗi tài khoản chỉ có một vai trò hệ thống chính.
+ * Quyền nhóm được giữ lại khi đổi vai trò để có thể phục hồi mà không mất cấu hình cũ,
+ * nhưng chỉ có hiệu lực khi vai trò chính là Người dùng theo nhóm.
  */
-export async function setSystemRoleAction(formData: FormData) {
+export async function setPrimarySystemRoleAction(formData: FormData) {
   const auth = await requireAdmin();
   const userId = String(formData.get("userId") || "");
-  const role = String(formData.get("role") || "") as SystemRole;
-  const enabled = String(formData.get("enabled") || "false") === "true";
+  const role = String(formData.get("systemRole") || "group_user") as PrimarySystemRole;
 
   if (!userId) throw new Error("Thiếu user.");
-  if (!( ["workshop_admin", "readonly_viewer"] as const).includes(role)) throw new Error("Vai trò hệ thống không hợp lệ.");
-  if (role === "workshop_admin" && userId === auth.userId && !enabled) {
-    throw new Error("Không thể tự gỡ quyền Quản lý Xưởng / Admin của chính mình.");
+  if (!( ["group_user", "readonly_viewer", "ws_manager", "admin"] as const).includes(role)) {
+    throw new Error("Vai trò hệ thống không hợp lệ.");
   }
 
   const [before] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!before) throw new Error("Không tìm thấy user.");
 
-  const changes = role === "workshop_admin"
-    ? { isAdmin: enabled, isWsManager: enabled, isReadOnlyViewer: enabled ? false : before.isReadOnlyViewer }
-    : { isReadOnlyViewer: enabled, isAdmin: enabled ? false : before.isAdmin, isWsManager: enabled ? false : before.isWsManager };
+  if (userId === auth.userId && role !== "admin") {
+    throw new Error("Admin đang đăng nhập không thể tự hạ quyền của chính mình.");
+  }
+
+  if (before.isAdmin && role !== "admin" && before.accountStatus === "active") {
+    const [adminCount] = await db.select({ value: sql<number>`count(*)::int` }).from(users)
+      .where(and(eq(users.isAdmin, true), eq(users.accountStatus, "active")));
+    if ((adminCount?.value || 0) <= 1) {
+      throw new Error("Không thể hạ quyền Admin cuối cùng. Hệ thống phải luôn còn ít nhất một Admin hoạt động.");
+    }
+  }
+
+  const changes = {
+    isAdmin: role === "admin",
+    isWsManager: role === "ws_manager",
+    isReadOnlyViewer: role === "readonly_viewer",
+  };
 
   await db.transaction(async (tx) => {
     await tx.update(users).set({
@@ -263,11 +288,11 @@ export async function setSystemRoleAction(formData: FormData) {
 
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
-      actorRole: "Quản lý Xưởng / Admin",
-      action: role === "workshop_admin" ? "user.role.workshop_admin.update" : "user.role.readonly_viewer.update",
+      actorRole: "Admin hệ thống",
+      action: "user.system_role.update",
       entityType: "user",
       entityId: userId,
-      description: `${enabled ? "Cấp" : "Thu hồi"} vai trò ${role === "workshop_admin" ? "Quản lý Xưởng / Admin" : "Người xem toàn xưởng"} cho ${before.username}`,
+      description: `Cập nhật vai trò hệ thống của ${before.username}: ${role}`,
       beforeData: { isAdmin: before.isAdmin, isWsManager: before.isWsManager, isReadOnlyViewer: before.isReadOnlyViewer },
       afterData: changes,
     });
@@ -277,3 +302,15 @@ export async function setSystemRoleAction(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+/** Tương thích với form cũ nếu còn request từ tab chưa tải lại. */
+export async function setSystemRoleAction(formData: FormData) {
+  const legacyRole = String(formData.get("role") || "");
+  const enabled = String(formData.get("enabled") || "false") === "true";
+  const translated = new FormData();
+  translated.set("userId", String(formData.get("userId") || ""));
+  if (!enabled) translated.set("systemRole", "group_user");
+  else if (legacyRole === "workshop_admin") translated.set("systemRole", "admin");
+  else if (legacyRole === "readonly_viewer") translated.set("systemRole", "readonly_viewer");
+  else translated.set("systemRole", "group_user");
+  return setPrimarySystemRoleAction(translated);
+}

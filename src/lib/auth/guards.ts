@@ -10,16 +10,26 @@ export async function requireUser(): Promise<AuthContext> {
   return auth;
 }
 
-export async function requireWorkshopAdmin() {
+/** Admin hệ thống: quản trị user, phân quyền, cơ cấu nhóm và cấu hình. */
+export async function requireAdmin() {
   const auth = await requireUser();
-  if (!auth.isWorkshopAdmin || auth.isReadOnlyViewer) {
-    throw new Error("Bạn không có quyền Quản lý Xưởng / Admin.");
+  if (!auth.isAdmin || auth.isReadOnlyViewer) {
+    throw new Error("Bạn không có quyền Admin hệ thống.");
   }
   return auth;
 }
 
-export const requireAdmin = requireWorkshopAdmin;
-export const requireWsManager = requireWorkshopAdmin;
+/** Quản lý Xưởng: xử lý nghiệp vụ toàn XSC. Admin hệ thống cũng có toàn quyền nghiệp vụ. */
+export async function requireWsManager() {
+  const auth = await requireUser();
+  if (!(auth.isWsManager || auth.isAdmin) || auth.isReadOnlyViewer) {
+    throw new Error("Bạn không có quyền Quản lý Xưởng.");
+  }
+  return auth;
+}
+
+/** Tương thích các chỗ cũ đang dùng khái niệm quyền toàn Xưởng. */
+export const requireWorkshopAdmin = requireWsManager;
 
 export function hasGroupPermission(
   auth: AuthContext,
