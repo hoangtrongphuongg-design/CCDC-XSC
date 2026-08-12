@@ -66,7 +66,7 @@ export async function acceptRepairAction(formData: FormData) {
   const [repair] = await db.select().from(repairs).where(eq(repairs.id, repairId)).limit(1);
   if (!repair) throw new Error("Không tìm thấy phiếu sửa chữa.");
   await db.transaction(async (tx) => {
-    const [updated] = await tx.update(repairs).set({ status: "repairing", receivedBy: auth.userId, receivedAt: new Date(), updatedAt: new Date() })
+    const [updated] = await tx.update(repairs).set({ status: "repairing", repairType: "internal", receivedBy: auth.userId, receivedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(repairs.id, repair.id), eq(repairs.status, "pending_acceptance"))).returning();
     if (!updated) throw new Error("Phiếu đã được xử lý.");
     await tx.update(equipment).set({ status: "repairing", updatedAt: new Date() }).where(eq(equipment.id, repair.equipmentId));
@@ -84,7 +84,6 @@ export async function acceptRepairAction(formData: FormData) {
 
 export async function completeRepairAction(formData: FormData) {
   const repairId = String(formData.get("repairId") || "");
-  const result = String(formData.get("result") || "completed");
   const workDescription = String(formData.get("workDescription") || "").trim();
   const resultNotes = String(formData.get("resultNotes") || "").trim();
   const cost = Number(formData.get("cost") || 0);
@@ -93,9 +92,9 @@ export async function completeRepairAction(formData: FormData) {
   if (!repair || repair.status !== "repairing") throw new Error("Phiếu chưa ở trạng thái đang sửa.");
 
   await db.transaction(async (tx) => {
-    const irreparable = result === "irreparable";
     await tx.update(repairs).set({
-      status: irreparable ? "irreparable" : "wait_owner_confirm",
+      status: "wait_owner_confirm",
+      repairType: repair.repairType || "internal",
       workDescription: workDescription || null,
       resultNotes: resultNotes || null,
       cost: String(Math.max(0, cost)),
@@ -103,19 +102,38 @@ export async function completeRepairAction(formData: FormData) {
       completedAt: new Date(),
       updatedAt: new Date(),
     }).where(eq(repairs.id, repair.id));
-    await tx.update(equipment).set({
-      status: irreparable ? "wait_disposal" : "wait_repair_confirm",
-      condition: irreparable ? "irreparable" : "good",
-      updatedAt: new Date(),
-    }).where(eq(equipment.id, repair.equipmentId));
-    await writeAudit(tx as never, {
-      actorUserId: auth.userId,
-      action: irreparable ? "repair.irreparable" : "repair.complete",
-      entityType: "repair",
-      entityId: repair.id,
-      description: irreparable ? `Kết luận không thể phục hồi ${repair.code}` : `Hoàn tất sửa chữa ${repair.code}`,
-      afterData: { result, workDescription, resultNotes, cost },
-    });
+    await tx.update(equipment).set({ status: "wait_repair_confirm", condition: "good", updatedAt: new Date() }).where(eq(equipment.id, repair.equipmentId));
+    await writeAudit(tx as never, { actorUserId: auth.userId, action: "repair.complete", entityType: "repair", entityId: repair.id, description: `Hoàn tất sửa chữa ${repair.code}`, afterData: { repairType: repair.repairType || "internal", workDescription, resultNotes, cost } });
+  });
+  refresh();
+}
+
+export async function sendExternalRepairAction(formData: FormData) {
+  const repairId = String(formData.get("repairId") || "");
+  const vendor = String(formData.get("vendor") || "").trim();
+  const reason = String(formData.get("reason") || "").trim();
+  if (!vendor || !reason) throw new Error("Cần nhập đơn vị sửa ngoài và lý do thuê ngoài.");
+  const auth = await requireWsManager();
+  const [repair] = await db.select().from(repairs).where(eq(repairs.id, repairId)).limit(1);
+  if (!repair || repair.status !== "repairing") throw new Error("Phiếu chưa ở trạng thái đang sửa.");
+  await db.transaction(async (tx) => {
+    await tx.update(repairs).set({ repairType: "external", vendor, workDescription: reason, resultNotes: "Đã chuyển thuê ngoài sửa chữa", updatedAt: new Date() }).where(eq(repairs.id, repair.id));
+    await writeAudit(tx as never, { actorUserId: auth.userId, action: "repair.external", entityType: "repair", entityId: repair.id, description: `Chuyển thuê ngoài sửa chữa ${repair.code} tại ${vendor}`, afterData: { repairType: "external", vendor, reason } });
+  });
+  refresh();
+}
+
+export async function markExternalIrreparableAction(formData: FormData) {
+  const repairId = String(formData.get("repairId") || "");
+  const resultNotes = String(formData.get("resultNotes") || "").trim();
+  const cost = Number(formData.get("cost") || 0);
+  const auth = await requireWsManager();
+  const [repair] = await db.select().from(repairs).where(eq(repairs.id, repairId)).limit(1);
+  if (!repair || repair.status !== "repairing" || repair.repairType !== "external") throw new Error("Phiếu chưa ở trạng thái thuê ngoài sửa chữa.");
+  await db.transaction(async (tx) => {
+    await tx.update(repairs).set({ status: "irreparable", resultNotes: resultNotes || "Đơn vị sửa ngoài kết luận không thể phục hồi", cost: String(Math.max(0, cost)), completedBy: auth.userId, completedAt: new Date(), updatedAt: new Date() }).where(eq(repairs.id, repair.id));
+    await tx.update(equipment).set({ status: "wait_disposal", condition: "irreparable", updatedAt: new Date() }).where(eq(equipment.id, repair.equipmentId));
+    await writeAudit(tx as never, { actorUserId: auth.userId, action: "repair.irreparable", entityType: "repair", entityId: repair.id, description: `Sửa ngoài kết luận không thể phục hồi ${repair.code}`, afterData: { resultNotes, cost } });
   });
   refresh();
 }
