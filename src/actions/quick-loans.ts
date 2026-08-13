@@ -26,7 +26,7 @@ export async function createQuickLoanAction(formData: FormData) {
   const toolId = String(formData.get("toolId") || "") || null;
   const itemName = String(formData.get("itemName") || "").trim();
   const specification = String(formData.get("specification") || "").trim();
-  const unit = String(formData.get("unit") || "cái").trim();
+  const unit = String(formData.get("unit") || "Cái").trim();
   const quantityBorrowed = Number(formData.get("quantityBorrowed") || 0);
   const expectedReturnAtRaw = String(formData.get("expectedReturnAt") || "");
   const borrowerNote = String(formData.get("borrowerNote") || "").trim();

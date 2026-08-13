@@ -202,7 +202,7 @@ export default async function QuickLoansPage() {
           </CardContent>
         </Card>
 
-        <Card className="side-panel">
+        <Card className="side-panel" id="new-quick-loan">
           <CardHeader><CardTitle>Tạo đề nghị mượn nhanh</CardTitle><Plus size={18} /></CardHeader>
           <CardContent>
             {borrowerGroups.length ? (
@@ -259,7 +259,7 @@ export default async function QuickLoansPage() {
                 </div>
                 <div className="form-grid two">
                   <FormField label="Số lượng" required><input name="quantityBorrowed" type="number" min="0.01" step="0.01" /></FormField>
-                  <FormField label="Đơn vị"><input name="unit" defaultValue="cái" /></FormField>
+                  <FormField label="Đơn vị"><input name="unit" defaultValue="Cái" /></FormField>
                 </div>
                 <FormField label="Ngày dự kiến trả"><input name="expectedReturnAt" type="datetime-local" /></FormField>
                 <FormField label="Nội dung đề nghị"><textarea name="borrowerNote" placeholder="Mục đích sử dụng hoặc lưu ý cần thiết" /></FormField>

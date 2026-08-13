@@ -125,10 +125,10 @@ export default async function MachineLoansPage() {
                 <form action={confirmMachineReturnAction} className="mobile-return-confirm-form">
                   <input type="hidden" name="loanId" value={loan.id} />
                   <select name="condition" aria-label="Tình trạng khi nhận lại" defaultValue="good">
-                    <option value="good">Bình thường</option>
-                    <option value="limited">Hạn chế</option>
-                    <option value="minor_damage">Hư nhẹ</option>
-                    <option value="major_damage">Hư nặng</option>
+                    <option value="good">Tốt</option>
+                    <option value="major_damage">Hư hỏng</option>
+                    <option value="awaiting_assessment">Chờ kiểm tra</option>
+                    <option value="irreparable">Thanh lý</option>
                   </select>
                   <Button size="sm">Nhận lại</Button>
                 </form>
@@ -194,10 +194,9 @@ export default async function MachineLoansPage() {
                       <input type="hidden" name="loanId" value={loan.id} />
                       <select name="condition" aria-label="Tình trạng kỹ thuật" className="field-inline-md">
                         <option value="good">Tốt</option>
-                        <option value="limited">Hạn chế</option>
-                        <option value="minor_damage">Hư nhẹ</option>
-                        <option value="major_damage">Hư nặng</option>
-                        <option value="awaiting_assessment">Chờ đánh giá</option>
+                        <option value="major_damage">Hư hỏng</option>
+                        <option value="awaiting_assessment">Chờ kiểm tra</option>
+                        <option value="irreparable">Thanh lý</option>
                       </select>
                       <input name="returnCondition" placeholder="Ghi chú khi nhận lại" aria-label="Ghi chú khi nhận lại" className="field-inline-lg" />
                       <Button size="sm">Nhận lại</Button>
@@ -231,7 +230,7 @@ export default async function MachineLoansPage() {
           </CardContent>
         </Card>
 
-        <Card className="side-panel">
+        <Card className="side-panel" id="new-loan">
           <CardHeader><CardTitle>Tạo đề nghị mượn</CardTitle><Plus size={18} /></CardHeader>
           <CardContent>
             {borrowerGroups.length ? (

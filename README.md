@@ -122,3 +122,11 @@ Không reset/seed database. Chỉ chạy `database/update.sql` một lần; ph�
 
 ### Cập nhật database
 Sau khi deploy V1.6.7, chạy `database/update.sql` **một lần** để tạo bảng `tool_disposals`. Script chỉ bổ sung bảng/cột, không reset dữ liệu hiện có.
+
+## Cập nhật V1.6.9
+- Trang chủ mobile tinh gọn: card dùng để xem chi tiết; nút `+` mở 3 thao tác nhanh Mượn CCDC / Báo hỏng / Trả CCDC.
+- `Việc cần xử lý` trên mobile hợp nhất Mượn máy và Mượn nhanh, hiển thị đúng lệnh cần Duyệt/Từ chối/Báo trả/Xác nhận nhận lại theo quyền.
+- `Đang liên quan` gộp giao dịch máy có mã và CCDC lặt vặt, hiển thị theo góc nhìn Đang mượn / Đang cho mượn / Chờ nhận lại.
+- Form thêm CCDC có mã rút gọn: Nhóm quản lý, Tên CCDC, Nhóm thiết bị, Mã hiện hữu, Hãng, Đơn giá mua, Ngày đưa vào sử dụng, Tình trạng, Ghi chú. Model/thông số nhận diện ghi trực tiếp trong Tên CCDC.
+- Tình trạng hiển thị chuẩn: Tốt / Hư hỏng / Chờ kiểm tra / Thanh lý. Dữ liệu trạng thái cũ vẫn được đọc tương thích.
+- Không có migration mới trong V1.6.9; không reset dữ liệu hiện có.

@@ -3,12 +3,26 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Boxes, CheckCircle2, Gauge, Handshake, Plus, UserRound, XCircle } from "lucide-react";
+import {
+  Boxes,
+  CheckCircle2,
+  Gauge,
+  Handshake,
+  Plus,
+  RotateCcw,
+  UserRound,
+  Wrench,
+  X,
+  XCircle,
+} from "lucide-react";
 import type { AuthContext, FlashMessage } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 
 export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMessage | null }) {
   const [toast, setToast] = useState<FlashMessage | null>(flash || null);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const pathname = usePathname();
+  const canOperate = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.length > 0);
 
   useEffect(() => {
     if (!flash) return;
@@ -17,13 +31,12 @@ export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMes
     const timer = window.setTimeout(() => setToast(null), 3600);
     return () => window.clearTimeout(timer);
   }, [flash?.id]);
-  const pathname = usePathname();
-  const canBorrow = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.length > 0);
-  const items = [
-    ["/dashboard", "Trang chủ", Gauge, false],
-    [auth.isReadOnlyViewer ? "/equipment" : "/my-equipment", "CCDC", Boxes, false],
-    ...(canBorrow ? [["/dashboard#mobile-actions", "", Plus, true], ["/machine-loans", "Mượn/Trả", Handshake, false]] as const : []),
-    ["/profile", "Cá nhân", UserRound, false],
+
+  const navItems = [
+    ["/dashboard", "Trang chủ", Gauge],
+    [auth.isReadOnlyViewer ? "/equipment" : "/my-equipment", "CCDC", Boxes],
+    ["/machine-loans", "Mượn/Trả", Handshake],
+    ["/profile", "Cá nhân", UserRound],
   ] as const;
 
   return (
@@ -37,17 +50,54 @@ export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMes
           </div>
         </div>
       ) : null}
-    <nav className="mobile-nav" aria-label="Điều hướng điện thoại">
-      {items.map(([href, label, Icon, primary], index) => {
-        const active = !primary && (pathname === href || pathname.startsWith(`${href}/`));
-        return (
-          <Link href={href} key={`${href}-${index}`} className={cn(primary && "is-primary-action", active && "is-active")} aria-current={active ? "page" : undefined} aria-label={primary ? "Thao tác nhanh" : label}>
-            <span className="mobile-nav-icon"><Icon size={primary ? 24 : 20} strokeWidth={2} /></span>
-            {label ? <span>{label}</span> : null}
-          </Link>
-        );
-      })}
-    </nav>
+
+      {quickOpen ? (
+        <div className="mobile-quick-sheet-backdrop" role="presentation" onClick={() => setQuickOpen(false)}>
+          <section className="mobile-quick-sheet" role="dialog" aria-modal="true" aria-label="Thao tác nhanh" onClick={(event) => event.stopPropagation()}>
+            <div className="mobile-quick-sheet-head">
+              <div><strong>Thao tác nhanh</strong><small>Chọn việc cần thực hiện</small></div>
+              <button type="button" onClick={() => setQuickOpen(false)} aria-label="Đóng"><X size={20} /></button>
+            </div>
+            <div className="mobile-quick-sheet-actions">
+              <Link href="/machine-loans#new-loan" onClick={() => setQuickOpen(false)}>
+                <span><Handshake size={21} /></span><div><strong>Mượn CCDC</strong><small>Tạo đề nghị mượn mới</small></div>
+              </Link>
+              <Link href="/repairs#new-repair" onClick={() => setQuickOpen(false)}>
+                <span><Wrench size={21} /></span><div><strong>Báo hỏng</strong><small>Tạo báo hư nhanh</small></div>
+              </Link>
+              <Link href="/machine-loans#mobile-active-loans" onClick={() => setQuickOpen(false)}>
+                <span><RotateCcw size={21} /></span><div><strong>Trả CCDC</strong><small>Chọn CCDC đang mượn để trả</small></div>
+              </Link>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      <nav className="mobile-nav mobile-nav-v2" aria-label="Điều hướng điện thoại">
+        {navItems.slice(0, 2).map(([href, label, Icon]) => {
+          const active = pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <Link href={href} key={href} className={cn(active && "is-active")} aria-current={active ? "page" : undefined}>
+              <span className="mobile-nav-icon"><Icon size={20} strokeWidth={2} /></span><span>{label}</span>
+            </Link>
+          );
+        })}
+
+        {canOperate ? (
+          <button type="button" className="mobile-nav-quick" onClick={() => setQuickOpen(true)} aria-label="Thao tác nhanh">
+            <span className="mobile-nav-icon"><Plus size={25} strokeWidth={2.2} /></span>
+          </button>
+        ) : <span className="mobile-nav-spacer" aria-hidden="true" />}
+
+        {navItems.slice(2).map(([href, label, Icon]) => {
+          const active = pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <Link href={href} key={href} className={cn(active && "is-active")} aria-current={active ? "page" : undefined}>
+              <span className="mobile-nav-icon"><Icon size={20} strokeWidth={2} /></span><span>{label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </>
   );
 }

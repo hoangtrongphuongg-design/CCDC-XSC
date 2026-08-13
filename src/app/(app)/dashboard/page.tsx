@@ -13,13 +13,16 @@ import {
   Wrench,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { activityLogs, equipment, groups, machineLoans, repairs, transfers } from "@/lib/db/schema";
-import { requireUser } from "@/lib/auth/guards";
+import { activityLogs, equipment, groups, machineLoans, quickLoans, repairs, transfers } from "@/lib/db/schema";
+import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { formatDateTime } from "@/lib/utils";
 import { WORKFLOW_LABELS } from "@/lib/constants";
+import { approveMachineLoanAction, confirmMachineReturnAction, rejectMachineLoanAction, requestMachineReturnAction } from "@/actions/machine-loans";
+import { approveQuickLoanAction, closeQuickLoanAction, rejectQuickLoanAction, reportQuickLoanReturnAction } from "@/actions/quick-loans";
 
 const statusMeta = {
   in_use_owner: ["Sẵn sàng", "#7BA7CC"],
@@ -36,6 +39,7 @@ const statusMeta = {
 
 const openLoanStatuses = ["pending_owner", "approved", "wait_handover", "on_loan", "return_requested", "incident"] as const;
 const openRepairStatuses = ["pending_acceptance", "repairing", "wait_owner_confirm"] as const;
+const openQuickLoanStatuses = ["pending_approval", "pending_receipt", "borrowed", "return_reported"] as const;
 const openTransferStatuses = ["pending_source", "pending_target", "pending_ws", "wait_handover"] as const;
 
 export const dynamic = "force-dynamic";
@@ -52,11 +56,13 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const q = one(params.q).trim();
   const filterGroup = one(params.group);
   const filterStatus = one(params.status);
+  const showMobileInbox = one(params.inbox) === "1";
+  const showMobileRelated = one(params.related) === "1";
   const fullWorkshopScope = auth.isAdmin || auth.isWsManager || auth.isReadOnlyViewer;
   const allowedGroupIds = new Set(auth.permissions.map((permission) => permission.groupId));
   const today = new Date().toISOString().slice(0, 10);
 
-  const [groupRows, equipmentRows, loanRows, repairRows, transferRows, recentRows] = await Promise.all([
+  const [groupRows, equipmentRows, loanRows, quickLoanRows, repairRows, transferRows, recentRows] = await Promise.all([
     db.select({ id: groups.id, name: groups.name, code: groups.code }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
     db.select({
       id: equipment.id,
@@ -72,6 +78,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
       condition: equipment.condition,
     }).from(equipment).where(and(isNull(equipment.archivedAt), eq(equipment.recordStatus, "active"))).orderBy(asc(equipment.code)),
     db.select().from(machineLoans).where(inArray(machineLoans.status, [...openLoanStatuses])).orderBy(desc(machineLoans.createdAt)),
+    db.select().from(quickLoans).where(inArray(quickLoans.status, [...openQuickLoanStatuses])).orderBy(desc(quickLoans.createdAt)),
     db.select().from(repairs).where(inArray(repairs.status, [...openRepairStatuses])).orderBy(desc(repairs.createdAt)),
     db.select().from(transfers).where(inArray(transfers.status, [...openTransferStatuses])).orderBy(desc(transfers.createdAt)),
     db.select().from(activityLogs).orderBy(desc(activityLogs.createdAt)).limit(30),
@@ -82,6 +89,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const scopedEquipment = equipmentRows.filter((item) => fullWorkshopScope || allowedGroupIds.has(item.ownerGroupId));
   const scopedEquipmentIds = new Set(scopedEquipment.map((item) => item.id));
   const scopedLoans = loanRows.filter((row) => fullWorkshopScope || allowedGroupIds.has(row.ownerGroupId) || allowedGroupIds.has(row.borrowerGroupId));
+  const scopedQuickLoans = quickLoanRows.filter((row) => fullWorkshopScope || allowedGroupIds.has(row.sourceGroupId) || allowedGroupIds.has(row.borrowerGroupId));
   const scopedRepairs = repairRows.filter((row) => fullWorkshopScope || allowedGroupIds.has(row.reportedByGroupId) || scopedEquipmentIds.has(row.equipmentId));
   const scopedTransfers = transferRows.filter((row) => fullWorkshopScope || allowedGroupIds.has(row.sourceGroupId) || allowedGroupIds.has(row.targetGroupId));
   const scopedRecent = recentRows.filter((row) => fullWorkshopScope || (row.actorGroupId ? allowedGroupIds.has(row.actorGroupId) : false)).slice(0, 6);
@@ -95,6 +103,25 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const transferEquipmentIds = new Set(scopedTransfers.map((row) => row.equipmentId));
   const readyCount = scopedEquipment.filter((item) => item.status === "in_use_owner" && item.condition === "good").length;
   const actionCount = pendingLoanCount + overdueLoanCount + repairCount + transferCount;
+
+  const actionableMachineLoans = scopedLoans.filter((row) =>
+    (row.status === "pending_owner" && hasGroupPermission(auth, row.ownerGroupId, "operator")) ||
+    (row.status === "return_requested" && hasGroupPermission(auth, row.ownerGroupId, "operator")) ||
+    (row.status === "on_loan" && hasGroupPermission(auth, row.borrowerGroupId, "viewer"))
+  );
+  const actionableQuickLoans = scopedQuickLoans.filter((row) =>
+    (row.status === "pending_approval" && hasGroupPermission(auth, row.sourceGroupId, "operator")) ||
+    (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "operator")) ||
+    (["pending_receipt", "borrowed"].includes(row.status) && hasGroupPermission(auth, row.borrowerGroupId, "viewer"))
+  );
+  const mobileActionCount = actionableMachineLoans.length + actionableQuickLoans.length;
+  const mobileRelatedMachine = scopedLoans.filter((row) => ["on_loan", "return_requested", "incident"].includes(row.status));
+  const mobileRelatedQuick = scopedQuickLoans.filter((row) => ["pending_receipt", "borrowed", "return_reported"].includes(row.status));
+  const mobileRelatedCount = mobileRelatedMachine.length + mobileRelatedQuick.length;
+  const machineBorrowedByMe = mobileRelatedMachine.filter((row) => hasGroupPermission(auth, row.borrowerGroupId, "viewer")).length;
+  const machineLentByMe = mobileRelatedMachine.filter((row) => hasGroupPermission(auth, row.ownerGroupId, "viewer")).length;
+  const quickBorrowedByMe = mobileRelatedQuick.filter((row) => hasGroupPermission(auth, row.borrowerGroupId, "viewer")).length;
+  const quickLentByMe = mobileRelatedQuick.filter((row) => hasGroupPermission(auth, row.sourceGroupId, "viewer")).length;
 
   const statusData = Object.entries(
     scopedEquipment.reduce<Record<string, number>>((acc, item) => {
@@ -161,19 +188,20 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
 
   const scopeLabel = fullWorkshopScope ? "toàn XSC" : auth.permissions.length === 1 ? auth.permissions[0].groupName : "các nhóm được phân quyền";
   const canOperate = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.length > 0);
-  const mobileRelatedLoans = scopedLoans
-    .filter((row) => ["on_loan", "return_requested", "incident", "wait_handover"].includes(row.status))
-    .slice(0, 4);
+  const borrowedCountForMobile = machineBorrowedByMe + quickBorrowedByMe;
+  const lentCountForMobile = machineLentByMe + quickLentByMe;
+  const returnWaitingCount = mobileRelatedMachine.filter((row) => row.status === "return_requested").length
+    + mobileRelatedQuick.filter((row) => row.status === "return_reported").length;
 
   return (
     <div className="dashboard-page">
-      <section className="mobile-ops-home" aria-label="Thao tác nhanh trên điện thoại">
-        <header className="mobile-ops-header">
+      <section className="mobile-ops-home" aria-label="Trang chủ CCDC trên điện thoại">
+        <header className="mobile-ops-header mobile-ops-header-v2">
           <div>
-            <small>{auth.primaryGroupName || (fullWorkshopScope ? "Toàn XSC" : "CCDC Xưởng Sửa chữa")}</small>
             <strong>{auth.fullName}</strong>
+            <small>{auth.primaryGroupName || (fullWorkshopScope ? "Toàn XSC" : "CCDC Xưởng Sửa chữa")}</small>
           </div>
-          <Link href="/profile" className="mobile-ops-avatar" aria-label="Hồ sơ cá nhân">{auth.fullName.trim().slice(-1).toUpperCase()}</Link>
+          <Link href="/profile" className="mobile-ops-avatar" aria-label="Hồ sơ cá nhân">{auth.fullName.trim().slice(0, 1).toUpperCase()}</Link>
         </header>
 
         <form className="mobile-ops-search" action="/equipment" method="get" role="search">
@@ -182,50 +210,94 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
         </form>
 
         {canOperate ? (
-          <div className="mobile-ops-primary" id="mobile-actions">
-            <Link href="/machine-loans" className="mobile-action-card is-primary">
-              <span><Plus size={22} /></span><div><strong>Mượn CCDC</strong><small>Tìm và chọn nhanh</small></div>
+          <div className="mobile-ops-primary mobile-ops-primary-v2" id="mobile-actions">
+            <Link href="/machine-loans" className="mobile-action-card">
+              <span><Handshake size={20} /></span><div><strong>Mượn CCDC</strong><small>{borrowedCountForMobile ? `${borrowedCountForMobile} đang mượn` : "Xem phiếu mượn"}</small></div><ChevronRight size={16} />
             </Link>
             <Link href="/machine-loans#mobile-active-loans" className="mobile-action-card">
-              <span><Handshake size={22} /></span><div><strong>Trả CCDC</strong><small>Chỉ hiện đồ đang mượn</small></div>
+              <span><Clock3 size={20} /></span><div><strong>Trả CCDC</strong><small>{returnWaitingCount ? `${returnWaitingCount} chờ nhận lại` : "Xem CCDC cần trả"}</small></div><ChevronRight size={16} />
             </Link>
             <Link href="/repairs" className="mobile-action-card is-compact">
-              <span><Wrench size={19} /></span><div><strong>Báo hư</strong><small>Tạo báo hư nhanh</small></div>
+              <span><Wrench size={18} /></span><div><strong>Báo hư</strong><small>{repairCount ? `${repairCount} phiếu đang mở` : "Xem phiếu báo hư"}</small></div><ChevronRight size={16} />
             </Link>
             <Link href="/my-equipment" className="mobile-action-card is-compact">
-              <span><Boxes size={19} /></span><div><strong>CCDC nhóm tôi</strong><small>Xem nhanh</small></div>
+              <span><Boxes size={18} /></span><div><strong>CCDC nhóm tôi</strong><small>{scopedEquipment.length} CCDC</small></div><ChevronRight size={16} />
             </Link>
           </div>
-        ) : null}
+        ) : (
+          <div className="mobile-ops-primary mobile-ops-primary-v2 viewer-only">
+            <Link href="/equipment" className="mobile-action-card"><span><Boxes size={20} /></span><div><strong>Dụng cụ toàn xưởng</strong><small>Xem và tra cứu</small></div><ChevronRight size={16} /></Link>
+          </div>
+        )}
 
-        <section className="mobile-ops-block">
-          <div className="mobile-ops-block-title"><strong>Việc cần xử lý</strong><span>{actionCount}</span></div>
-          {tasks.filter((task) => task.count > 0).slice(0, 3).length ? (
-            <div className="mobile-task-list">
-              {tasks.filter((task) => task.count > 0).slice(0, 3).map((task) => (
-                <Link href={task.href} key={task.label}><span>{task.label}</span><b>{task.count}</b><ChevronRight size={16} /></Link>
-              ))}
-            </div>
-          ) : <p className="mobile-ops-empty">Không có việc cần xử lý ngay.</p>}
-        </section>
-
-        <section className="mobile-ops-block" id="mobile-active-loans">
-          <div className="mobile-ops-block-title"><strong>Đang liên quan</strong><Link href="/machine-loans">Xem tất cả</Link></div>
-          {mobileRelatedLoans.length ? (
-            <div className="mobile-related-list">
-              {mobileRelatedLoans.map((loan) => {
+        <section className="mobile-ops-block mobile-ops-summary" id="mobile-work-inbox">
+          <Link className="mobile-ops-block-title is-link" href={showMobileInbox ? "/dashboard" : "/dashboard?inbox=1#mobile-work-inbox"}>
+            <div><strong>Việc cần xử lý</strong><small>{mobileActionCount ? "Bấm để xem và xử lý các lệnh đang chờ" : "Không có việc cần xử lý"}</small></div>
+            <span>{mobileActionCount}</span><ChevronRight size={17} />
+          </Link>
+          {showMobileInbox && mobileActionCount ? (
+            <div className="mobile-unified-inbox">
+              {actionableMachineLoans.slice(0, 8).map((loan) => {
                 const machine = equipmentMap.get(loan.equipmentId);
                 const owner = groupMap.get(loan.ownerGroupId) || "—";
                 const borrower = groupMap.get(loan.borrowerGroupId) || "—";
                 return (
-                  <Link href="/machine-loans" key={loan.id} className="mobile-related-item">
-                    <div><strong>{machine?.name || "CCDC"}</strong><span>{machine?.code || loan.code} · {owner} → {borrower}</span></div>
-                    <small>{WORKFLOW_LABELS[loan.status] || loan.status}</small>
-                  </Link>
+                  <article className="mobile-inbox-card" key={`machine-${loan.id}`}>
+                    <div className="mobile-inbox-copy"><small>Mượn máy · {loan.code}</small><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || "—"} · {owner} → {borrower}</span></div>
+                    {loan.status === "pending_owner" ? (
+                      <div className="mobile-inbox-actions">
+                        <form action={rejectMachineLoanAction}><input type="hidden" name="loanId" value={loan.id} /><Button size="sm" variant="secondary">Từ chối</Button></form>
+                        <form action={approveMachineLoanAction}><input type="hidden" name="loanId" value={loan.id} /><Button size="sm">Duyệt</Button></form>
+                      </div>
+                    ) : loan.status === "return_requested" ? (
+                      <form action={confirmMachineReturnAction} className="mobile-inbox-actions"><input type="hidden" name="loanId" value={loan.id} /><input type="hidden" name="condition" value="good" /><Button size="sm">Xác nhận nhận lại</Button></form>
+                    ) : (
+                      <form action={requestMachineReturnAction} className="mobile-inbox-actions"><input type="hidden" name="loanId" value={loan.id} /><Button size="sm" variant="secondary">Báo trả</Button></form>
+                    )}
+                  </article>
                 );
               })}
+              {actionableQuickLoans.slice(0, 8).map((loan) => (
+                <article className="mobile-inbox-card" key={`quick-${loan.id}`}>
+                  <div className="mobile-inbox-copy"><small>Mượn nhanh · {loan.code}</small><strong>{loan.itemName}</strong><span>{loan.quantityBorrowed} {loan.unit} · {groupMap.get(loan.sourceGroupId) || "—"} → {groupMap.get(loan.borrowerGroupId) || "—"}</span></div>
+                  {loan.status === "pending_approval" ? (
+                    <div className="mobile-inbox-actions">
+                      <form action={rejectQuickLoanAction}><input type="hidden" name="loanId" value={loan.id} /><Button size="sm" variant="secondary">Từ chối</Button></form>
+                      <form action={approveQuickLoanAction}><input type="hidden" name="loanId" value={loan.id} /><Button size="sm">Duyệt</Button></form>
+                    </div>
+                  ) : loan.status === "return_reported" ? (
+                    <form action={closeQuickLoanAction} className="mobile-inbox-actions">
+                      <input type="hidden" name="loanId" value={loan.id} /><input type="hidden" name="returnedGood" value={Number(loan.quantityBorrowed)} /><input type="hidden" name="returnedDamaged" value="0" /><input type="hidden" name="lostQuantity" value="0" /><Button size="sm">Xác nhận nhận lại</Button>
+                    </form>
+                  ) : (
+                    <form action={reportQuickLoanReturnAction} className="mobile-inbox-actions"><input type="hidden" name="loanId" value={loan.id} /><Button size="sm" variant="secondary">Báo trả</Button></form>
+                  )}
+                </article>
+              ))}
             </div>
-          ) : <p className="mobile-ops-empty">Chưa có CCDC đang mượn hoặc chờ trả.</p>}
+          ) : null}
+        </section>
+
+        <section className="mobile-ops-block mobile-ops-summary" id="mobile-related">
+          <Link className="mobile-ops-block-title is-link" href={showMobileRelated ? "/dashboard" : "/dashboard?related=1#mobile-related"}>
+            <div><strong>Đang liên quan</strong><small>{mobileRelatedCount ? `${borrowedCountForMobile} đang mượn · ${lentCountForMobile} đang cho mượn${returnWaitingCount ? ` · ${returnWaitingCount} chờ nhận lại` : ""}` : "Không có giao dịch đang diễn ra"}</small></div>
+            <span>{mobileRelatedCount}</span><ChevronRight size={17} />
+          </Link>
+          {showMobileRelated && mobileRelatedCount ? (
+            <div className="mobile-related-list">
+              {mobileRelatedMachine.slice(0, 6).map((loan) => {
+                const machine = equipmentMap.get(loan.equipmentId);
+                const ownerView = hasGroupPermission(auth, loan.ownerGroupId, "viewer");
+                const label = loan.status === "return_requested" ? (ownerView ? "Chờ nhận lại" : "Đã báo trả") : (ownerView ? "Đang cho mượn" : "Đang mượn");
+                return <Link href="/machine-loans" key={`related-machine-${loan.id}`} className="mobile-related-item"><div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || loan.code} · {groupMap.get(loan.ownerGroupId) || "—"} → {groupMap.get(loan.borrowerGroupId) || "—"}</span></div><small>{label}</small></Link>;
+              })}
+              {mobileRelatedQuick.slice(0, 6).map((loan) => {
+                const ownerView = hasGroupPermission(auth, loan.sourceGroupId, "viewer");
+                const label = loan.status === "return_reported" ? (ownerView ? "Chờ nhận lại" : "Đã báo trả") : (ownerView ? "Đang cho mượn" : "Đang mượn");
+                return <Link href="/quick-loans" key={`related-quick-${loan.id}`} className="mobile-related-item"><div><strong>{loan.itemName}</strong><span>{loan.quantityBorrowed} {loan.unit} · {groupMap.get(loan.sourceGroupId) || "—"} → {groupMap.get(loan.borrowerGroupId) || "—"}</span></div><small>{label}</small></Link>;
+              })}
+            </div>
+          ) : null}
         </section>
       </section>
       <PageHeader

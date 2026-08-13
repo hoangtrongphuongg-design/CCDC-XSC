@@ -18,12 +18,12 @@ export const EQUIPMENT_STATUS_LABELS = {
 
 export const CONDITION_LABELS = {
   good: "Tốt",
-  limited: "Cần theo dõi",
-  minor_damage: "Hư nhẹ",
+  limited: "Chờ kiểm tra", // dữ liệu cũ
+  minor_damage: "Hư hỏng", // dữ liệu cũ
   major_damage: "Hư hỏng",
-  awaiting_assessment: "Chờ đánh giá",
-  irreparable: "Không thể phục hồi",
-  unknown: "Chưa đánh giá",
+  awaiting_assessment: "Chờ kiểm tra",
+  irreparable: "Thanh lý",
+  unknown: "Chờ kiểm tra", // dữ liệu cũ
 } as const;
 
 export const WORKFLOW_LABELS: Record<string, string> = {

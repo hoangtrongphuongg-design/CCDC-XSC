@@ -343,6 +343,76 @@ function AssetForm({
     return <QuantityToolForm permissions={permissions} typeRows={typeRows} isWorkshopAdmin={isWorkshopAdmin} onCancel={onCancel} onBack={() => setManagementMode("individual")} onSaved={onSaved} />;
   }
 
+  if (!isEditing && !isClone) {
+    return (
+      <form ref={formRef} action={action} className="asset-form asset-form-compact">
+        <section className="asset-form-section asset-management-mode">
+          <div className="asset-section-heading"><div><span>00</span><div><strong>Kiểu quản lý</strong><small>Chọn cách quản lý phù hợp với CCDC.</small></div></div></div>
+          <div className="management-mode-grid">
+            <button type="button" className="management-mode-card is-active"><strong>Có mã riêng</strong><small>Quản lý từng máy/CCDC.</small></button>
+            <button type="button" className="management-mode-card" onClick={() => setManagementMode("quantity")}><strong>Theo số lượng</strong><small>CCDC nhỏ lẻ quản lý theo số lượng tồn.</small></button>
+          </div>
+        </section>
+
+        <input type="hidden" name="recordId" value="" />
+        <input type="hidden" name="originType" value="existing" />
+        <input type="hidden" name="status" value="in_use_owner" />
+        <input type="hidden" name="purchasePrice" value={purchasePrice} />
+
+        <section className="asset-form-section">
+          <div className="asset-section-heading">
+            <div><span>01</span><div><strong>Thông tin CCDC</strong><small>Chỉ giữ các trường cần thiết để nhập nhanh và quản lý thực tế.</small></div></div>
+            <code className="asset-code-preview">{codePreview}</code>
+          </div>
+          <div className="form-grid two">
+            <FormField label="Nhóm quản lý" required>
+              <select name="ownerGroupId" value={ownerGroupId} onChange={(event) => setOwnerGroupId(event.target.value)}>
+                {(isWorkshopAdmin ? permissions : actionableGroups).map((group) => <option key={group.groupId} value={group.groupId}>{group.groupName}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Tên CCDC" required hint="Ghi luôn model/thông số nhận diện vào tên nếu cần.">
+              <input name="name" required placeholder="Ví dụ: Máy hàn que HK300A 300A" />
+            </FormField>
+            <FormField label="Nhóm thiết bị" required>
+              <select name="categoryCode" value={categoryCode} onChange={(event) => setCategoryCode(event.target.value)}>
+                {disciplineOrder.map((discipline) => (
+                  <optgroup key={discipline} label={EQUIPMENT_DISCIPLINE_LABELS[discipline]}>
+                    {EQUIPMENT_CATEGORIES.filter((category) => category.discipline === discipline).map((category) => <option key={category.code} value={category.code}>{category.name}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Mã hiện hữu / mã đã gán"><input name="legacyCode" placeholder="Ví dụ: MH-05" /></FormField>
+            <FormField label="Hãng"><input name="brand" placeholder="Ví dụ: Hồng Ký, Bosch, Makita..." /></FormField>
+            <FormField label="Đơn giá mua (VNĐ)" hint="Tự hiển thị dấu chấm phân cách hàng nghìn.">
+              <input type="text" inputMode="numeric" value={formatPurchasePriceInput(purchasePrice)} onChange={(event) => setPurchasePrice(event.target.value.replace(/\D/g, "").slice(0, 16))} placeholder="Ví dụ: 25.000.000" aria-label="Đơn giá mua" />
+            </FormField>
+            <FormField label="Ngày đưa vào sử dụng"><input name="recordedDate" type="date" defaultValue={defaultRecordedDate} /></FormField>
+            <FormField label="Tình trạng">
+              <select name="condition" value={condition} onChange={(event) => setCondition(event.target.value)}>
+                {simpleConditionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </FormField>
+          </div>
+          <div className="form-grid"><FormField label="Ghi chú"><textarea name="notes" rows={3} placeholder="Thông tin đặc biệt nếu có" /></FormField></div>
+        </section>
+
+        {state.message ? <p className={`form-message ${state.status === "error" ? "error" : state.status === "confirm" ? "warning" : "success"}`} role={state.status === "error" ? "alert" : "status"}>{state.message}</p> : null}
+        <div className="asset-form-footer">
+          <Button type="button" variant="ghost" onClick={onCancel}>Hủy</Button>
+          {state.status === "confirm" ? (
+            <Button type="submit" name="confirmDuplicates" value="true" variant="danger" disabled={pending}>Vẫn lưu sau khi kiểm tra</Button>
+          ) : (
+            <>
+              <Button type="submit" name="afterSave" value="add_next" variant="secondary" disabled={pending}>{pending ? "Đang lưu..." : "Lưu & thêm tiếp"}</Button>
+              <Button type="submit" name="afterSave" value="close" disabled={pending}>{pending ? "Đang lưu..." : "Lưu"}</Button>
+            </>
+          )}
+        </div>
+      </form>
+    );
+  }
+
   return (
     <form ref={formRef} action={action} className="asset-form">
       {!isEditing && !isClone ? <section className="asset-form-section asset-management-mode"><div className="asset-section-heading"><div><span>00</span><div><strong>Kiểu quản lý</strong><small>Chọn cách quản lý phù hợp với loại CCDC.</small></div></div></div><div className="management-mode-grid"><button type="button" className="management-mode-card is-active"><strong>Có mã riêng</strong><small>Máy hàn, máy khoan, máy mài, pa lăng...</small></button><button type="button" className="management-mode-card" onClick={() => setManagementMode("quantity")}><strong>Theo số lượng</strong><small>Mũi khoan, taro, đá mài, đầu khẩu, phụ kiện...</small></button></div></section> : null}

@@ -63,7 +63,7 @@ export default async function RepairsPage() {
             })} empty={<EmptyState description="Chưa có phiếu sửa chữa." />} />
           </CardContent>
         </Card>
-        <Card className="side-panel">
+        <Card className="side-panel" id="new-repair">
           <CardHeader><CardTitle>Báo hư / yêu cầu sửa</CardTitle><Plus size={18} /></CardHeader>
           <CardContent>
             {actingGroups.length ? <form action={createRepairAction} className="form-grid">
