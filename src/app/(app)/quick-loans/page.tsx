@@ -123,7 +123,13 @@ export default async function QuickLoansPage() {
 
                 return [
                   <strong key="code">{row.code}</strong>,
-                  `${row.itemName}${row.specification ? ` — ${row.specification}` : ""}`,
+                  <div key="item" className="quick-loan-item-cell">
+                    <strong>{row.itemName}</strong>
+                    {row.specification ? <small>{row.specification}</small> : null}
+                    <span className={row.toolId ? "catalog-chip is-linked" : "catalog-chip is-external"}>
+                      {row.toolId ? "Có trong danh mục" : "Ngoài danh mục"}
+                    </span>
+                  </div>,
                   `${row.quantityBorrowed} ${row.unit}`,
                   groupMap.get(row.sourceGroupId) || "—",
                   groupMap.get(row.borrowerGroupId) || "—",
@@ -152,14 +158,21 @@ export default async function QuickLoansPage() {
                     {operationalGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
                   </select>
                 </FormField>
-                <FormField label="Chọn dụng cụ" hint="Chỉ hiển thị dụng cụ còn số lượng tại Nhóm cho mượn. Gõ mã, tên hoặc quy cách để tìm nhanh.">
+                <div className="quick-loan-entry-block is-catalog">
+                  <div className="quick-loan-entry-heading">
+                    <span className="quick-loan-entry-index">1</span>
+                    <div>
+                      <strong>Tìm trong danh mục <span className="optional-label">(không bắt buộc)</span></strong>
+                      <p>Nếu CCDC đã có trong hệ thống, nên chọn để liên kết đúng danh mục và kiểm soát số lượng.</p>
+                    </div>
+                  </div>
                   <SearchableSelect
                     name="toolId"
                     controllerId="quick-loan-source-group"
                     includeControllerValue
-                    placeholder="Tìm dụng cụ còn sẵn..."
+                    placeholder="Gõ mã, tên hoặc quy cách để tìm..."
                     searchPlaceholder="Gõ mã, tên dụng cụ, quy cách..."
-                    emptyText="Nhóm này không có dụng cụ còn sẵn phù hợp."
+                    emptyText="Không tìm thấy trong danh mục của nhóm này. Có thể nhập nhanh ở mục 2 bên dưới."
                     options={tools.map((tool) => ({
                       value: tool.id,
                       groupId: tool.groupId,
@@ -167,9 +180,24 @@ export default async function QuickLoansPage() {
                       description: [tool.specification, `${tool.quantityOnHand} ${tool.unit}`, groupMap.get(tool.groupId)].filter(Boolean).join(" · "),
                     }))}
                   />
-                </FormField>
-                <FormField label="Tên vật dụng" hint="Chỉ cần nhập khi mượn vật dụng chưa có trong danh mục."><input name="itemName" placeholder="Ví dụ: Taro M20" /></FormField>
-                <FormField label="Quy cách"><input name="specification" placeholder="Có thể bỏ trống nếu đã chọn từ danh mục" /></FormField>
+                </div>
+
+                <div className="quick-loan-or"><span>HOẶC</span></div>
+
+                <div className="quick-loan-entry-block is-free-text">
+                  <div className="quick-loan-entry-heading">
+                    <span className="quick-loan-entry-index">2</span>
+                    <div>
+                      <strong>Nhập nhanh CCDC ngoài danh mục</strong>
+                      <p>Dùng khi CCDC lặt vặt chưa được khai báo trong hệ thống. Không cần tạo danh mục trước.</p>
+                    </div>
+                  </div>
+                  <div className="form-grid two quick-loan-free-fields">
+                    <FormField label="Tên CCDC"><input name="itemName" placeholder="Ví dụ: Taro M20, mũi khoan Ø12..." /></FormField>
+                    <FormField label="Quy cách"><input name="specification" placeholder="Ví dụ: M20, Ø12 HSS..." /></FormField>
+                  </div>
+                  <p className="quick-loan-note">Nếu đã chọn CCDC ở mục 1, hệ thống ưu tiên dữ liệu trong danh mục. Nếu không chọn, cần nhập tên CCDC tại mục 2.</p>
+                </div>
                 <div className="form-grid two">
                   <FormField label="Số lượng" required><input name="quantityBorrowed" type="number" min="0.01" step="0.01" /></FormField>
                   <FormField label="Đơn vị"><input name="unit" defaultValue="cái" /></FormField>

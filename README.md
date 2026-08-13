@@ -59,6 +59,14 @@ Giữ nguyên dashboard điều hành và bổ sung:
 - Phân quyền tập trung V1.5.7 và bảo vệ Admin.
 - Nhóm KHBT và Ban Quản Đốc đã nằm trong cơ cấu chuẩn; database hiện hữu vẫn cần có 2 bản ghi nhóm tương ứng.
 
+## V1.6.0 — Cho mượn nhanh linh hoạt CCDC ngoài danh mục
+- CCDC trong danh mục: tìm kiếm theo mã/tên/quy cách và chọn để liên kết; hệ thống kiểm soát số lượng tồn khi duyệt.
+- CCDC chưa có trong danh mục: được nhập trực tiếp tên + quy cách + số lượng + đơn vị, không bắt buộc tạo danh mục trước.
+- Bản ghi được hiển thị rõ `Có trong danh mục` hoặc `Ngoài danh mục`.
+- CCDC ngoài danh mục không tự trừ tồn kho; lịch sử mượn/trả vẫn được lưu đầy đủ.
+- Form được bố trí thành 2 lựa chọn rõ ràng, responsive trên desktop/mobile và không cuộn ngang.
+- Không thay đổi schema database, không cần migration.
+
 ## Cập nhật an toàn
 Chỉ upload/deploy code. Giữ nguyên `DATABASE_URL` và `AUTH_SECRET` trên Vercel.
 
