@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { SearchableSelect } from "@/components/searchable-select";
-import { formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import {
   approveQuickLoanAction,
   closeQuickLoanAction,
@@ -32,8 +32,13 @@ function tone(status: string) {
 
 export const dynamic = "force-dynamic";
 
-export default async function QuickLoansPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function QuickLoansPage({ searchParams }: { searchParams?: SearchParams }) {
   const auth = await requireUser();
+  const params = searchParams ? await searchParams : {};
+  const modeValue = params.mode;
+  const mobileMode = (Array.isArray(modeValue) ? modeValue[0] : modeValue) || "view";
   const [groupRows, tools, rows] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name, isSystem: groups.isSystem })
       .from(groups)
@@ -57,7 +62,7 @@ export default async function QuickLoansPage() {
   const completed = rows.filter((row) => row.status === "completed").length;
 
   return (
-    <div className="loan-mobile-page quick-loans-page">
+    <div className={`loan-mobile-page quick-loans-page mobile-mode-${mobileMode}`}>
       <div className="loan-mobile-switch" aria-label="Chọn kiểu mượn">
         <a href="/machine-loans">Máy có mã</a>
         <span className="is-active">CCDC lặt vặt</span>
@@ -182,7 +187,7 @@ export default async function QuickLoansPage() {
                   `${row.quantityBorrowed} ${row.unit}`,
                   groupMap.get(row.sourceGroupId) || "—",
                   groupMap.get(row.borrowerGroupId) || "—",
-                  formatDateTime(row.expectedReturnAt),
+                  row.expectedReturnAt ? formatDate(row.expectedReturnAt) : "—",
                   <StatusBadge
                     key="status"
                     label={
@@ -261,7 +266,7 @@ export default async function QuickLoansPage() {
                   <FormField label="Số lượng" required><input name="quantityBorrowed" type="number" min="0.01" step="0.01" /></FormField>
                   <FormField label="Đơn vị"><input name="unit" defaultValue="Cái" /></FormField>
                 </div>
-                <FormField label="Ngày dự kiến trả"><input name="expectedReturnAt" type="datetime-local" /></FormField>
+                <FormField label="Ngày dự kiến trả"><input name="expectedReturnAt" type="date" /></FormField>
                 <FormField label="Nội dung đề nghị"><textarea name="borrowerNote" placeholder="Mục đích sử dụng hoặc lưu ý cần thiết" /></FormField>
                 <Button type="submit">Gửi đề nghị mượn nhanh</Button>
               </form>

@@ -16,8 +16,13 @@ import { formatNumber } from "@/lib/utils";
 import { acceptRepairAction, completeRepairAction, confirmRepairByOwnerAction, createRepairAction, markExternalIrreparableAction, sendExternalRepairAction } from "@/actions/repairs";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 
-export default async function RepairsPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function RepairsPage({ searchParams }: { searchParams?: SearchParams }) {
   const auth = await requireUser();
+  const params = searchParams ? await searchParams : {};
+  const modeValue = params.mode;
+  const mobileMode = (Array.isArray(modeValue) ? modeValue[0] : modeValue) || "view";
   const [groupRows, equipmentRows, rows] = await Promise.all([
     db.select({ id: groups.id, name: groups.name }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
     db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId, currentGroupId: equipment.currentGroupId }).from(equipment).where(eq(equipment.recordStatus, "active")).orderBy(asc(equipment.code)),
@@ -33,7 +38,7 @@ export default async function RepairsPage() {
   const completed = rows.filter((row) => row.status === "completed").length;
 
   return (
-    <>
+    <div className={`repair-mobile-page mobile-mode-${mobileMode}`}>
       <PageHeader title="Sửa chữa" description="Báo hư, tiếp nhận, thực hiện sửa và xác nhận hoàn thành theo từng mã máy." />
       <section className="stat-grid">
         <StatCard title="Chờ tiếp nhận" value={pending} icon={Clock3} tone="warning" />
@@ -41,6 +46,11 @@ export default async function RepairsPage() {
         <StatCard title="Thuê ngoài" value={externalRepairing} icon={Wrench} tone="warning" />
         <StatCard title="Chờ nhóm nhận lại" value={waitingOwner} icon={ShieldAlert} tone="violet" />
         <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
+      </section>
+      <section className="mobile-repair-list" aria-label="Danh sách phiếu báo hư">
+        <div className="mobile-loan-section-title"><strong>Phiếu báo hư</strong><span>{rows.length}</span></div>
+        {rows.slice(0, 20).map((row) => { const machine = equipmentMap.get(row.equipmentId); return <article className="mobile-repair-card" key={`mobile-repair-${row.id}`}><div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || row.code} · {groupMap.get(row.reportedByGroupId) || "—"}</span><small>{row.status === "repairing" && row.repairType === "external" ? "Đang sửa ngoài" : row.status === "repairing" ? "Đang sửa nội bộ" : WORKFLOW_LABELS[row.status] || row.status}</small></div></article>; })}
+        {!rows.length ? <p className="mobile-ops-empty">Chưa có phiếu báo hư.</p> : null}
       </section>
       <div className="content-grid">
         <Card className="table-card">
@@ -75,6 +85,6 @@ export default async function RepairsPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }

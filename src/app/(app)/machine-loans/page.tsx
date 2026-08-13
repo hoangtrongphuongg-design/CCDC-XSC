@@ -32,8 +32,13 @@ function tone(status: string) {
 
 export const dynamic = "force-dynamic";
 
-export default async function MachineLoansPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function MachineLoansPage({ searchParams }: { searchParams?: SearchParams }) {
   const auth = await requireUser();
+  const params = searchParams ? await searchParams : {};
+  const modeValue = params.mode;
+  const mobileMode = (Array.isArray(modeValue) ? modeValue[0] : modeValue) || "view";
   const [groupRows, availableEquipmentRows, allEquipment, loans, openLoanRows, openTransfers, openRepairs, openDisposals] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name, isSystem: groups.isSystem })
       .from(groups)
@@ -71,7 +76,7 @@ export default async function MachineLoansPage() {
   const completed = loans.filter((row) => row.status === "completed").length;
 
   return (
-    <div className="loan-mobile-page machine-loans-page">
+    <div className={`loan-mobile-page machine-loans-page mobile-mode-${mobileMode}`}>
       <div className="loan-mobile-switch" aria-label="Chọn kiểu mượn">
         <span className="is-active">Máy có mã</span>
         <a href="/quick-loans">CCDC lặt vặt</a>

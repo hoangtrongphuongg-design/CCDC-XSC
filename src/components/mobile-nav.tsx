@@ -59,13 +59,13 @@ export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMes
               <button type="button" onClick={() => setQuickOpen(false)} aria-label="Đóng"><X size={20} /></button>
             </div>
             <div className="mobile-quick-sheet-actions">
-              <Link href="/machine-loans#new-loan" onClick={() => setQuickOpen(false)}>
+              <Link href="/machine-loans?mode=create#new-loan" onClick={() => setQuickOpen(false)}>
                 <span><Handshake size={21} /></span><div><strong>Mượn CCDC</strong><small>Tạo đề nghị mượn mới</small></div>
               </Link>
-              <Link href="/repairs#new-repair" onClick={() => setQuickOpen(false)}>
+              <Link href="/repairs?mode=create#new-repair" onClick={() => setQuickOpen(false)}>
                 <span><Wrench size={21} /></span><div><strong>Báo hỏng</strong><small>Tạo báo hư nhanh</small></div>
               </Link>
-              <Link href="/machine-loans#mobile-active-loans" onClick={() => setQuickOpen(false)}>
+              <Link href="/machine-loans?mode=return#mobile-active-loans" onClick={() => setQuickOpen(false)}>
                 <span><RotateCcw size={21} /></span><div><strong>Trả CCDC</strong><small>Chọn CCDC đang mượn để trả</small></div>
               </Link>
             </div>

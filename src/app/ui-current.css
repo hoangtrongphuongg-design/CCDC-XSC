@@ -2335,3 +2335,27 @@ body {
   .asset-form-compact .asset-form-section { padding-top: 13px; padding-bottom: 13px; }
   .asset-form-compact .asset-section-heading small { font-size: 9px; }
 }
+
+
+/* Mobile V1.6.10 — card để xem, dấu + để tạo thao tác */
+.mobile-repair-list { display: none; }
+@media (max-width: 760px) {
+  .loan-mobile-page:not(.mobile-mode-create) .side-panel { display: none !important; }
+  .loan-mobile-page.mobile-mode-create .mobile-loan-action-inbox,
+  .loan-mobile-page.mobile-mode-create .mobile-loan-return-list { display: none !important; }
+  .loan-mobile-page.mobile-mode-create .side-panel { display: block !important; order: -1; }
+  .loan-mobile-page.mobile-mode-return .mobile-loan-action-inbox { display: none !important; }
+  .repair-mobile-page > .page-header,
+  .repair-mobile-page > .stat-grid { display: none !important; }
+  .repair-mobile-page .table-card { display: none !important; }
+  .repair-mobile-page:not(.mobile-mode-create) .side-panel { display: none !important; }
+  .repair-mobile-page.mobile-mode-create .side-panel { display: block !important; }
+  .repair-mobile-page.mobile-mode-create .mobile-repair-list { display: none !important; }
+  .mobile-repair-list { display: grid; gap: 8px; margin: 0 0 12px; }
+  .mobile-repair-card { padding: 11px 12px; border: 1px solid var(--border); border-radius: 12px; background: #fff; box-shadow: var(--shadow-xs); }
+  .mobile-repair-card strong, .mobile-repair-card span, .mobile-repair-card small { display: block; }
+  .mobile-repair-card strong { font-size: 11px; line-height: 1.25; }
+  .mobile-repair-card span { margin-top: 3px; color: var(--text-muted); font-size: 8.5px; }
+  .mobile-repair-card small { margin-top: 4px; color: var(--primary); font-size: 8px; font-weight: 700; }
+  .mobile-home-detail { margin-top: 8px; }
+}
