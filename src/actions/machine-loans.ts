@@ -75,6 +75,15 @@ export async function createMachineLoanAction(formData: FormData) {
       description: `Tạo đề nghị mượn máy ${item.code}`,
       afterData: created,
     });
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: borrowerGroupId,
+      action: "equipment.loan_requested",
+      entityType: "equipment",
+      entityId: equipmentId,
+      description: `Tạo đề nghị mượn ${item.code} theo phiếu ${created.code}`,
+      afterData: { loanId: created.id, loanCode: created.code, borrowerGroupId },
+    });
   });
 
   refresh();
@@ -82,7 +91,11 @@ export async function createMachineLoanAction(formData: FormData) {
   await setFlashMessage("success", 'Đã gửi đề nghị mượn');
 }
 
-/** Kỹ sư giám sát hoặc Đốc công nhóm cho mượn đều có quyền duyệt. */
+/**
+ * Kỹ sư giám sát hoặc Đốc công nhóm cho mượn duyệt.
+ * Theo quy trình rút gọn: Duyệt = đã bàn giao + phía mượn được xem là đã nhận.
+ * Phiếu chuyển thẳng sang Đang mượn, không còn bước bàn giao/nhận riêng.
+ */
 export async function approveMachineLoanAction(formData: FormData) {
   const loanId = String(formData.get("loanId") || "");
   const handoverCondition = String(formData.get("handoverCondition") || "").trim();
@@ -95,117 +108,101 @@ export async function approveMachineLoanAction(formData: FormData) {
   }
 
   await db.transaction(async (tx) => {
-    await lockEquipment(tx, loan.equipmentId);
+    const item = await lockEquipment(tx, loan.equipmentId);
     await assertEquipmentHasNoOtherOpenWorkflow(tx, loan.equipmentId, { machineLoanId: loan.id });
+    if (item.status !== "in_use_owner" || item.condition !== "good") {
+      throw new Error("Máy không còn ở trạng thái Sẵn sàng/Tốt để bàn giao.");
+    }
 
+    const now = new Date();
     const [updated] = await tx.update(machineLoans).set({
-      status: "wait_handover",
+      status: "on_loan",
       approvedBy: auth.userId,
-      approvedAt: new Date(),
+      approvedAt: now,
+      handedOverBy: auth.userId,
+      handedOverAt: now,
+      receivedBy: loan.requestedBy,
+      receivedAt: now,
       handoverCondition: handoverCondition || null,
-      updatedAt: new Date(),
+      updatedAt: now,
     }).where(and(eq(machineLoans.id, loan.id), eq(machineLoans.status, "pending_owner"))).returning();
 
     if (!updated) throw new Error("Phiếu đã được người khác xử lý. Vui lòng tải lại.");
 
-    await tx.update(equipment)
-      .set({ status: "wait_handover", updatedAt: new Date() })
-      .where(eq(equipment.id, loan.equipmentId));
-
-    await writeAudit(tx as never, {
-      actorUserId: auth.userId,
-      actorGroupId: loan.ownerGroupId,
-      action: "machine_loan.approve",
-      entityType: "machine_loan",
-      entityId: loan.id,
-      description: `Nhóm cho mượn duyệt phiếu ${loan.code}`,
-      beforeData: loan,
-      afterData: updated,
-    });
-  });
-
-  refresh();
-
-  await setFlashMessage("success", 'Đã duyệt đề nghị mượn');
-}
-
-/** Kỹ sư giám sát hoặc Đốc công nhóm cho mượn có thể xác nhận giao theo quyền nghiệp vụ. */
-export async function confirmLoanHandoverAction(formData: FormData) {
-  const loanId = String(formData.get("loanId") || "");
-  const [loan] = await db.select().from(machineLoans).where(eq(machineLoans.id, loanId)).limit(1);
-  if (!loan) throw new Error("Không tìm thấy phiếu.");
-
-  const auth = await requireGroupPermission(loan.ownerGroupId, "operator");
-  if (loan.status !== "wait_handover") throw new Error("Phiếu chưa ở bước bàn giao.");
-
-  await db.transaction(async (tx) => {
-    const [updated] = await tx.update(machineLoans).set({
-      handedOverBy: auth.userId,
-      handedOverAt: new Date(),
-      updatedAt: new Date(),
-    }).where(and(eq(machineLoans.id, loan.id), eq(machineLoans.status, "wait_handover"))).returning();
-
-    if (!updated) throw new Error("Phiếu đã được người khác xử lý.");
-
-    await writeAudit(tx as never, {
-      actorUserId: auth.userId,
-      actorGroupId: loan.ownerGroupId,
-      action: "machine_loan.handover",
-      entityType: "machine_loan",
-      entityId: loan.id,
-      description: `Xác nhận bàn giao theo phiếu ${loan.code}`,
-      afterData: updated,
-    });
-  });
-
-  refresh();
-
-  await setFlashMessage("success", 'Đã xác nhận bàn giao');
-}
-
-/** Mọi thành viên của nhóm mượn được xác nhận đã nhận. */
-export async function confirmLoanReceiptAction(formData: FormData) {
-  const loanId = String(formData.get("loanId") || "");
-  const [loan] = await db.select().from(machineLoans).where(eq(machineLoans.id, loanId)).limit(1);
-  if (!loan) throw new Error("Không tìm thấy phiếu.");
-
-  const auth = await requireGroupPermission(loan.borrowerGroupId, "viewer");
-  if (!loan.handedOverAt || loan.status !== "wait_handover") {
-    throw new Error("Bên cho chưa xác nhận bàn giao.");
-  }
-
-  await db.transaction(async (tx) => {
-    await lockEquipment(tx, loan.equipmentId);
-    const [updated] = await tx.update(machineLoans).set({
-      status: "on_loan",
-      receivedBy: auth.userId,
-      receivedAt: new Date(),
-      updatedAt: new Date(),
-    }).where(and(eq(machineLoans.id, loan.id), eq(machineLoans.status, "wait_handover"))).returning();
-
-    if (!updated) throw new Error("Phiếu đã được xử lý.");
-
     await tx.update(equipment).set({
       status: "on_loan",
       currentGroupId: loan.borrowerGroupId,
-      currentHolderId: auth.userId,
-      updatedAt: new Date(),
+      currentHolderId: loan.requestedBy,
+      updatedAt: now,
     }).where(eq(equipment.id, loan.equipmentId));
 
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
-      actorGroupId: loan.borrowerGroupId,
-      action: "machine_loan.receive",
+      actorGroupId: loan.ownerGroupId,
+      action: "machine_loan.approve_and_handover",
       entityType: "machine_loan",
       entityId: loan.id,
-      description: `Nhóm mượn xác nhận nhận máy theo phiếu ${loan.code}`,
+      description: `Duyệt và bàn giao máy theo phiếu ${loan.code}; phiếu chuyển sang Đang mượn`,
+      beforeData: loan,
       afterData: updated,
+    });
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: loan.ownerGroupId,
+      action: "equipment.loan_started",
+      entityType: "equipment",
+      entityId: loan.equipmentId,
+      description: `Máy ${item.code} được bàn giao cho nhóm mượn theo phiếu ${loan.code}`,
+      afterData: { loanId: loan.id, loanCode: loan.code, ownerGroupId: loan.ownerGroupId, borrowerGroupId: loan.borrowerGroupId },
     });
   });
 
   refresh();
+  await setFlashMessage("success", "Đã duyệt và bàn giao CCDC");
+}
 
-  await setFlashMessage("success", 'Đã xác nhận nhận CCDC');
+/** Từ chối đề nghị trước khi máy được bàn giao. */
+export async function rejectMachineLoanAction(formData: FormData) {
+  const loanId = String(formData.get("loanId") || "");
+  const rejectionReason = String(formData.get("rejectionReason") || "").trim();
+  const [loan] = await db.select().from(machineLoans).where(eq(machineLoans.id, loanId)).limit(1);
+  if (!loan) throw new Error("Không tìm thấy phiếu mượn.");
+
+  const auth = await requireGroupPermission(loan.ownerGroupId, "operator");
+  if (loan.requestedBy === auth.userId) throw new Error("Người tạo phiếu không được tự xử lý phiếu.");
+
+  await db.transaction(async (tx) => {
+    const [updated] = await tx.update(machineLoans).set({
+      status: "rejected",
+      rejectionReason: rejectionReason || "Nhóm quản lý không đồng ý cho mượn",
+      updatedAt: new Date(),
+    }).where(and(eq(machineLoans.id, loan.id), eq(machineLoans.status, "pending_owner"))).returning();
+    if (!updated) throw new Error("Phiếu đã được người khác xử lý. Vui lòng tải lại.");
+
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: loan.ownerGroupId,
+      action: "machine_loan.reject",
+      entityType: "machine_loan",
+      entityId: loan.id,
+      description: `Từ chối đề nghị mượn ${loan.code}`,
+      beforeData: loan,
+      afterData: updated,
+      reason: rejectionReason || null,
+    });
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: loan.ownerGroupId,
+      action: "equipment.loan_rejected",
+      entityType: "equipment",
+      entityId: loan.equipmentId,
+      description: `Đề nghị mượn ${loan.code} bị từ chối`,
+      reason: rejectionReason || null,
+    });
+  });
+
+  refresh();
+  await setFlashMessage("success", "Đã từ chối đề nghị mượn");
 }
 
 /** Mọi thành viên của nhóm mượn được báo trả. */
@@ -241,6 +238,15 @@ export async function requestMachineReturnAction(formData: FormData) {
       entityId: loan.id,
       description: `Nhóm mượn báo trả máy theo phiếu ${loan.code}`,
       afterData: updated,
+    });
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: loan.borrowerGroupId,
+      action: "equipment.return_requested",
+      entityType: "equipment",
+      entityId: loan.equipmentId,
+      description: `Nhóm mượn gửi trả máy theo phiếu ${loan.code}`,
+      afterData: { loanId: loan.id, loanCode: loan.code },
     });
   });
 
@@ -296,6 +302,15 @@ export async function confirmMachineReturnAction(formData: FormData) {
       entityId: loan.id,
       description: `Thành viên nhóm cho mượn xác nhận nhận lại máy theo phiếu ${loan.code}`,
       afterData: { ...updated, equipmentCondition: condition },
+    });
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: loan.ownerGroupId,
+      action: "equipment.loan_completed",
+      entityType: "equipment",
+      entityId: loan.equipmentId,
+      description: `Hoàn tất mượn/trả theo phiếu ${loan.code}`,
+      afterData: { loanId: loan.id, loanCode: loan.code, condition, returnCondition: returnCondition || null },
     });
   });
 

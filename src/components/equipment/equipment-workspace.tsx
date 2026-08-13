@@ -753,7 +753,7 @@ export function EquipmentWorkspace({
 
         <section className="card table-card">
           <div className="card-header"><div><h2 className="card-title">Danh sách CCDC</h2><p className="card-subtitle">Mỗi thiết bị có một mã hệ thống cố định trong toàn bộ vòng đời.</p></div></div>
-          <div className="card-content">
+          <div className="card-content equipment-list-table">
             <DataTable
               headers={["Mã", "Mã hiện hữu", "Tên CCDC", "Loại", "Hãng / Model", "Vị trí", "Tình trạng", "Trạng thái", "Cập nhật", "Thao tác"]}
               rows={filteredEquipment.map((row) => [
@@ -765,7 +765,7 @@ export function EquipmentWorkspace({
                 row.currentLocation || "—",
                 <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />,
                 <StatusBadge key="status" label={EQUIPMENT_STATUS_LABELS[row.status]} tone={statusTone(row.status)} />,
-                formatDateTime(row.updatedAt),
+                <span key="updated" className="equipment-updated-at">{formatDateTime(row.updatedAt)}</span>,
                 <div key="actions" className="row-actions equipment-row-actions">
                   <Button type="button" size="sm" variant="ghost" onClick={() => openDetail(row)}><Eye size={14} /> Xem</Button>
                   {canEditRow(row) ? <Button type="button" size="sm" variant="ghost" onClick={() => openEdit(row)}><Edit3 size={14} /> Sửa</Button> : null}

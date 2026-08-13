@@ -17,10 +17,9 @@ import { formatDate } from "@/lib/utils";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import {
   approveMachineLoanAction,
-  confirmLoanHandoverAction,
-  confirmLoanReceiptAction,
   confirmMachineReturnAction,
   createMachineLoanAction,
+  rejectMachineLoanAction,
   requestMachineReturnAction,
 } from "@/actions/machine-loans";
 
@@ -66,7 +65,7 @@ export default async function MachineLoansPage() {
     (permission) => permission.groupCode !== "KHO_TL" && isOfficialOperationalGroupCode(permission.groupCode),
   );
 
-  const pending = loans.filter((row) => ["pending_owner", "approved", "wait_handover"].includes(row.status)).length;
+  const pending = loans.filter((row) => row.status === "pending_owner").length;
   const onLoan = loans.filter((row) => row.status === "on_loan").length;
   const waitingReturn = loans.filter((row) => row.status === "return_requested").length;
   const completed = loans.filter((row) => row.status === "completed").length;
@@ -79,7 +78,7 @@ export default async function MachineLoansPage() {
       </div>
       <PageHeader
         title="Mượn máy"
-        description="Công nhân kỹ thuật, Kỹ sư giám sát và Đốc công đều được lập đề nghị; Kỹ sư giám sát hoặc Đốc công nhóm cho mượn duyệt; thành viên nhóm cho mượn xác nhận nhận lại."
+        description="Luồng rút gọn: tạo đề nghị → nhóm cho mượn duyệt (đồng thời bàn giao) → đang mượn → gửi trả → nhóm chủ máy xác nhận nhận lại."
       />
 
       <section className="stat-grid">
@@ -87,6 +86,56 @@ export default async function MachineLoansPage() {
         <StatCard title="Đang mượn" value={onLoan} icon={Handshake} tone="cyan" />
         <StatCard title="Chờ nhận lại" value={waitingReturn} icon={RotateCcw} tone="violet" />
         <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
+      </section>
+
+      <section className="mobile-loan-action-inbox" aria-label="Việc cần xử lý">
+        <div className="mobile-loan-section-title">
+          <strong>Việc cần xử lý</strong>
+          <span>{loans.filter((loan) =>
+            (loan.status === "pending_owner" && hasGroupPermission(auth, loan.ownerGroupId, "operator")) ||
+            (loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "viewer"))
+          ).length}</span>
+        </div>
+        {loans.filter((loan) =>
+          (loan.status === "pending_owner" && hasGroupPermission(auth, loan.ownerGroupId, "operator")) ||
+          (loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "viewer"))
+        ).slice(0, 6).map((loan) => {
+          const machine = equipmentMap.get(loan.equipmentId);
+          const ownerName = groupMap.get(loan.ownerGroupId) || "—";
+          const borrowerName = groupMap.get(loan.borrowerGroupId) || "—";
+          return (
+            <article className="mobile-loan-action-card" key={`action-${loan.id}`}>
+              <div className="mobile-loan-action-copy">
+                <strong>{machine?.name || "Máy/CCDC"}</strong>
+                <span>{machine?.code || loan.code} · {ownerName} → {borrowerName}</span>
+                <small>{loan.status === "pending_owner" ? `Mượn đến ${formatDate(loan.expectedReturnDate)}` : "Nhóm mượn đã gửi trả"}</small>
+              </div>
+              {loan.status === "pending_owner" ? (
+                <div className="mobile-loan-action-buttons">
+                  <form action={rejectMachineLoanAction}>
+                    <input type="hidden" name="loanId" value={loan.id} />
+                    <Button size="sm" variant="secondary">Từ chối</Button>
+                  </form>
+                  <form action={approveMachineLoanAction}>
+                    <input type="hidden" name="loanId" value={loan.id} />
+                    <Button size="sm">Duyệt</Button>
+                  </form>
+                </div>
+              ) : (
+                <form action={confirmMachineReturnAction} className="mobile-return-confirm-form">
+                  <input type="hidden" name="loanId" value={loan.id} />
+                  <select name="condition" aria-label="Tình trạng khi nhận lại" defaultValue="good">
+                    <option value="good">Bình thường</option>
+                    <option value="limited">Hạn chế</option>
+                    <option value="minor_damage">Hư nhẹ</option>
+                    <option value="major_damage">Hư nặng</option>
+                  </select>
+                  <Button size="sm">Nhận lại</Button>
+                </form>
+              )}
+            </article>
+          );
+        })}
       </section>
 
       <div className="mobile-loan-return-list" id="mobile-active-loans">
@@ -99,7 +148,7 @@ export default async function MachineLoansPage() {
             <div className="mobile-loan-return-item" key={loan.id}>
               <div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || loan.code} · {groupMap.get(loan.ownerGroupId) || "—"}</span></div>
               {canReport ? <form action={requestMachineReturnAction}><input type="hidden" name="loanId" value={loan.id} /><Button size="sm" variant="secondary">Trả</Button></form> : null}
-              {canReceive ? <span className="mobile-loan-state">Chờ nhận lại</span> : null}
+              {canReceive ? <form action={confirmMachineReturnAction} className="mobile-inline-confirm"><input type="hidden" name="loanId" value={loan.id} /><input type="hidden" name="condition" value="good" /><Button size="sm">Nhận lại</Button></form> : null}
             </div>
           );
         })}
@@ -118,29 +167,17 @@ export default async function MachineLoansPage() {
                   actions.push(
                     <form action={approveMachineLoanAction} key="approve" className="row-actions">
                       <input type="hidden" name="loanId" value={loan.id} />
-                      <input name="handoverCondition" placeholder="Tình trạng khi giao" aria-label="Tình trạng khi giao" className="field-inline-lg" />
-                      <Button size="sm"><ShieldCheck size={14} /> Duyệt</Button>
+                      <input name="handoverCondition" placeholder="Tình trạng khi giao (nếu cần)" aria-label="Tình trạng khi giao" className="field-inline-lg" />
+                      <Button size="sm"><ShieldCheck size={14} /> Duyệt & bàn giao</Button>
+                    </form>,
+                    <form action={rejectMachineLoanAction} key="reject" className="row-actions">
+                      <input type="hidden" name="loanId" value={loan.id} />
+                      <input name="rejectionReason" placeholder="Lý do từ chối (nếu cần)" aria-label="Lý do từ chối" className="field-inline-lg" />
+                      <Button size="sm" variant="danger">Từ chối</Button>
                     </form>,
                   );
                 }
 
-                if (loan.status === "wait_handover" && !loan.handedOverAt && hasGroupPermission(auth, loan.ownerGroupId, "operator")) {
-                  actions.push(
-                    <form action={confirmLoanHandoverAction} key="handover">
-                      <input type="hidden" name="loanId" value={loan.id} />
-                      <Button size="sm" variant="secondary">Đã giao</Button>
-                    </form>,
-                  );
-                }
-
-                if (loan.status === "wait_handover" && loan.handedOverAt && hasGroupPermission(auth, loan.borrowerGroupId, "viewer")) {
-                  actions.push(
-                    <form action={confirmLoanReceiptAction} key="receipt">
-                      <input type="hidden" name="loanId" value={loan.id} />
-                      <Button size="sm">Đã nhận</Button>
-                    </form>,
-                  );
-                }
 
                 if (loan.status === "on_loan" && hasGroupPermission(auth, loan.borrowerGroupId, "viewer")) {
                   actions.push(

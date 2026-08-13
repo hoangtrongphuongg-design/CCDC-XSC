@@ -1,4 +1,12 @@
-# CCDC-XSC V1.6.2
+# QUẢN LÝ CCDC - XSC — V1.6.3
+
+## Thay đổi V1.6.3
+
+- Rút gọn luồng Mượn máy còn 4 bước: Tạo đề nghị → Nhóm cho mượn Duyệt (đồng thời bàn giao/đã nhận) → Nhóm mượn Gửi trả → Nhóm chủ máy Xác nhận nhận lại.
+- Mobile có khu vực **Việc cần xử lý** để duyệt/từ chối, gửi trả và xác nhận nhận lại theo đúng quyền; Mượn nhanh cũng có các action chính trên mobile.
+- Ghi thêm audit theo chính CCDC ở các mốc tạo đề nghị, duyệt/bàn giao, gửi trả, hoàn tất để lịch sử máy truy vết được vòng đời mượn/trả.
+- Trang **Dụng cụ nhóm tôi** cân lại cột Cập nhật/Thao tác, không chồng chữ và vẫn không cuộn ngang.
+- Không thay đổi schema/database, không migration, không reset dữ liệu.
 
 ## Mobile V1
 - Trang Tổng quan trên điện thoại chuyển thành màn hình thao tác nhanh: Tìm CCDC, Mượn CCDC, Trả CCDC, Báo hư, CCDC nhóm tôi.

@@ -74,6 +74,43 @@ export default async function QuickLoansPage() {
         <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
       </section>
 
+      <section className="mobile-loan-action-inbox" aria-label="Việc cần xử lý mượn nhanh">
+        <div className="mobile-loan-section-title">
+          <strong>Việc cần xử lý</strong>
+          <span>{rows.filter((row) =>
+            (row.status === "pending_approval" && hasGroupPermission(auth, row.sourceGroupId, "operator")) ||
+            (row.status === "pending_receipt" && hasGroupPermission(auth, row.borrowerGroupId, "viewer")) ||
+            (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "viewer"))
+          ).length}</span>
+        </div>
+        {rows.filter((row) =>
+          (row.status === "pending_approval" && hasGroupPermission(auth, row.sourceGroupId, "operator")) ||
+          (row.status === "pending_receipt" && hasGroupPermission(auth, row.borrowerGroupId, "viewer")) ||
+          (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "viewer"))
+        ).slice(0, 6).map((row) => (
+          <article className="mobile-loan-action-card" key={`quick-action-${row.id}`}>
+            <div className="mobile-loan-action-copy">
+              <strong>{row.itemName}</strong>
+              <span>{row.specification || `${row.quantityBorrowed} ${row.unit}`} · {groupMap.get(row.sourceGroupId) || "—"} → {groupMap.get(row.borrowerGroupId) || "—"}</span>
+              <small>{row.status === "pending_approval" ? "Chờ duyệt cho mượn" : row.status === "pending_receipt" ? "Chờ xác nhận đã nhận" : "Chờ xác nhận nhận lại"}</small>
+            </div>
+            {row.status === "pending_approval" ? (
+              <form action={approveQuickLoanAction}><input type="hidden" name="loanId" value={row.id} /><Button size="sm">Duyệt</Button></form>
+            ) : row.status === "pending_receipt" ? (
+              <form action={confirmQuickLoanReceiptAction}><input type="hidden" name="loanId" value={row.id} /><Button size="sm">Đã nhận</Button></form>
+            ) : (
+              <form action={closeQuickLoanAction} className="mobile-quick-close-form">
+                <input type="hidden" name="loanId" value={row.id} />
+                <input type="hidden" name="returnedGood" value={Number(row.quantityBorrowed)} />
+                <input type="hidden" name="returnedDamaged" value="0" />
+                <input type="hidden" name="lostQuantity" value="0" />
+                <Button size="sm">Nhận lại đủ</Button>
+              </form>
+            )}
+          </article>
+        ))}
+      </section>
+
       <div className="mobile-loan-return-list" id="mobile-active-loans">
         <div className="mobile-loan-section-title"><strong>Đang mượn / chờ trả</strong><span>{rows.filter((row) => ["borrowed", "return_reported"].includes(row.status)).length}</span></div>
         {rows.filter((row) => ["borrowed", "return_reported"].includes(row.status)).slice(0, 6).map((row) => {
@@ -83,7 +120,7 @@ export default async function QuickLoansPage() {
             <div className="mobile-loan-return-item" key={row.id}>
               <div><strong>{row.itemName}</strong><span>{row.specification || `${row.quantityBorrowed} ${row.unit}`} · {groupMap.get(row.sourceGroupId) || "—"}</span></div>
               {canReport ? <form action={reportQuickLoanReturnAction}><input type="hidden" name="loanId" value={row.id} /><Button size="sm" variant="secondary">Trả</Button></form> : null}
-              {canReceive ? <span className="mobile-loan-state">Chờ nhận lại</span> : null}
+              {canReceive ? <form action={closeQuickLoanAction} className="mobile-inline-confirm"><input type="hidden" name="loanId" value={row.id} /><input type="hidden" name="returnedGood" value={Number(row.quantityBorrowed)} /><input type="hidden" name="returnedDamaged" value="0" /><input type="hidden" name="lostQuantity" value="0" /><Button size="sm">Nhận lại</Button></form> : null}
             </div>
           );
         })}
