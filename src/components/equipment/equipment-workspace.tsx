@@ -298,7 +298,7 @@ function AssetForm({
   const [ownerGroupId, setOwnerGroupId] = useState(initialGroupId);
   const [categoryCode, setCategoryCode] = useState(record?.categoryCode || "CK_HAN_CAT");
   const [originType, setOriginType] = useState<IndividualEquipmentRow["originType"]>(isClone && !isWorkshopAdmin ? "existing" : record?.originType || "existing");
-  const [condition, setCondition] = useState<string>(record?.condition || "unknown");
+  const [condition, setCondition] = useState<string>(record?.condition || "good");
   const [status, setStatus] = useState<string>(record?.status || "in_use_owner");
   const [purchasePrice, setPurchasePrice] = useState(() => normalizePurchasePrice(record?.purchasePrice));
   const [managementMode, setManagementMode] = useState<"individual" | "quantity">("individual");
@@ -321,7 +321,7 @@ function AssetForm({
     if (state.afterSave === "add_next" && !isEditing) {
       formRef.current?.reset();
       setPurchasePrice("");
-      setCondition(originType === "new_purchase" ? "good" : "unknown");
+      setCondition("good");
       setStatus("in_use_owner");
       onSaved("add_next");
       return;
@@ -332,7 +332,7 @@ function AssetForm({
 
   useEffect(() => {
     if (mode !== "create") return;
-    setCondition(originType === "new_purchase" ? "good" : "unknown");
+    setCondition("good");
   }, [originType, mode]);
 
   const defaultLegacyCode = isClone ? "" : record?.legacyCode || "";

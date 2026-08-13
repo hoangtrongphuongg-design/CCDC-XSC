@@ -53,7 +53,7 @@ const equipmentFormSchema = z.object({
   commissionYear: z.coerce.number().int().min(1900).max(2200).optional(),
   technicalSpecs: z.string().trim().max(8000).optional(),
   technicalNote: z.string().trim().max(4000).optional(),
-  condition: z.enum(conditionValues).default("unknown"),
+  condition: z.enum(conditionValues).default("good"),
   status: z.enum(statusValues).default("in_use_owner"),
   currentLocation: z.string().trim().max(255).optional(),
   notes: z.string().trim().max(4000).optional(),
@@ -153,7 +153,7 @@ export async function saveEquipmentRecordAction(
     commissionYear: numberTextOrUndefined(formData, "commissionYear"),
     technicalSpecs: textOrUndefined(formData, "technicalSpecs"),
     technicalNote: textOrUndefined(formData, "technicalNote"),
-    condition: formData.get("condition") || "unknown",
+    condition: formData.get("condition") || "good",
     status: formData.get("status") || "in_use_owner",
     currentLocation: textOrUndefined(formData, "currentLocation"),
     notes: textOrUndefined(formData, "notes"),
@@ -387,7 +387,7 @@ export async function saveEquipmentRecordAction(
 
 export async function updateEquipmentConditionAction(formData: FormData) {
   const equipmentId = String(formData.get("equipmentId") || "");
-  const conditionRaw = String(formData.get("condition") || "unknown");
+  const conditionRaw = String(formData.get("condition") || "good");
   if (!conditionValues.includes(conditionRaw as (typeof conditionValues)[number])) throw new Error("Tình trạng không hợp lệ.");
   const condition = conditionRaw as (typeof conditionValues)[number];
   const [item] = await db.select().from(equipment).where(eq(equipment.id, equipmentId)).limit(1);
