@@ -1,4 +1,4 @@
-# CCDC-XSC V1.6.1
+# CCDC-XSC V1.6.2
 
 ## Mobile V1
 - Trang Tổng quan trên điện thoại chuyển thành màn hình thao tác nhanh: Tìm CCDC, Mượn CCDC, Trả CCDC, Báo hư, CCDC nhóm tôi.

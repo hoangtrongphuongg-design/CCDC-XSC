@@ -2108,3 +2108,35 @@ body {
   .quick-loan-note { font-size: 8px; line-height: 1.35; }
   .quick-loan-or { margin: 2px 0; }
 }
+
+
+/* V1.6.2 - phản hồi thao tác dùng chung */
+.app-toast {
+  position: fixed;
+  z-index: 1200;
+  top: 18px;
+  right: 22px;
+  width: min(390px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px 13px;
+  border: 1px solid rgba(20, 125, 100, .22);
+  border-radius: 14px;
+  background: rgba(248, 255, 252, .98);
+  box-shadow: 0 14px 38px rgba(20, 32, 50, .16);
+  color: var(--text);
+  animation: app-toast-in .18s ease-out;
+}
+.app-toast-error { border-color: rgba(220, 38, 38, .22); background: rgba(255, 250, 250, .98); }
+.app-toast-icon { color: var(--success, #147d64); display: grid; margin-top: 1px; }
+.app-toast-error .app-toast-icon { color: #dc2626; }
+.app-toast-copy { min-width: 0; display: grid; gap: 2px; line-height: 1.3; }
+.app-toast-copy strong { font-size: 13px; font-weight: 760; }
+.app-toast-copy small { color: var(--text-muted); font-size: 11.5px; overflow-wrap: anywhere; }
+.app-toast-close { border: 0; background: transparent; color: var(--text-muted); font-size: 21px; line-height: 18px; cursor: pointer; padding: 0 1px; }
+@keyframes app-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 760px) {
+  .app-toast { top: 10px; left: 10px; right: 10px; width: auto; padding: 11px 12px; border-radius: 12px; }
+}

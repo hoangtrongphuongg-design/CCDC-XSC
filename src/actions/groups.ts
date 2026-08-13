@@ -1,5 +1,7 @@
 "use server";
 
+import { setFlashMessage } from "@/lib/auth/session";
+
 import { and, eq, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -78,6 +80,8 @@ export async function syncStandardGroupsAction() {
   });
 
   refreshGroupConsumers();
+
+  await setFlashMessage("success", 'Đã đồng bộ cơ cấu nhóm');
 }
 
 export async function createGroupAction(formData: FormData) {
@@ -110,6 +114,8 @@ export async function createGroupAction(formData: FormData) {
   });
 
   refreshGroupConsumers();
+
+  await setFlashMessage("success", 'Đã thêm nhóm mới');
 }
 
 export async function updateGroupNameAction(formData: FormData) {
@@ -142,6 +148,8 @@ export async function updateGroupNameAction(formData: FormData) {
   });
 
   refreshGroupConsumers();
+
+  await setFlashMessage("success", 'Đã lưu tên nhóm');
 }
 
 export async function setGroupStatusAction(formData: FormData) {
@@ -198,4 +206,6 @@ export async function setGroupStatusAction(formData: FormData) {
   });
 
   refreshGroupConsumers();
+
+  await setFlashMessage("success", 'Đã cập nhật trạng thái nhóm');
 }

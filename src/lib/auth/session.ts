@@ -9,6 +9,46 @@ const secretValue = process.env.AUTH_SECRET || (process.env.NODE_ENV === "produc
 if (!secretValue) throw new Error("Thiếu AUTH_SECRET trong môi trường production.");
 const secret = new TextEncoder().encode(secretValue);
 
+
+export type FlashMessage = {
+  id: string;
+  type: "success" | "error" | "info";
+  message: string;
+  detail?: string;
+};
+
+const FLASH_COOKIE = "ccdc_xsc_flash";
+
+export async function setFlashMessage(type: FlashMessage["type"], message: string, detail?: string) {
+  const store = await cookies();
+  const payload: FlashMessage = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    message,
+    ...(detail ? { detail } : {}),
+  };
+  store.set(FLASH_COOKIE, encodeURIComponent(JSON.stringify(payload)), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 30,
+  });
+}
+
+export async function getFlashMessage(): Promise<FlashMessage | null> {
+  const store = await cookies();
+  const raw = store.get(FLASH_COOKIE)?.value;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(raw)) as FlashMessage;
+    if (!parsed?.id || !parsed?.message) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export type GroupPermission = {
   groupId: string;
   groupCode: string;

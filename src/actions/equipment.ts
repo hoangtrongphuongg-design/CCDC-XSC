@@ -1,5 +1,7 @@
 "use server";
 
+import { setFlashMessage } from "@/lib/auth/session";
+
 import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -289,6 +291,7 @@ export async function saveEquipmentRecordAction(
         });
       });
 
+      await setFlashMessage("success", "Đã lưu thay đổi", `CCDC ${nextCode} đã được cập nhật.`);
       refreshEquipmentConsumers();
       return { status: "success", message: `Đã cập nhật ${nextCode}.`, code: nextCode, afterSave: "close" };
     }
@@ -363,6 +366,7 @@ export async function saveEquipmentRecordAction(
       });
     });
 
+    await setFlashMessage("success", "Đã thêm CCDC mới", `CCDC ${createdCode} đã được tạo thành công.`);
     refreshEquipmentConsumers();
     return {
       status: "success",
@@ -404,5 +408,6 @@ export async function updateEquipmentConditionAction(formData: FormData) {
       afterData: { condition },
     });
   });
+  await setFlashMessage("success", "Đã lưu tình trạng CCDC", `Đã cập nhật ${item.code}.`);
   refreshEquipmentConsumers();
 }

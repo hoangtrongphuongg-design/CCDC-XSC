@@ -1,5 +1,7 @@
 "use server";
 
+import { setFlashMessage } from "@/lib/auth/session";
+
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -61,6 +63,8 @@ export async function createTransferAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã gửi đề nghị điều chuyển');
 }
 
 export async function acceptTransferCounterpartAction(formData: FormData) {
@@ -90,6 +94,8 @@ export async function acceptTransferCounterpartAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận điều chuyển');
 }
 
 export async function approveTransferByWsAction(formData: FormData) {
@@ -122,6 +128,8 @@ export async function approveTransferByWsAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã duyệt điều chuyển');
 }
 
 export async function confirmTransferHandoverAction(formData: FormData) {
@@ -146,6 +154,8 @@ export async function confirmTransferHandoverAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận bàn giao điều chuyển');
 }
 
 export async function confirmTransferReceiptAction(formData: FormData) {
@@ -182,4 +192,6 @@ export async function confirmTransferReceiptAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận nhận điều chuyển');
 }

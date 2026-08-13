@@ -1,5 +1,7 @@
 "use server";
 
+import { setFlashMessage } from "@/lib/auth/session";
+
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -76,6 +78,8 @@ export async function createMachineLoanAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã gửi đề nghị mượn');
 }
 
 /** Kỹ sư giám sát hoặc Đốc công nhóm cho mượn đều có quyền duyệt. */
@@ -121,6 +125,8 @@ export async function approveMachineLoanAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã duyệt đề nghị mượn');
 }
 
 /** Kỹ sư giám sát hoặc Đốc công nhóm cho mượn có thể xác nhận giao theo quyền nghiệp vụ. */
@@ -153,6 +159,8 @@ export async function confirmLoanHandoverAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận bàn giao');
 }
 
 /** Mọi thành viên của nhóm mượn được xác nhận đã nhận. */
@@ -196,6 +204,8 @@ export async function confirmLoanReceiptAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận nhận CCDC');
 }
 
 /** Mọi thành viên của nhóm mượn được báo trả. */
@@ -235,6 +245,8 @@ export async function requestMachineReturnAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã gửi yêu cầu trả CCDC');
 }
 
 /**
@@ -288,4 +300,6 @@ export async function confirmMachineReturnAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận nhận lại CCDC');
 }

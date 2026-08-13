@@ -1,5 +1,7 @@
 "use server";
 
+import { setFlashMessage } from "@/lib/auth/session";
+
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -42,6 +44,8 @@ export async function createDisposalAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã tạo đề nghị thanh lý');
 }
 
 export async function confirmDisposalByGroupAction(formData: FormData) {
@@ -65,6 +69,8 @@ export async function confirmDisposalByGroupAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Nhóm đã xác nhận thanh lý');
 }
 
 export async function approveDisposalByWsAction(formData: FormData) {
@@ -86,6 +92,8 @@ export async function approveDisposalByWsAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã duyệt thanh lý');
 }
 
 export async function receiveDisposalWarehouseAction(formData: FormData) {
@@ -112,4 +120,6 @@ export async function receiveDisposalWarehouseAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận nhập kho thanh lý');
 }

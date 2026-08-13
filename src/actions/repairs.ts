@@ -1,5 +1,7 @@
 "use server";
 
+import { setFlashMessage } from "@/lib/auth/session";
+
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -58,6 +60,8 @@ export async function createRepairAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã gửi báo hư / đề nghị sửa chữa');
 }
 
 export async function acceptRepairAction(formData: FormData) {
@@ -80,6 +84,8 @@ export async function acceptRepairAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã tiếp nhận sửa chữa');
 }
 
 export async function completeRepairAction(formData: FormData) {
@@ -106,6 +112,8 @@ export async function completeRepairAction(formData: FormData) {
     await writeAudit(tx as never, { actorUserId: auth.userId, action: "repair.complete", entityType: "repair", entityId: repair.id, description: `Hoàn tất sửa chữa ${repair.code}`, afterData: { repairType: repair.repairType || "internal", workDescription, resultNotes, cost } });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã hoàn tất sửa chữa và chờ bàn giao');
 }
 
 export async function sendExternalRepairAction(formData: FormData) {
@@ -121,6 +129,8 @@ export async function sendExternalRepairAction(formData: FormData) {
     await writeAudit(tx as never, { actorUserId: auth.userId, action: "repair.external", entityType: "repair", entityId: repair.id, description: `Chuyển thuê ngoài sửa chữa ${repair.code} tại ${vendor}`, afterData: { repairType: "external", vendor, reason } });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã chuyển sang thuê ngoài sửa chữa');
 }
 
 export async function markExternalIrreparableAction(formData: FormData) {
@@ -136,6 +146,8 @@ export async function markExternalIrreparableAction(formData: FormData) {
     await writeAudit(tx as never, { actorUserId: auth.userId, action: "repair.irreparable", entityType: "repair", entityId: repair.id, description: `Sửa ngoài kết luận không thể phục hồi ${repair.code}`, afterData: { resultNotes, cost } });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã ghi nhận không thể phục hồi');
 }
 
 export async function confirmRepairByOwnerAction(formData: FormData) {
@@ -164,4 +176,6 @@ export async function confirmRepairByOwnerAction(formData: FormData) {
     });
   });
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận nhận lại CCDC sau sửa');
 }

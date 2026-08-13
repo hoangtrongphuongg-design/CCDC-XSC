@@ -1,5 +1,7 @@
 "use server";
 
+import { setFlashMessage } from "@/lib/auth/session";
+
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -90,6 +92,8 @@ export async function approveUserAction(formData: FormData) {
   });
 
   revalidatePath("/users");
+
+  await setFlashMessage("success", 'Đã duyệt tài khoản');
 }
 
 export async function updateUserStatusAction(formData: FormData) {
@@ -130,6 +134,8 @@ export async function updateUserStatusAction(formData: FormData) {
   });
 
   revalidatePath("/users");
+
+  await setFlashMessage("success", 'Đã cập nhật trạng thái tài khoản');
 }
 
 export async function assignGroupPermissionAction(formData: FormData) {
@@ -179,6 +185,8 @@ export async function assignGroupPermissionAction(formData: FormData) {
   });
 
   revalidatePath("/users");
+
+  await setFlashMessage("success", 'Đã cấp quyền nhóm');
 }
 
 export async function revokeGroupPermissionAction(formData: FormData) {
@@ -209,6 +217,8 @@ export async function revokeGroupPermissionAction(formData: FormData) {
   });
 
   revalidatePath("/users");
+
+  await setFlashMessage("success", 'Đã thu hồi quyền nhóm');
 }
 
 export async function resetTemporaryPasswordAction(formData: FormData) {
@@ -241,6 +251,8 @@ export async function resetTemporaryPasswordAction(formData: FormData) {
   });
 
   revalidatePath("/users");
+
+  await setFlashMessage("success", 'Đã đặt lại mật khẩu tạm');
 }
 
 /**
@@ -300,6 +312,8 @@ export async function setPrimarySystemRoleAction(formData: FormData) {
 
   revalidatePath("/users");
   revalidatePath("/dashboard");
+
+  await setFlashMessage("success", 'Đã cập nhật vai trò hệ thống');
 }
 
 /** Tương thích với form cũ nếu còn request từ tab chưa tải lại. */

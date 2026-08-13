@@ -1,5 +1,7 @@
 "use server";
 
+import { setFlashMessage } from "@/lib/auth/session";
+
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -92,6 +94,8 @@ export async function createQuickLoanAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã tạo phiếu mượn nhanh');
 }
 
 /** Kỹ sư giám sát hoặc Đốc công nhóm cho mượn đều có quyền duyệt. */
@@ -148,6 +152,8 @@ export async function approveQuickLoanAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã duyệt mượn nhanh');
 }
 
 /** Mọi thành viên nhóm mượn được xác nhận đã nhận. */
@@ -182,6 +188,8 @@ export async function confirmQuickLoanReceiptAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận nhận CCDC');
 }
 
 /** Mọi thành viên nhóm mượn được báo đã mang trả. */
@@ -213,6 +221,8 @@ export async function reportQuickLoanReturnAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã xác nhận trả CCDC');
 }
 
 /**
@@ -271,4 +281,6 @@ export async function closeQuickLoanAction(formData: FormData) {
   });
 
   refresh();
+
+  await setFlashMessage("success", 'Đã hoàn tất phiếu mượn nhanh');
 }
