@@ -17,8 +17,8 @@ import { formatDateTime } from "@/lib/utils";
 import {
   approveQuickLoanAction,
   closeQuickLoanAction,
-  confirmQuickLoanReceiptAction,
   createQuickLoanAction,
+  rejectQuickLoanAction,
   reportQuickLoanReturnAction,
 } from "@/actions/quick-loans";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
@@ -64,7 +64,7 @@ export default async function QuickLoansPage() {
       </div>
       <PageHeader
         title="Mượn nhanh"
-        description="Công nhân kỹ thuật, Kỹ sư giám sát và Đốc công đều được lập đề nghị; Kỹ sư giám sát hoặc Đốc công nhóm cho mượn duyệt; thành viên nhóm cho mượn xác nhận số lượng nhận lại."
+        description="Luồng giống Mượn máy: tạo đề nghị → nhóm cho mượn duyệt (đồng thời bàn giao/đã nhận) → báo trả → nhóm cho mượn xác nhận nhận lại."
       />
 
       <section className="stat-grid">
@@ -79,25 +79,24 @@ export default async function QuickLoansPage() {
           <strong>Việc cần xử lý</strong>
           <span>{rows.filter((row) =>
             (row.status === "pending_approval" && hasGroupPermission(auth, row.sourceGroupId, "operator")) ||
-            (row.status === "pending_receipt" && hasGroupPermission(auth, row.borrowerGroupId, "viewer")) ||
-            (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "viewer"))
+            (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "operator"))
           ).length}</span>
         </div>
         {rows.filter((row) =>
           (row.status === "pending_approval" && hasGroupPermission(auth, row.sourceGroupId, "operator")) ||
-          (row.status === "pending_receipt" && hasGroupPermission(auth, row.borrowerGroupId, "viewer")) ||
-          (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "viewer"))
+          (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "operator"))
         ).slice(0, 6).map((row) => (
           <article className="mobile-loan-action-card" key={`quick-action-${row.id}`}>
             <div className="mobile-loan-action-copy">
               <strong>{row.itemName}</strong>
               <span>{row.specification || `${row.quantityBorrowed} ${row.unit}`} · {groupMap.get(row.sourceGroupId) || "—"} → {groupMap.get(row.borrowerGroupId) || "—"}</span>
-              <small>{row.status === "pending_approval" ? "Chờ duyệt cho mượn" : row.status === "pending_receipt" ? "Chờ xác nhận đã nhận" : "Chờ xác nhận nhận lại"}</small>
+              <small>{row.status === "pending_approval" ? "Chờ duyệt cho mượn" : "Chờ nhóm cho mượn xác nhận nhận lại"}</small>
             </div>
             {row.status === "pending_approval" ? (
-              <form action={approveQuickLoanAction}><input type="hidden" name="loanId" value={row.id} /><Button size="sm">Duyệt</Button></form>
-            ) : row.status === "pending_receipt" ? (
-              <form action={confirmQuickLoanReceiptAction}><input type="hidden" name="loanId" value={row.id} /><Button size="sm">Đã nhận</Button></form>
+              <div className="row-actions">
+                <form action={rejectQuickLoanAction}><input type="hidden" name="loanId" value={row.id} /><Button size="sm" variant="secondary">Từ chối</Button></form>
+                <form action={approveQuickLoanAction}><input type="hidden" name="loanId" value={row.id} /><Button size="sm">Duyệt</Button></form>
+              </div>
             ) : (
               <form action={closeQuickLoanAction} className="mobile-quick-close-form">
                 <input type="hidden" name="loanId" value={row.id} />
@@ -112,10 +111,10 @@ export default async function QuickLoansPage() {
       </section>
 
       <div className="mobile-loan-return-list" id="mobile-active-loans">
-        <div className="mobile-loan-section-title"><strong>Đang mượn / chờ trả</strong><span>{rows.filter((row) => ["borrowed", "return_reported"].includes(row.status)).length}</span></div>
-        {rows.filter((row) => ["borrowed", "return_reported"].includes(row.status)).slice(0, 6).map((row) => {
-          const canReport = row.status === "borrowed" && hasGroupPermission(auth, row.borrowerGroupId, "viewer");
-          const canReceive = row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "viewer");
+        <div className="mobile-loan-section-title"><strong>Đang mượn / chờ trả</strong><span>{rows.filter((row) => ["pending_receipt", "borrowed", "return_reported"].includes(row.status)).length}</span></div>
+        {rows.filter((row) => ["pending_receipt", "borrowed", "return_reported"].includes(row.status)).slice(0, 6).map((row) => {
+          const canReport = ["pending_receipt", "borrowed"].includes(row.status) && hasGroupPermission(auth, row.borrowerGroupId, "viewer");
+          const canReceive = row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "operator");
           return (
             <div className="mobile-loan-return-item" key={row.id}>
               <div><strong>{row.itemName}</strong><span>{row.specification || `${row.quantityBorrowed} ${row.unit}`} · {groupMap.get(row.sourceGroupId) || "—"}</span></div>
@@ -142,20 +141,14 @@ export default async function QuickLoansPage() {
                       <input name="lenderNote" placeholder="Ghi chú khi duyệt/giao" aria-label="Ghi chú khi duyệt" className="field-inline-lg" />
                       <Button size="sm"><ShieldCheck size={14} /> Duyệt</Button>
                     </form>,
-                  );
-                }
-
-                if (row.status === "pending_receipt" && hasGroupPermission(auth, row.borrowerGroupId, "viewer")) {
-                  actions.push(
-                    <form action={confirmQuickLoanReceiptAction} key="receive" className="row-actions">
+                    <form action={rejectQuickLoanAction} key="reject">
                       <input type="hidden" name="loanId" value={row.id} />
-                      <input name="borrowerNote" placeholder="Ghi chú nhận" aria-label="Ghi chú nhận" className="field-inline-md" />
-                      <Button size="sm">Đã nhận</Button>
+                      <Button size="sm" variant="secondary">Từ chối</Button>
                     </form>,
                   );
                 }
 
-                if (row.status === "borrowed" && hasGroupPermission(auth, row.borrowerGroupId, "viewer")) {
+                if (["pending_receipt", "borrowed"].includes(row.status) && hasGroupPermission(auth, row.borrowerGroupId, "viewer")) {
                   actions.push(
                     <form action={reportQuickLoanReturnAction} key="report">
                       <input type="hidden" name="loanId" value={row.id} />
@@ -164,7 +157,7 @@ export default async function QuickLoansPage() {
                   );
                 }
 
-                if (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "viewer")) {
+                if (row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "operator")) {
                   actions.push(
                     <form action={closeQuickLoanAction} key="close" className="row-actions">
                       <input type="hidden" name="loanId" value={row.id} />
@@ -190,7 +183,17 @@ export default async function QuickLoansPage() {
                   groupMap.get(row.sourceGroupId) || "—",
                   groupMap.get(row.borrowerGroupId) || "—",
                   formatDateTime(row.expectedReturnAt),
-                  <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={tone(row.status)} />,
+                  <StatusBadge
+                    key="status"
+                    label={
+                      ["pending_receipt", "borrowed"].includes(row.status)
+                        ? (hasGroupPermission(auth, row.sourceGroupId, "viewer") && !hasGroupPermission(auth, row.borrowerGroupId, "viewer") ? "Đang cho mượn" : "Đang mượn")
+                        : row.status === "return_reported"
+                          ? (hasGroupPermission(auth, row.sourceGroupId, "viewer") ? "Chờ nhận lại" : "Đã báo trả")
+                          : WORKFLOW_LABELS[row.status] || row.status
+                    }
+                    tone={tone(row.status)}
+                  />,
                   <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>,
                 ];
               })}

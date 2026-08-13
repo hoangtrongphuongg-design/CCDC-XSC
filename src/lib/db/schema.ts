@@ -410,6 +410,31 @@ export const disposals = pgTable(
   (t) => [uniqueIndex("disposals_code_unique").on(t.code), index("disposals_status_idx").on(t.status)],
 );
 
+export const toolDisposals = pgTable(
+  "tool_disposals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 40 }).notNull(),
+    toolId: uuid("tool_id").notNull().references(() => toolCatalog.id),
+    ownerGroupId: uuid("owner_group_id").notNull().references(() => groups.id),
+    quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+    proposedBy: uuid("proposed_by").notNull().references(() => users.id),
+    reason: text("reason").notNull(),
+    conditionSummary: text("condition_summary"),
+    status: disposalStatusEnum("status").notNull().default("pending_group"),
+    groupConfirmedBy: uuid("group_confirmed_by").references(() => users.id),
+    groupConfirmedAt: timestamp("group_confirmed_at", { withTimezone: true }),
+    wsApprovedBy: uuid("ws_approved_by").references(() => users.id),
+    wsApprovedAt: timestamp("ws_approved_at", { withTimezone: true }),
+    warehouseReceivedBy: uuid("warehouse_received_by").references(() => users.id),
+    warehouseReceivedAt: timestamp("warehouse_received_at", { withTimezone: true }),
+    rejectionReason: text("rejection_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("tool_disposals_code_unique").on(t.code), index("tool_disposals_status_idx").on(t.status)],
+);
+
 export const activityLogs = pgTable(
   "activity_logs",
   {

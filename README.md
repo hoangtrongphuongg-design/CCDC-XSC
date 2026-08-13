@@ -111,3 +111,14 @@ Bản này **không yêu cầu migration database**.
 
 ### Cập nhật DB cho V1.6.4
 Không reset/seed database. Chỉ chạy `database/update.sql` một lần; phần V1.6.4 dùng `ADD COLUMN IF NOT EXISTS` để bổ sung `purchase_price`, `current_location`, `condition` cho `tool_catalog`.
+
+
+## V1.6.7 - cập nhật nghiệp vụ
+- Cho mượn nhanh dùng cùng luồng với Mượn máy: Tạo đề nghị → Nhóm cho mượn duyệt (đồng thời bàn giao/đã nhận) → Báo trả → Nhóm cho mượn xác nhận nhận lại → Hoàn thành.
+- Thêm Từ chối cho mượn nhanh; chỉ nhóm cho mượn có quyền thao tác mới được duyệt/nhận lại.
+- Form CCDC theo số lượng được tinh gọn: bỏ Loại CCDC và Vị trí lưu; ĐVT mặc định `Cái`; đơn giá hiển thị dấu chấm phân cách hàng nghìn.
+- Tình trạng CCDC chuẩn hóa trên form: Tốt / Hư hỏng / Chờ kiểm tra / Thanh lý.
+- CCDC theo số lượng được phép tạo đề xuất thanh lý một phần hoặc toàn bộ. Khi duyệt thanh lý chỉ giảm đúng số lượng; không chuyển cả danh mục sang thanh lý nếu vẫn còn tồn.
+
+### Cập nhật database
+Sau khi deploy V1.6.7, chạy `database/update.sql` **một lần** để tạo bảng `tool_disposals`. Script chỉ bổ sung bảng/cột, không reset dữ liệu hiện có.

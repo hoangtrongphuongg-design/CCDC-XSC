@@ -22,7 +22,7 @@ export type EquipmentFormState = {
 };
 
 const categoryCodes = EQUIPMENT_CATEGORIES.map((category) => category.code) as [string, ...string[]];
-const conditionValues = ["good", "limited", "major_damage", "unknown"] as const;
+const conditionValues = ["good", "major_damage", "awaiting_assessment", "irreparable"] as const;
 const statusValues = [
   "in_use_owner",
   "wait_handover",
@@ -420,12 +420,11 @@ export async function createQuantityToolAction(
   const groupId = String(formData.get("ownerGroupId") || "");
   const name = String(formData.get("name") || "").trim();
   const categoryCode = String(formData.get("categoryCode") || "KHAC");
-  const equipmentType = String(formData.get("equipmentType") || "Dụng cụ khác").trim();
+  const equipmentType = name;
   const specification = String(formData.get("specification") || "").trim();
-  const unit = String(formData.get("unit") || "cái").trim();
+  const unit = String(formData.get("unit") || "Cái").trim();
   const quantity = Number(String(formData.get("quantity") || "0").replace(/,/g, "."));
   const purchasePriceRaw = String(formData.get("purchasePrice") || "").replace(/\D/g, "");
-  const currentLocation = String(formData.get("currentLocation") || "").trim();
   const condition = String(formData.get("condition") || "good") as typeof toolCatalog.$inferInsert["condition"];
   const notes = String(formData.get("notes") || "").trim();
   const afterSave = String(formData.get("afterSave") || "close") === "add_next" ? "add_next" : "close";
@@ -436,7 +435,7 @@ export async function createQuantityToolAction(
   if (!categoryCodes.includes(categoryCode as (typeof categoryCodes)[number])) {
     return { status: "error", message: "Nhóm thiết bị không hợp lệ." };
   }
-  if (!condition || !["good", "limited", "major_damage", "unknown"].includes(condition)) {
+  if (!condition || !["good", "major_damage", "awaiting_assessment", "irreparable"].includes(condition)) {
     return { status: "error", message: "Tình trạng CCDC không hợp lệ." };
   }
 
@@ -460,7 +459,6 @@ export async function createQuantityToolAction(
         unit,
         quantityOnHand: String(quantity),
         purchasePrice: purchasePriceRaw ? String(Number(purchasePriceRaw)) : null,
-        currentLocation: currentLocation || null,
         condition,
         notes: notes || null,
         createdBy: auth.userId,

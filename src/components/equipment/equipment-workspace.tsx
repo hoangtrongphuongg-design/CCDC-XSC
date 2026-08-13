@@ -110,9 +110,9 @@ const originLabels = {
 
 const simpleConditionOptions = [
   ["good", "Tốt"],
-  ["limited", "Cần theo dõi"],
   ["major_damage", "Hư hỏng"],
-  ["unknown", "Chưa đánh giá"],
+  ["awaiting_assessment", "Chờ kiểm tra"],
+  ["irreparable", "Thanh lý"],
 ] as const;
 
 const auditFieldLabels: Record<string, string> = {
@@ -238,26 +238,34 @@ function conditionTone(condition: IndividualEquipmentRow["condition"]): "neutral
 }
 
 
-function QuantityToolForm({ permissions, typeRows, isWorkshopAdmin, onCancel, onBack, onSaved }: { permissions: EquipmentPermission[]; typeRows: EquipmentTypeRow[]; isWorkshopAdmin: boolean; onCancel: () => void; onBack: () => void; onSaved: (afterSave: "close" | "add_next") => void; }) {
+function QuantityToolForm({ permissions, isWorkshopAdmin, onCancel, onBack, onSaved }: { permissions: EquipmentPermission[]; typeRows: EquipmentTypeRow[]; isWorkshopAdmin: boolean; onCancel: () => void; onBack: () => void; onSaved: (afterSave: "close" | "add_next") => void; }) {
   const [state, action, pending] = useActionState(createQuantityToolAction, initialState);
   const actionableGroups = permissions.filter((permission) => permissionRank(permission.level) >= 1);
   const groups = isWorkshopAdmin ? permissions : actionableGroups;
   const [categoryCode, setCategoryCode] = useState("CK_HAN_CAT");
+  const [purchasePrice, setPurchasePrice] = useState("");
   useEffect(() => { if (state.status === "success") { const timer = window.setTimeout(() => onSaved(state.afterSave || "close"), 500); return () => clearTimeout(timer); } }, [state.status, state.afterSave, onSaved]);
-  const suggestions = useMemo(() => Array.from(new Set([...(EQUIPMENT_CATEGORIES.find(c => c.code === categoryCode)?.suggestedTypes || []), ...typeRows.filter(t => t.categoryCode === categoryCode).map(t => t.name)])).sort((a,b)=>a.localeCompare(b,"vi")), [categoryCode, typeRows]);
+
   return <form action={action} className="asset-form">
     <section className="asset-form-section asset-management-mode"><div className="asset-section-heading"><div><span>00</span><div><strong>Kiểu quản lý</strong><small>CCDC nhỏ lẻ được quản lý theo số lượng tồn.</small></div></div></div><div className="management-mode-grid"><button type="button" className="management-mode-card" onClick={onBack}><strong>Có mã riêng</strong><small>Quản lý từng máy/CCDC.</small></button><button type="button" className="management-mode-card is-active"><strong>Theo số lượng</strong><small>Không tạo mã riêng cho từng cái.</small></button></div></section>
-    <section className="asset-form-section"><div className="asset-section-heading"><div><span>01</span><div><strong>Thông tin CCDC nhỏ lẻ</strong><small>Chỉ nhập các thông tin cần để quản lý số lượng và cho mượn nhanh.</small></div></div></div><div className="form-grid two">
+    <section className="asset-form-section"><div className="asset-section-heading"><div><span>01</span><div><strong>Thông tin CCDC theo số lượng</strong><small>Form tinh gọn: chỉ giữ thông tin cần để quản lý, tìm kiếm, mượn/trả và thống kê.</small></div></div></div><div className="form-grid two">
       <FormField label="Nhóm quản lý" required><select name="ownerGroupId" required>{groups.map(g => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
-      <FormField label="Tên CCDC" required><input name="name" required placeholder="Ví dụ: Mũi khoan HSS Ø12" /></FormField>
+      <FormField label="Tên CCDC" required><input name="name" required placeholder="Ví dụ: Thước kẹp điện tử" /></FormField>
       <FormField label="Nhóm thiết bị" required><select name="categoryCode" value={categoryCode} onChange={e=>setCategoryCode(e.target.value)}>{disciplineOrder.map(d=><optgroup key={d} label={EQUIPMENT_DISCIPLINE_LABELS[d]}>{EQUIPMENT_CATEGORIES.filter(c=>c.discipline===d).map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</optgroup>)}</select></FormField>
-      <FormField label="Loại CCDC" required><input name="equipmentType" required list={`quantity-types-${categoryCode}`} placeholder="Ví dụ: Mũi khoan"/><datalist id={`quantity-types-${categoryCode}`}>{suggestions.map(v=><option key={v} value={v}/>)}</datalist></FormField>
-      <FormField label="Quy cách"><input name="specification" placeholder="Ví dụ: HSS Ø12 mm" /></FormField>
-      <FormField label="Đơn vị tính" required><input name="unit" defaultValue="cái" required /></FormField>
+      <FormField label="Quy cách"><input name="specification" placeholder="Ví dụ: 300 mm, Ø12, M20..." /></FormField>
+      <FormField label="Đơn vị tính" required><input name="unit" defaultValue="Cái" required /></FormField>
       <FormField label="Số lượng" required><input name="quantity" type="number" min="0.01" step="0.01" required defaultValue="1" /></FormField>
-      <FormField label="Đơn giá (VNĐ)"><input name="purchasePrice" inputMode="numeric" placeholder="Ví dụ: 45000" /></FormField>
-      <FormField label="Vị trí lưu"><input name="currentLocation" placeholder="Ví dụ: Tủ dụng cụ số 2" /></FormField>
-      <FormField label="Tình trạng"><select name="condition" defaultValue="good"><option value="good">Tốt</option><option value="limited">Cần theo dõi</option><option value="major_damage">Hư hỏng</option><option value="unknown">Chưa đánh giá</option></select></FormField>
+      <FormField label="Đơn giá (VNĐ)" hint="Tự hiển thị dấu chấm phân cách hàng nghìn.">
+        <input
+          name="purchasePrice"
+          type="text"
+          inputMode="numeric"
+          value={formatPurchasePriceInput(purchasePrice)}
+          onChange={(event) => setPurchasePrice(event.target.value.replace(/\D/g, "").slice(0, 16))}
+          placeholder="Ví dụ: 1.250.000"
+        />
+      </FormField>
+      <FormField label="Tình trạng"><select name="condition" defaultValue="good"><option value="good">Tốt</option><option value="major_damage">Hư hỏng</option><option value="awaiting_assessment">Chờ kiểm tra</option><option value="irreparable">Thanh lý</option></select></FormField>
     </div><div className="form-grid"><FormField label="Ghi chú"><textarea name="notes" rows={3}/></FormField></div></section>
     {state.status === "error" ? <div className="form-message error">{state.message}</div> : null}
     <div className="asset-form-actions"><Button type="button" variant="secondary" onClick={onCancel}>Hủy</Button><Button type="submit" name="afterSave" value="add_next" variant="secondary" disabled={pending}>Lưu & thêm tiếp</Button><Button type="submit" name="afterSave" value="close" disabled={pending}>{pending ? "Đang lưu..." : "Lưu CCDC"}</Button></div>

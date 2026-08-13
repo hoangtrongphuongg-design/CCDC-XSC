@@ -212,7 +212,17 @@ export default async function MachineLoansPage() {
                   groupMap.get(loan.ownerGroupId) || "—",
                   groupMap.get(loan.borrowerGroupId) || "—",
                   formatDate(loan.expectedReturnDate),
-                  <StatusBadge key="status" label={WORKFLOW_LABELS[loan.status] || loan.status} tone={tone(loan.status)} />,
+                  <StatusBadge
+                    key="status"
+                    label={
+                      loan.status === "on_loan"
+                        ? (hasGroupPermission(auth, loan.ownerGroupId, "viewer") && !hasGroupPermission(auth, loan.borrowerGroupId, "viewer") ? "Đang cho mượn" : "Đang mượn")
+                        : loan.status === "return_requested"
+                          ? (hasGroupPermission(auth, loan.ownerGroupId, "viewer") ? "Chờ nhận lại" : "Đã báo trả")
+                          : WORKFLOW_LABELS[loan.status] || loan.status
+                    }
+                    tone={tone(loan.status)}
+                  />,
                   <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>,
                 ];
               })}

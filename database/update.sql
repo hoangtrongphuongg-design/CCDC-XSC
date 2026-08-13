@@ -65,3 +65,27 @@ ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS reason text;
 ALTER TABLE tool_catalog ADD COLUMN IF NOT EXISTS purchase_price numeric(18,2);
 ALTER TABLE tool_catalog ADD COLUMN IF NOT EXISTS current_location varchar(255);
 ALTER TABLE tool_catalog ADD COLUMN IF NOT EXISTS condition equipment_condition NOT NULL DEFAULT 'good';
+
+
+-- V1.6.7: Thanh lý CCDC nhỏ lẻ quản lý theo số lượng.
+CREATE TABLE IF NOT EXISTS tool_disposals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code varchar(40) NOT NULL UNIQUE,
+  tool_id uuid NOT NULL REFERENCES tool_catalog(id),
+  owner_group_id uuid NOT NULL REFERENCES groups(id),
+  quantity numeric(12,2) NOT NULL,
+  proposed_by uuid NOT NULL REFERENCES users(id),
+  reason text NOT NULL,
+  condition_summary text,
+  status disposal_status NOT NULL DEFAULT 'pending_group',
+  group_confirmed_by uuid REFERENCES users(id),
+  group_confirmed_at timestamptz,
+  ws_approved_by uuid REFERENCES users(id),
+  ws_approved_at timestamptz,
+  warehouse_received_by uuid REFERENCES users(id),
+  warehouse_received_at timestamptz,
+  rejection_reason text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS tool_disposals_status_idx ON tool_disposals(status);

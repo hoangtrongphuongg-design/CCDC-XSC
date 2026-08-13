@@ -2,7 +2,7 @@
 
 import { setFlashMessage } from "@/lib/auth/session";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { groups, quickLoans, toolCatalog } from "@/lib/db/schema";
@@ -129,10 +129,12 @@ export async function approveQuickLoanAction(formData: FormData) {
     }
 
     const [updated] = await tx.update(quickLoans).set({
-      status: "pending_receipt",
+      status: "borrowed",
       approvedBy: auth.userId,
       approvedAt: new Date(),
       lenderUserId: auth.userId,
+      borrowerUserId: loan.requestedBy,
+      receivedAt: new Date(),
       lenderNote: lenderNote || loan.lenderNote,
       updatedAt: new Date(),
     }).where(and(eq(quickLoans.id, loan.id), eq(quickLoans.status, "pending_approval"))).returning();
@@ -145,7 +147,7 @@ export async function approveQuickLoanAction(formData: FormData) {
       action: "quick_loan.approve",
       entityType: "quick_loan",
       entityId: loan.id,
-      description: `Nhóm cho mượn duyệt phiếu ${loan.code}`,
+      description: `Nhóm cho mượn duyệt và bàn giao phiếu ${loan.code}; phía mượn được xem là đã nhận`,
       beforeData: loan,
       afterData: updated,
     });
@@ -153,7 +155,45 @@ export async function approveQuickLoanAction(formData: FormData) {
 
   refresh();
 
-  await setFlashMessage("success", 'Đã duyệt mượn nhanh');
+  await setFlashMessage("success", "Đã duyệt và bàn giao CCDC");
+}
+
+/** Nhóm cho mượn từ chối đề nghị trước khi bàn giao. */
+export async function rejectQuickLoanAction(formData: FormData) {
+  const loanId = String(formData.get("loanId") || "");
+  const rejectionReason = String(formData.get("rejectionReason") || "").trim();
+  const [loan] = await db.select().from(quickLoans).where(eq(quickLoans.id, loanId)).limit(1);
+  if (!loan) throw new Error("Không tìm thấy giao dịch.");
+
+  const auth = await requireGroupPermission(loan.sourceGroupId, "operator");
+  if (loan.requestedBy === auth.userId) {
+    throw new Error("Người tạo phiếu không được tự xử lý phiếu.");
+  }
+
+  await db.transaction(async (tx) => {
+    const [updated] = await tx.update(quickLoans).set({
+      status: "rejected",
+      lenderNote: rejectionReason || "Nhóm quản lý không đồng ý cho mượn",
+      updatedAt: new Date(),
+    }).where(and(eq(quickLoans.id, loan.id), eq(quickLoans.status, "pending_approval"))).returning();
+
+    if (!updated) throw new Error("Phiếu đã được người khác xử lý. Vui lòng tải lại.");
+
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: loan.sourceGroupId,
+      action: "quick_loan.reject",
+      entityType: "quick_loan",
+      entityId: loan.id,
+      description: `Từ chối đề nghị mượn nhanh ${loan.code}`,
+      beforeData: loan,
+      afterData: updated,
+      reason: rejectionReason || null,
+    });
+  });
+
+  refresh();
+  await setFlashMessage("success", "Đã từ chối đề nghị mượn");
 }
 
 /** Mọi thành viên nhóm mượn được xác nhận đã nhận. */
@@ -205,7 +245,10 @@ export async function reportQuickLoanReturnAction(formData: FormData) {
       status: "return_reported",
       returnReportedAt: new Date(),
       updatedAt: new Date(),
-    }).where(and(eq(quickLoans.id, loanId), eq(quickLoans.status, "borrowed"))).returning();
+    }).where(and(
+      eq(quickLoans.id, loanId),
+      or(eq(quickLoans.status, "borrowed"), eq(quickLoans.status, "pending_receipt")),
+    )).returning();
 
     if (!updated) throw new Error("Giao dịch chưa ở trạng thái đang mượn.");
 
@@ -238,7 +281,7 @@ export async function closeQuickLoanAction(formData: FormData) {
   const [loan] = await db.select().from(quickLoans).where(eq(quickLoans.id, loanId)).limit(1);
   if (!loan) throw new Error("Không tìm thấy giao dịch.");
 
-  const auth = await requireGroupPermission(loan.sourceGroupId, "viewer");
+  const auth = await requireGroupPermission(loan.sourceGroupId, "operator");
   if ([returnedGood, returnedDamaged, lostQuantity].some((value) => !Number.isFinite(value) || value < 0)) {
     throw new Error("Số lượng nhận lại không hợp lệ.");
   }
