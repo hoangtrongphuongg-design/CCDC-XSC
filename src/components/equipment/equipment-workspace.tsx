@@ -17,7 +17,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { saveEquipmentRecordAction, type EquipmentFormState } from "@/actions/equipment";
+import { createQuantityToolAction, saveEquipmentRecordAction, type EquipmentFormState } from "@/actions/equipment";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -237,6 +237,33 @@ function conditionTone(condition: IndividualEquipmentRow["condition"]): "neutral
   return "warning";
 }
 
+
+function QuantityToolForm({ permissions, typeRows, isWorkshopAdmin, onCancel, onBack, onSaved }: { permissions: EquipmentPermission[]; typeRows: EquipmentTypeRow[]; isWorkshopAdmin: boolean; onCancel: () => void; onBack: () => void; onSaved: (afterSave: "close" | "add_next") => void; }) {
+  const [state, action, pending] = useActionState(createQuantityToolAction, initialState);
+  const actionableGroups = permissions.filter((permission) => permissionRank(permission.level) >= 1);
+  const groups = isWorkshopAdmin ? permissions : actionableGroups;
+  const [categoryCode, setCategoryCode] = useState("CK_HAN_CAT");
+  useEffect(() => { if (state.status === "success") { const timer = window.setTimeout(() => onSaved(state.afterSave || "close"), 500); return () => clearTimeout(timer); } }, [state.status, state.afterSave, onSaved]);
+  const suggestions = useMemo(() => Array.from(new Set([...(EQUIPMENT_CATEGORIES.find(c => c.code === categoryCode)?.suggestedTypes || []), ...typeRows.filter(t => t.categoryCode === categoryCode).map(t => t.name)])).sort((a,b)=>a.localeCompare(b,"vi")), [categoryCode, typeRows]);
+  return <form action={action} className="asset-form">
+    <section className="asset-form-section asset-management-mode"><div className="asset-section-heading"><div><span>00</span><div><strong>Kiểu quản lý</strong><small>CCDC nhỏ lẻ được quản lý theo số lượng tồn.</small></div></div></div><div className="management-mode-grid"><button type="button" className="management-mode-card" onClick={onBack}><strong>Có mã riêng</strong><small>Quản lý từng máy/CCDC.</small></button><button type="button" className="management-mode-card is-active"><strong>Theo số lượng</strong><small>Không tạo mã riêng cho từng cái.</small></button></div></section>
+    <section className="asset-form-section"><div className="asset-section-heading"><div><span>01</span><div><strong>Thông tin CCDC nhỏ lẻ</strong><small>Chỉ nhập các thông tin cần để quản lý số lượng và cho mượn nhanh.</small></div></div></div><div className="form-grid two">
+      <FormField label="Nhóm quản lý" required><select name="ownerGroupId" required>{groups.map(g => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
+      <FormField label="Tên CCDC" required><input name="name" required placeholder="Ví dụ: Mũi khoan HSS Ø12" /></FormField>
+      <FormField label="Nhóm thiết bị" required><select name="categoryCode" value={categoryCode} onChange={e=>setCategoryCode(e.target.value)}>{disciplineOrder.map(d=><optgroup key={d} label={EQUIPMENT_DISCIPLINE_LABELS[d]}>{EQUIPMENT_CATEGORIES.filter(c=>c.discipline===d).map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</optgroup>)}</select></FormField>
+      <FormField label="Loại CCDC" required><input name="equipmentType" required list={`quantity-types-${categoryCode}`} placeholder="Ví dụ: Mũi khoan"/><datalist id={`quantity-types-${categoryCode}`}>{suggestions.map(v=><option key={v} value={v}/>)}</datalist></FormField>
+      <FormField label="Quy cách"><input name="specification" placeholder="Ví dụ: HSS Ø12 mm" /></FormField>
+      <FormField label="Đơn vị tính" required><input name="unit" defaultValue="cái" required /></FormField>
+      <FormField label="Số lượng" required><input name="quantity" type="number" min="0.01" step="0.01" required defaultValue="1" /></FormField>
+      <FormField label="Đơn giá (VNĐ)"><input name="purchasePrice" inputMode="numeric" placeholder="Ví dụ: 45000" /></FormField>
+      <FormField label="Vị trí lưu"><input name="currentLocation" placeholder="Ví dụ: Tủ dụng cụ số 2" /></FormField>
+      <FormField label="Tình trạng"><select name="condition" defaultValue="good"><option value="good">Tốt</option><option value="limited">Cần theo dõi</option><option value="major_damage">Hư hỏng</option><option value="unknown">Chưa đánh giá</option></select></FormField>
+    </div><div className="form-grid"><FormField label="Ghi chú"><textarea name="notes" rows={3}/></FormField></div></section>
+    {state.status === "error" ? <div className="form-message error">{state.message}</div> : null}
+    <div className="asset-form-actions"><Button type="button" variant="secondary" onClick={onCancel}>Hủy</Button><Button type="submit" name="afterSave" value="add_next" variant="secondary" disabled={pending}>Lưu & thêm tiếp</Button><Button type="submit" name="afterSave" value="close" disabled={pending}>{pending ? "Đang lưu..." : "Lưu CCDC"}</Button></div>
+  </form>;
+}
+
 function AssetForm({
   mode,
   record,
@@ -266,6 +293,7 @@ function AssetForm({
   const [condition, setCondition] = useState<string>(record?.condition || "unknown");
   const [status, setStatus] = useState<string>(record?.status || "in_use_owner");
   const [purchasePrice, setPurchasePrice] = useState(() => normalizePurchasePrice(record?.purchasePrice));
+  const [managementMode, setManagementMode] = useState<"individual" | "quantity">("individual");
 
   const selectedGroup = permissions.find((permission) => permission.groupId === ownerGroupId);
   const codePreview = isEditing && record
@@ -303,8 +331,13 @@ function AssetForm({
   const defaultSerial = isClone ? "" : record?.serial || "";
   const defaultRecordedDate = record?.recordedDate || todayIso();
 
+  if (!isEditing && !isClone && managementMode === "quantity") {
+    return <QuantityToolForm permissions={permissions} typeRows={typeRows} isWorkshopAdmin={isWorkshopAdmin} onCancel={onCancel} onBack={() => setManagementMode("individual")} onSaved={onSaved} />;
+  }
+
   return (
     <form ref={formRef} action={action} className="asset-form">
+      {!isEditing && !isClone ? <section className="asset-form-section asset-management-mode"><div className="asset-section-heading"><div><span>00</span><div><strong>Kiểu quản lý</strong><small>Chọn cách quản lý phù hợp với loại CCDC.</small></div></div></div><div className="management-mode-grid"><button type="button" className="management-mode-card is-active"><strong>Có mã riêng</strong><small>Máy hàn, máy khoan, máy mài, pa lăng...</small></button><button type="button" className="management-mode-card" onClick={() => setManagementMode("quantity")}><strong>Theo số lượng</strong><small>Mũi khoan, taro, đá mài, đầu khẩu, phụ kiện...</small></button></div></section> : null}
       <input type="hidden" name="recordId" value={isEditing ? record?.id || "" : ""} />
       <input type="hidden" name="ownerGroupId" value={ownerGroupId} />
       <input type="hidden" name="originType" value={originType} />
@@ -493,7 +526,7 @@ function DetailModal({
           <button type="button" className="icon-button" onClick={onClose} aria-label="Đóng"><X size={18} /></button>
         </header>
         <div className="asset-detail-status-row">
-          <StatusBadge label={EQUIPMENT_STATUS_LABELS[row.status]} tone={statusTone(row.status)} />
+          <StatusBadge label={displayEquipmentStatus(row)} tone={statusTone(row.status)} />
           <StatusBadge label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />
           {row.legacyCode ? <span className="legacy-code-chip">Mã hiện hữu: {row.legacyCode}</span> : null}
         </div>
@@ -629,6 +662,21 @@ export function EquipmentWorkspace({
       && physicalLoanStatuses.has(row.activeLoanStatus)
       && inScope(row.activeLoanOwnerGroupId),
   );
+  const displayEquipmentStatus = (row: IndividualEquipmentRow) => {
+    if (row.activeLoanStatus && physicalLoanStatuses.has(row.activeLoanStatus)) {
+      if (groupFilter !== "all") {
+        if (row.activeLoanOwnerGroupId === groupFilter) return row.activeLoanStatus === "return_requested" ? "Chờ nhận lại" : "Đang cho mượn";
+        if (row.activeLoanBorrowerGroupId === groupFilter) return row.activeLoanStatus === "return_requested" ? "Đã báo trả" : "Đang mượn";
+      }
+      const owns = inScope(row.activeLoanOwnerGroupId);
+      const borrows = inScope(row.activeLoanBorrowerGroupId);
+      if (owns && !borrows) return row.activeLoanStatus === "return_requested" ? "Chờ nhận lại" : "Đang cho mượn";
+      if (borrows && !owns) return row.activeLoanStatus === "return_requested" ? "Đã báo trả" : "Đang mượn";
+      if (row.ownerGroupId === row.activeLoanOwnerGroupId) return row.activeLoanStatus === "return_requested" ? "Chờ nhận lại" : "Đang cho mượn";
+    }
+    return EQUIPMENT_STATUS_LABELS[row.status];
+  };
+
   const isRepairInScope = (row: IndividualEquipmentRow) => Boolean(
     row.activeRepairStatus && (inScope(row.ownerGroupId) || inScope(row.currentGroupId)),
   );
@@ -721,7 +769,7 @@ export function EquipmentWorkspace({
           {filteredEquipment.length ? filteredEquipment.map((row) => <article className="mobile-equipment-item mobile-equipment-clickable" key={row.id} onClick={() => openDetail(row)}>
             <div className="mobile-equipment-thumb"><Wrench size={23} /></div>
             <div className="mobile-equipment-copy"><strong>{row.name}</strong><span>{row.code}{row.legacyCode ? ` · ${row.legacyCode}` : ""}<i />{row.ownerGroupName}</span></div>
-            <div className="mobile-equipment-state"><StatusBadge label={EQUIPMENT_STATUS_LABELS[row.status]} tone={statusTone(row.status)} />{row.condition !== "good" ? <small>{CONDITION_LABELS[row.condition]}</small> : null}</div>
+            <div className="mobile-equipment-state"><StatusBadge label={displayEquipmentStatus(row)} tone={statusTone(row.status)} />{row.condition !== "good" ? <small>{CONDITION_LABELS[row.condition]}</small> : null}</div>
             <button type="button" className="mobile-equipment-more" onClick={(event) => { event.stopPropagation(); openDetail(row); }} aria-label={`Xem ${row.name}`}><MoreHorizontal size={18} /></button>
           </article>) : <EmptyState title="Chưa có dụng cụ" description="Không có dữ liệu phù hợp với bộ lọc hiện tại." />}
         </div>
@@ -764,7 +812,7 @@ export function EquipmentWorkspace({
                 <span key="brand-model">{[row.brand, row.model].filter(Boolean).join(" / ") || "—"}</span>,
                 row.currentLocation || "—",
                 <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />,
-                <StatusBadge key="status" label={EQUIPMENT_STATUS_LABELS[row.status]} tone={statusTone(row.status)} />,
+                <StatusBadge key="status" label={displayEquipmentStatus(row)} tone={statusTone(row.status)} />,
                 <span key="updated" className="equipment-updated-at">{formatDateTime(row.updatedAt)}</span>,
                 <div key="actions" className="row-actions equipment-row-actions">
                   <Button type="button" size="sm" variant="ghost" onClick={() => openDetail(row)}><Eye size={14} /> Xem</Button>

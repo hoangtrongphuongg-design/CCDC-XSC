@@ -97,3 +97,13 @@ Chỉ upload/deploy code. Giữ nguyên `DATABASE_URL` và `AUTH_SECRET` trên V
 - migration/SQL khởi tạo cũ
 
 Bản này **không yêu cầu migration database**.
+
+## V1.6.4
+- Thông báo kết quả thao tác chuyển thành cửa sổ xác nhận ở giữa màn hình (mobile + desktop).
+- Mượn máy: trạng thái hiển thị theo góc nhìn nhóm: nhóm sở hữu = Đang cho mượn; nhóm nhận = Đang mượn.
+- Trả máy: nhóm mượn chỉ Báo trả; chỉ Kỹ sư/Đốc công (operator+) của nhóm sở hữu được Xác nhận nhận lại. Backend kiểm tra lại quyền.
+- Thêm / cấp phát CCDC: bổ sung Kiểu quản lý `Có mã riêng` và `Theo số lượng`. CCDC nhỏ lẻ nhập Tên, Loại, Quy cách, ĐVT, Số lượng, Đơn giá, Nhóm quản lý, Vị trí, Tình trạng, Ghi chú.
+- Giữ các cập nhật V1.6.3: mobile action inbox, luồng mượn rút gọn, audit mượn/trả, cân cột Dụng cụ nhóm tôi.
+
+### Cập nhật DB cho V1.6.4
+Không reset/seed database. Chỉ chạy `database/update.sql` một lần; phần V1.6.4 dùng `ADD COLUMN IF NOT EXISTS` để bổ sung `purchase_price`, `current_location`, `condition` cho `tool_catalog`.

@@ -29,10 +29,12 @@ export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMes
   return (
     <>
       {toast ? (
-        <div className={`app-toast app-toast-${toast.type}`} role="status" aria-live="polite">
-          <span className="app-toast-icon">{toast.type === "error" ? <XCircle size={20} /> : <CheckCircle2 size={20} />}</span>
-          <span className="app-toast-copy"><strong>{toast.message}</strong>{toast.detail ? <small>{toast.detail}</small> : null}</span>
-          <button type="button" className="app-toast-close" aria-label="Đóng thông báo" onClick={() => setToast(null)}>×</button>
+        <div className="app-toast-backdrop" role="presentation" onClick={() => setToast(null)}>
+          <div className={`app-toast app-toast-${toast.type}`} role="status" aria-live="polite" onClick={(event) => event.stopPropagation()}>
+            <span className="app-toast-icon">{toast.type === "error" ? <XCircle size={34} /> : <CheckCircle2 size={34} />}</span>
+            <span className="app-toast-copy"><strong>{toast.message}</strong>{toast.detail ? <small>{toast.detail}</small> : null}</span>
+            <button type="button" className="app-toast-close" aria-label="Đóng thông báo" onClick={() => setToast(null)}>Đóng</button>
+          </div>
         </div>
       ) : null}
     <nav className="mobile-nav" aria-label="Điều hướng điện thoại">

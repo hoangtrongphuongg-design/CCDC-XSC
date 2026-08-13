@@ -270,7 +270,7 @@ export async function confirmMachineReturnAction(formData: FormData) {
   const [loan] = await db.select().from(machineLoans).where(eq(machineLoans.id, loanId)).limit(1);
   if (!loan) throw new Error("Không tìm thấy phiếu.");
 
-  const auth = await requireGroupPermission(loan.ownerGroupId, "viewer");
+  const auth = await requireGroupPermission(loan.ownerGroupId, "operator");
 
   await db.transaction(async (tx) => {
     await lockEquipment(tx, loan.equipmentId);

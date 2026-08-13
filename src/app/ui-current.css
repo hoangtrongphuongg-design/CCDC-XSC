@@ -2126,36 +2126,24 @@ body {
 }
 
 
-/* V1.6.2 - phản hồi thao tác dùng chung */
-.app-toast {
-  position: fixed;
-  z-index: 1200;
-  top: 18px;
-  right: 22px;
-  width: min(390px, calc(100vw - 32px));
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: start;
-  padding: 12px 13px;
-  border: 1px solid rgba(20, 125, 100, .22);
-  border-radius: 14px;
-  background: rgba(248, 255, 252, .98);
-  box-shadow: 0 14px 38px rgba(20, 32, 50, .16);
-  color: var(--text);
-  animation: app-toast-in .18s ease-out;
-}
-.app-toast-error { border-color: rgba(220, 38, 38, .22); background: rgba(255, 250, 250, .98); }
-.app-toast-icon { color: var(--success, #147d64); display: grid; margin-top: 1px; }
+/* V1.6.4 - phản hồi thao tác ở giữa màn hình */
+.app-toast-backdrop { position: fixed; inset: 0; z-index: 1400; display: grid; place-items: center; padding: 18px; background: rgba(15, 23, 42, .28); backdrop-filter: blur(2px); }
+.app-toast { width: min(420px, calc(100vw - 32px)); display: grid; justify-items: center; gap: 10px; padding: 22px 20px 18px; border: 1px solid rgba(20,125,100,.22); border-radius: 18px; background: #fff; box-shadow: 0 24px 70px rgba(15,23,42,.24); text-align: center; color: var(--text); animation: app-toast-in .18s ease-out; }
+.app-toast-error { border-color: rgba(220,38,38,.24); }
+.app-toast-icon { color: var(--success,#147d64); display: grid; }
 .app-toast-error .app-toast-icon { color: #dc2626; }
-.app-toast-copy { min-width: 0; display: grid; gap: 2px; line-height: 1.3; }
-.app-toast-copy strong { font-size: 13px; font-weight: 760; }
-.app-toast-copy small { color: var(--text-muted); font-size: 11.5px; overflow-wrap: anywhere; }
-.app-toast-close { border: 0; background: transparent; color: var(--text-muted); font-size: 21px; line-height: 18px; cursor: pointer; padding: 0 1px; }
-@keyframes app-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-@media (max-width: 760px) {
-  .app-toast { top: 10px; left: 10px; right: 10px; width: auto; padding: 11px 12px; border-radius: 12px; }
-}
+.app-toast-copy { min-width: 0; display: grid; gap: 5px; line-height: 1.35; }
+.app-toast-copy strong { font-size: 17px; font-weight: 800; }
+.app-toast-copy small { color: var(--text-muted); font-size: 13px; overflow-wrap: anywhere; }
+.app-toast-close { margin-top: 4px; min-width: 92px; min-height: 38px; border: 0; border-radius: 10px; background: var(--primary,#173b63); color: #fff; font-weight: 700; cursor: pointer; }
+@keyframes app-toast-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width:760px) { .app-toast { width: min(340px, calc(100vw - 28px)); padding: 20px 16px 16px; border-radius: 16px; } .app-toast-copy strong { font-size: 16px; } }
+
+.management-mode-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.management-mode-card { min-width:0; padding:14px; border:1px solid var(--border); border-radius:14px; background:#fff; text-align:left; cursor:pointer; display:grid; gap:4px; }
+.management-mode-card strong { font-size:14px; } .management-mode-card small { color:var(--text-muted); line-height:1.35; }
+.management-mode-card.is-active { border-color:var(--primary); box-shadow:0 0 0 2px rgba(23,59,99,.08); background:#f8fbff; }
+@media(max-width:760px){.management-mode-grid{grid-template-columns:1fr}.management-mode-card{padding:12px}}
 
 @media (max-width: 760px) {
   .mobile-loan-action-inbox { display: grid; gap: 8px; margin: 10px 0 12px; }

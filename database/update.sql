@@ -59,3 +59,9 @@ CREATE INDEX IF NOT EXISTS equipment_type_catalog_active_idx ON equipment_type_c
 
 ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS actor_role varchar(80);
 ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS reason text;
+
+
+-- V1.6.4: CCDC nhỏ lẻ quản lý theo số lượng.
+ALTER TABLE tool_catalog ADD COLUMN IF NOT EXISTS purchase_price numeric(18,2);
+ALTER TABLE tool_catalog ADD COLUMN IF NOT EXISTS current_location varchar(255);
+ALTER TABLE tool_catalog ADD COLUMN IF NOT EXISTS condition equipment_condition NOT NULL DEFAULT 'good';

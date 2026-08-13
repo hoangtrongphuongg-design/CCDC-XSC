@@ -6,7 +6,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { equipment, equipmentTypeCatalog, groups } from "@/lib/db/schema";
+import { equipment, equipmentTypeCatalog, groups, toolCatalog } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { writeAudit } from "@/lib/audit";
 import { EQUIPMENT_CATEGORIES } from "@/lib/equipment-categories";
@@ -410,4 +410,77 @@ export async function updateEquipmentConditionAction(formData: FormData) {
   });
   await setFlashMessage("success", "Đã lưu tình trạng CCDC", `Đã cập nhật ${item.code}.`);
   refreshEquipmentConsumers();
+}
+
+/** Tạo CCDC nhỏ lẻ quản lý theo số lượng. */
+export async function createQuantityToolAction(
+  _previousState: EquipmentFormState,
+  formData: FormData,
+): Promise<EquipmentFormState> {
+  const groupId = String(formData.get("ownerGroupId") || "");
+  const name = String(formData.get("name") || "").trim();
+  const categoryCode = String(formData.get("categoryCode") || "KHAC");
+  const equipmentType = String(formData.get("equipmentType") || "Dụng cụ khác").trim();
+  const specification = String(formData.get("specification") || "").trim();
+  const unit = String(formData.get("unit") || "cái").trim();
+  const quantity = Number(String(formData.get("quantity") || "0").replace(/,/g, "."));
+  const purchasePriceRaw = String(formData.get("purchasePrice") || "").replace(/\D/g, "");
+  const currentLocation = String(formData.get("currentLocation") || "").trim();
+  const condition = String(formData.get("condition") || "good") as typeof toolCatalog.$inferInsert["condition"];
+  const notes = String(formData.get("notes") || "").trim();
+  const afterSave = String(formData.get("afterSave") || "close") === "add_next" ? "add_next" : "close";
+
+  if (!groupId || name.length < 2 || !unit || !Number.isFinite(quantity) || quantity <= 0) {
+    return { status: "error", message: "Vui lòng nhập Tên CCDC, ĐVT và Số lượng lớn hơn 0." };
+  }
+  if (!categoryCodes.includes(categoryCode as (typeof categoryCodes)[number])) {
+    return { status: "error", message: "Nhóm thiết bị không hợp lệ." };
+  }
+  if (!["good", "limited", "major_damage", "unknown"].includes(condition)) {
+    return { status: "error", message: "Tình trạng CCDC không hợp lệ." };
+  }
+
+  try {
+    const auth = await requireUser();
+    if (auth.isReadOnlyViewer) return { status: "error", message: "Người xem toàn xưởng chỉ có quyền xem dữ liệu." };
+    if (!auth.isWorkshopAdmin && !hasGroupPermission(auth, groupId, "operator")) {
+      return { status: "error", message: "Chỉ Kỹ sư giám sát hoặc Đốc công được thêm CCDC cho nhóm mình." };
+    }
+    const ownerGroup = await assertOperationalGroup(groupId);
+    let code = "";
+    await db.transaction(async (tx) => {
+      code = await nextAssetCode(tx, { groupCode: ownerGroup.code, equipmentPrefix: ownerGroup.equipmentPrefix, mode: "quantity" });
+      const [created] = await tx.insert(toolCatalog).values({
+        groupId,
+        code,
+        categoryCode,
+        equipmentType: equipmentType || "Dụng cụ khác",
+        name,
+        specification: specification || null,
+        unit,
+        quantityOnHand: String(quantity),
+        purchasePrice: purchasePriceRaw ? String(Number(purchasePriceRaw)) : null,
+        currentLocation: currentLocation || null,
+        condition,
+        notes: notes || null,
+        createdBy: auth.userId,
+        updatedBy: auth.userId,
+      }).returning();
+      await writeAudit(tx as never, {
+        actorUserId: auth.userId,
+        actorGroupId: groupId,
+        actorRole: getActorRoleLabel(auth, groupId),
+        action: "tool_catalog.create",
+        entityType: "tool_catalog",
+        entityId: created.id,
+        description: `Thêm CCDC theo số lượng ${code} - ${name}`,
+        afterData: created,
+      });
+    });
+    await setFlashMessage("success", "Đã thêm CCDC theo số lượng", `${code} · ${name} · ${quantity} ${unit}`);
+    refreshEquipmentConsumers();
+    return { status: "success", message: `Đã tạo ${code}.`, code, afterSave };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "Không thể thêm CCDC." };
+  }
 }

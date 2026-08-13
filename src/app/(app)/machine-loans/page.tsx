@@ -93,12 +93,12 @@ export default async function MachineLoansPage() {
           <strong>Việc cần xử lý</strong>
           <span>{loans.filter((loan) =>
             (loan.status === "pending_owner" && hasGroupPermission(auth, loan.ownerGroupId, "operator")) ||
-            (loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "viewer"))
+            (loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "operator"))
           ).length}</span>
         </div>
         {loans.filter((loan) =>
           (loan.status === "pending_owner" && hasGroupPermission(auth, loan.ownerGroupId, "operator")) ||
-          (loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "viewer"))
+          (loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "operator"))
         ).slice(0, 6).map((loan) => {
           const machine = equipmentMap.get(loan.equipmentId);
           const ownerName = groupMap.get(loan.ownerGroupId) || "—";
@@ -143,7 +143,7 @@ export default async function MachineLoansPage() {
         {loans.filter((row) => ["on_loan", "return_requested"].includes(row.status)).slice(0, 6).map((loan) => {
           const machine = equipmentMap.get(loan.equipmentId);
           const canReport = loan.status === "on_loan" && hasGroupPermission(auth, loan.borrowerGroupId, "viewer");
-          const canReceive = loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "viewer");
+          const canReceive = loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "operator");
           return (
             <div className="mobile-loan-return-item" key={loan.id}>
               <div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || loan.code} · {groupMap.get(loan.ownerGroupId) || "—"}</span></div>
@@ -188,7 +188,7 @@ export default async function MachineLoansPage() {
                   );
                 }
 
-                if (loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "viewer")) {
+                if (loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "operator")) {
                   actions.push(
                     <form action={confirmMachineReturnAction} key="close" className="row-actions">
                       <input type="hidden" name="loanId" value={loan.id} />
