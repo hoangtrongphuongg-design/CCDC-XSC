@@ -235,7 +235,7 @@ export const toolCatalog = pgTable(
     quantityOnHand: numeric("quantity_on_hand", { precision: 12, scale: 2 }).notNull().default("0"),
     purchasePrice: numeric("purchase_price", { precision: 18, scale: 2 }),
     currentLocation: varchar("current_location", { length: 255 }),
-    condition: equipmentConditionEnum("condition").notNull().default("good"),
+    condition: conditionEnum("condition").notNull().default("good"),
     isActive: boolean("is_active").notNull().default(true),
     notes: text("notes"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),

@@ -506,6 +506,7 @@ function DetailModal({
   onClone,
   onTab,
   groupNames,
+  displayStatus,
 }: {
   row: IndividualEquipmentRow;
   tab: DetailTab;
@@ -516,6 +517,7 @@ function DetailModal({
   onClone: () => void;
   onTab: (tab: DetailTab) => void;
   groupNames: Map<string, string>;
+  displayStatus: string;
 }) {
   const category = EQUIPMENT_CATEGORIES.find((item) => item.code === row.categoryCode)?.name || row.categoryCode;
   return (
@@ -526,7 +528,7 @@ function DetailModal({
           <button type="button" className="icon-button" onClick={onClose} aria-label="Đóng"><X size={18} /></button>
         </header>
         <div className="asset-detail-status-row">
-          <StatusBadge label={displayEquipmentStatus(row)} tone={statusTone(row.status)} />
+          <StatusBadge label={displayStatus} tone={statusTone(row.status)} />
           <StatusBadge label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />
           {row.legacyCode ? <span className="legacy-code-chip">Mã hiện hữu: {row.legacyCode}</span> : null}
         </div>
@@ -836,7 +838,7 @@ export function EquipmentWorkspace({
         </section>
       </div> : null}
 
-      {detailRecord ? <DetailModal row={detailRecord} tab={detailTab} audits={auditByEquipment.get(detailRecord.id) || []} canEdit={canEditRow(detailRecord)} onClose={() => setDetailRecord(null)} onEdit={() => openEdit(detailRecord)} onClone={() => openClone(detailRecord)} onTab={setDetailTab} groupNames={groupNameById} /> : null}
+      {detailRecord ? <DetailModal row={detailRecord} tab={detailTab} audits={auditByEquipment.get(detailRecord.id) || []} canEdit={canEditRow(detailRecord)} onClose={() => setDetailRecord(null)} onEdit={() => openEdit(detailRecord)} onClone={() => openClone(detailRecord)} onTab={setDetailTab} groupNames={groupNameById} displayStatus={displayEquipmentStatus(detailRecord)} /> : null}
     </>
   );
 }

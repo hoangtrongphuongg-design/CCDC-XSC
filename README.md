@@ -1,3 +1,7 @@
+## CCDC-XSC V1.6.5
+
+Bản sửa lỗi build của V1.6.4. Không reset dữ liệu hiện có.
+
 # QUẢN LÝ CCDC - XSC — V1.6.3
 
 ## Thay đổi V1.6.3
