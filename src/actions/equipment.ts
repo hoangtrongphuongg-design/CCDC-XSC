@@ -436,7 +436,7 @@ export async function createQuantityToolAction(
   if (!categoryCodes.includes(categoryCode as (typeof categoryCodes)[number])) {
     return { status: "error", message: "Nhóm thiết bị không hợp lệ." };
   }
-  if (!["good", "limited", "major_damage", "unknown"].includes(condition)) {
+  if (!condition || !["good", "limited", "major_damage", "unknown"].includes(condition)) {
     return { status: "error", message: "Tình trạng CCDC không hợp lệ." };
   }
 
