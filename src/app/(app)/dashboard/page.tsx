@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { formatDateTime } from "@/lib/utils";
+import { WORKFLOW_LABELS } from "@/lib/constants";
 
 const statusMeta = {
   in_use_owner: ["Sẵn sàng", "#7BA7CC"],
@@ -77,6 +78,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   ]);
 
   const groupMap = new Map(groupRows.map((group) => [group.id, group.name]));
+  const equipmentMap = new Map(equipmentRows.map((item) => [item.id, item]));
   const scopedEquipment = equipmentRows.filter((item) => fullWorkshopScope || allowedGroupIds.has(item.ownerGroupId));
   const scopedEquipmentIds = new Set(scopedEquipment.map((item) => item.id));
   const scopedLoans = loanRows.filter((row) => fullWorkshopScope || allowedGroupIds.has(row.ownerGroupId) || allowedGroupIds.has(row.borrowerGroupId));
@@ -158,9 +160,74 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   ].filter((task) => task.visible);
 
   const scopeLabel = fullWorkshopScope ? "toàn XSC" : auth.permissions.length === 1 ? auth.permissions[0].groupName : "các nhóm được phân quyền";
+  const canOperate = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.length > 0);
+  const mobileRelatedLoans = scopedLoans
+    .filter((row) => ["on_loan", "return_requested", "incident", "wait_handover"].includes(row.status))
+    .slice(0, 4);
 
   return (
-    <>
+    <div className="dashboard-page">
+      <section className="mobile-ops-home" aria-label="Thao tác nhanh trên điện thoại">
+        <header className="mobile-ops-header">
+          <div>
+            <small>{auth.primaryGroupName || (fullWorkshopScope ? "Toàn XSC" : "CCDC Xưởng Sửa chữa")}</small>
+            <strong>{auth.fullName}</strong>
+          </div>
+          <Link href="/profile" className="mobile-ops-avatar" aria-label="Hồ sơ cá nhân">{auth.fullName.trim().slice(-1).toUpperCase()}</Link>
+        </header>
+
+        <form className="mobile-ops-search" action="/equipment" method="get" role="search">
+          <Search size={18} aria-hidden="true" />
+          <input name="q" placeholder="Tìm mã hoặc tên CCDC..." aria-label="Tìm CCDC" />
+        </form>
+
+        {canOperate ? (
+          <div className="mobile-ops-primary" id="mobile-actions">
+            <Link href="/machine-loans" className="mobile-action-card is-primary">
+              <span><Plus size={22} /></span><div><strong>Mượn CCDC</strong><small>Tìm và chọn nhanh</small></div>
+            </Link>
+            <Link href="/machine-loans#mobile-active-loans" className="mobile-action-card">
+              <span><Handshake size={22} /></span><div><strong>Trả CCDC</strong><small>Chỉ hiện đồ đang mượn</small></div>
+            </Link>
+            <Link href="/repairs" className="mobile-action-card is-compact">
+              <span><Wrench size={19} /></span><div><strong>Báo hư</strong><small>Tạo báo hư nhanh</small></div>
+            </Link>
+            <Link href="/my-equipment" className="mobile-action-card is-compact">
+              <span><Boxes size={19} /></span><div><strong>CCDC nhóm tôi</strong><small>Xem nhanh</small></div>
+            </Link>
+          </div>
+        ) : null}
+
+        <section className="mobile-ops-block">
+          <div className="mobile-ops-block-title"><strong>Việc cần xử lý</strong><span>{actionCount}</span></div>
+          {tasks.filter((task) => task.count > 0).slice(0, 3).length ? (
+            <div className="mobile-task-list">
+              {tasks.filter((task) => task.count > 0).slice(0, 3).map((task) => (
+                <Link href={task.href} key={task.label}><span>{task.label}</span><b>{task.count}</b><ChevronRight size={16} /></Link>
+              ))}
+            </div>
+          ) : <p className="mobile-ops-empty">Không có việc cần xử lý ngay.</p>}
+        </section>
+
+        <section className="mobile-ops-block" id="mobile-active-loans">
+          <div className="mobile-ops-block-title"><strong>Đang liên quan</strong><Link href="/machine-loans">Xem tất cả</Link></div>
+          {mobileRelatedLoans.length ? (
+            <div className="mobile-related-list">
+              {mobileRelatedLoans.map((loan) => {
+                const machine = equipmentMap.get(loan.equipmentId);
+                const owner = groupMap.get(loan.ownerGroupId) || "—";
+                const borrower = groupMap.get(loan.borrowerGroupId) || "—";
+                return (
+                  <Link href="/machine-loans" key={loan.id} className="mobile-related-item">
+                    <div><strong>{machine?.name || "CCDC"}</strong><span>{machine?.code || loan.code} · {owner} → {borrower}</span></div>
+                    <small>{WORKFLOW_LABELS[loan.status] || loan.status}</small>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : <p className="mobile-ops-empty">Chưa có CCDC đang mượn hoặc chờ trả.</p>}
+        </section>
+      </section>
       <PageHeader
         title="Tổng quan vận hành"
         description={`Theo dõi tình hình CCDC, cảnh báo và công việc cần xử lý trong ${scopeLabel}.`}
@@ -264,6 +331,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
           </CardContent>
         </Card>
       </section>
-    </>
+    </div>
   );
 }

@@ -11,8 +11,8 @@ export function MobileNav({ auth }: { auth: AuthContext }) {
   const canBorrow = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.length > 0);
   const items = [
     ["/dashboard", "Trang chủ", Gauge, false],
-    [auth.isReadOnlyViewer ? "/equipment" : "/my-equipment", "Dụng cụ", Boxes, false],
-    ...(canBorrow ? [["/machine-loans", "", Plus, true], ["/machine-loans", "Phiếu mượn", Handshake, false]] as const : []),
+    [auth.isReadOnlyViewer ? "/equipment" : "/my-equipment", "CCDC", Boxes, false],
+    ...(canBorrow ? [["/dashboard#mobile-actions", "", Plus, true], ["/machine-loans", "Mượn/Trả", Handshake, false]] as const : []),
     ["/profile", "Cá nhân", UserRound, false],
   ] as const;
 
@@ -21,7 +21,7 @@ export function MobileNav({ auth }: { auth: AuthContext }) {
       {items.map(([href, label, Icon, primary], index) => {
         const active = !primary && (pathname === href || pathname.startsWith(`${href}/`));
         return (
-          <Link href={href} key={`${href}-${index}`} className={cn(primary && "is-primary-action", active && "is-active")} aria-current={active ? "page" : undefined} aria-label={primary ? "Tạo phiếu mượn" : label}>
+          <Link href={href} key={`${href}-${index}`} className={cn(primary && "is-primary-action", active && "is-active")} aria-current={active ? "page" : undefined} aria-label={primary ? "Thao tác nhanh" : label}>
             <span className="mobile-nav-icon"><Icon size={primary ? 24 : 20} strokeWidth={2} /></span>
             {label ? <span>{label}</span> : null}
           </Link>

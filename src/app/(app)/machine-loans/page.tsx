@@ -72,7 +72,11 @@ export default async function MachineLoansPage() {
   const completed = loans.filter((row) => row.status === "completed").length;
 
   return (
-    <>
+    <div className="loan-mobile-page machine-loans-page">
+      <div className="loan-mobile-switch" aria-label="Chọn kiểu mượn">
+        <span className="is-active">Máy có mã</span>
+        <a href="/quick-loans">CCDC lặt vặt</a>
+      </div>
       <PageHeader
         title="Mượn máy"
         description="Công nhân kỹ thuật, Kỹ sư giám sát và Đốc công đều được lập đề nghị; Kỹ sư giám sát hoặc Đốc công nhóm cho mượn duyệt; thành viên nhóm cho mượn xác nhận nhận lại."
@@ -84,6 +88,22 @@ export default async function MachineLoansPage() {
         <StatCard title="Chờ nhận lại" value={waitingReturn} icon={RotateCcw} tone="violet" />
         <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
       </section>
+
+      <div className="mobile-loan-return-list" id="mobile-active-loans">
+        <div className="mobile-loan-section-title"><strong>Đang mượn / chờ trả</strong><span>{loans.filter((row) => ["on_loan", "return_requested"].includes(row.status)).length}</span></div>
+        {loans.filter((row) => ["on_loan", "return_requested"].includes(row.status)).slice(0, 6).map((loan) => {
+          const machine = equipmentMap.get(loan.equipmentId);
+          const canReport = loan.status === "on_loan" && hasGroupPermission(auth, loan.borrowerGroupId, "viewer");
+          const canReceive = loan.status === "return_requested" && hasGroupPermission(auth, loan.ownerGroupId, "viewer");
+          return (
+            <div className="mobile-loan-return-item" key={loan.id}>
+              <div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || loan.code} · {groupMap.get(loan.ownerGroupId) || "—"}</span></div>
+              {canReport ? <form action={requestMachineReturnAction}><input type="hidden" name="loanId" value={loan.id} /><Button size="sm" variant="secondary">Trả</Button></form> : null}
+              {canReceive ? <span className="mobile-loan-state">Chờ nhận lại</span> : null}
+            </div>
+          );
+        })}
+      </div>
 
       <div className="content-grid">
         <Card className="table-card">
@@ -203,6 +223,6 @@ export default async function MachineLoansPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }

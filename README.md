@@ -1,3 +1,15 @@
+# CCDC-XSC V1.6.1
+
+## Mobile V1
+- Trang Tổng quan trên điện thoại chuyển thành màn hình thao tác nhanh: Tìm CCDC, Mượn CCDC, Trả CCDC, Báo hư, CCDC nhóm tôi.
+- Chỉ hiển thị thông tin nhận diện tối thiểu trên card mobile.
+- Việc cần xử lý và CCDC đang liên quan hiển thị gọn theo quyền người dùng.
+- Mượn máy và CCDC lặt vặt được trình bày như hai lựa chọn trong cùng khu vực mobile; backend vẫn giữ hai workflow riêng.
+- Trang Mượn trên mobile ưu tiên form trước; danh sách/bảng chi tiết giữ cho desktop.
+- Có danh sách nhanh CCDC đang mượn/chờ trả để thao tác Trả ngay trên mobile.
+- Thanh điều hướng mobile đổi thành Trang chủ / CCDC / Thao tác nhanh / Mượn-Trả / Cá nhân.
+- Không thay database, không migration, không reset dữ liệu.
+
 # QUẢN LÝ CCDC - XSC — V1.5.9
 
 Bản V1.5.9 phát triển từ V1.5.8. Không thay đổi schema/database và không reset dữ liệu CCDC, tài khoản hay lịch sử nghiệp vụ hiện có.

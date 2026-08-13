@@ -57,7 +57,11 @@ export default async function QuickLoansPage() {
   const completed = rows.filter((row) => row.status === "completed").length;
 
   return (
-    <>
+    <div className="loan-mobile-page quick-loans-page">
+      <div className="loan-mobile-switch" aria-label="Chọn kiểu mượn">
+        <a href="/machine-loans">Máy có mã</a>
+        <span className="is-active">CCDC lặt vặt</span>
+      </div>
       <PageHeader
         title="Mượn nhanh"
         description="Công nhân kỹ thuật, Kỹ sư giám sát và Đốc công đều được lập đề nghị; Kỹ sư giám sát hoặc Đốc công nhóm cho mượn duyệt; thành viên nhóm cho mượn xác nhận số lượng nhận lại."
@@ -69,6 +73,21 @@ export default async function QuickLoansPage() {
         <StatCard title="Chờ nhóm cho nhận lại" value={waitingClose} icon={PackageCheck} tone="cyan" />
         <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
       </section>
+
+      <div className="mobile-loan-return-list" id="mobile-active-loans">
+        <div className="mobile-loan-section-title"><strong>Đang mượn / chờ trả</strong><span>{rows.filter((row) => ["borrowed", "return_reported"].includes(row.status)).length}</span></div>
+        {rows.filter((row) => ["borrowed", "return_reported"].includes(row.status)).slice(0, 6).map((row) => {
+          const canReport = row.status === "borrowed" && hasGroupPermission(auth, row.borrowerGroupId, "viewer");
+          const canReceive = row.status === "return_reported" && hasGroupPermission(auth, row.sourceGroupId, "viewer");
+          return (
+            <div className="mobile-loan-return-item" key={row.id}>
+              <div><strong>{row.itemName}</strong><span>{row.specification || `${row.quantityBorrowed} ${row.unit}`} · {groupMap.get(row.sourceGroupId) || "—"}</span></div>
+              {canReport ? <form action={reportQuickLoanReturnAction}><input type="hidden" name="loanId" value={row.id} /><Button size="sm" variant="secondary">Trả</Button></form> : null}
+              {canReceive ? <span className="mobile-loan-state">Chờ nhận lại</span> : null}
+            </div>
+          );
+        })}
+      </div>
 
       <div className="content-grid">
         <Card className="table-card">
@@ -212,6 +231,6 @@ export default async function QuickLoansPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }
