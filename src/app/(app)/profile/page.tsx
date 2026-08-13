@@ -1,8 +1,10 @@
-import { ShieldCheck, UserRound } from "lucide-react";
+import { LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { requireUser } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRoleSummary } from "@/lib/auth/roles";
+import { logoutAction } from "@/actions/auth";
+import { Button } from "@/components/ui/button";
 
 export default async function ProfilePage() {
   const auth = await requireUser();
@@ -25,6 +27,18 @@ export default async function ProfilePage() {
           <CardContent><div className="permission-list">
             {auth.permissions.map((permission) => <div key={permission.groupId}><strong>{permission.groupName}</strong><span>{permission.level === "viewer" ? "Công nhân kỹ thuật" : permission.level === "operator" ? "Kỹ sư giám sát" : "Đốc công khu vực"}</span></div>)}
           </div></CardContent>
+        </Card>
+
+        <Card className="mobile-profile-account-actions">
+          <CardHeader><CardTitle>Tài khoản</CardTitle><LogOut size={18} /></CardHeader>
+          <CardContent>
+            <form action={logoutAction}>
+              <Button type="submit" variant="danger" className="mobile-profile-logout">
+                <LogOut size={18} />
+                Đăng xuất
+              </Button>
+            </form>
+          </CardContent>
         </Card>
       </div>
     </>

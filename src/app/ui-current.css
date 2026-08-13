@@ -705,6 +705,8 @@ input[type="checkbox"] { accent-color: var(--primary); }
 }
 
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   body {
     background:
       radial-gradient(circle at 8% 0%, rgba(0, 74, 143, .08), transparent 20rem),
@@ -1128,6 +1130,10 @@ body {
 .permission-list strong, .permission-list span { display: block; }
 .permission-list span { color: var(--primary); text-align: right; font-weight: 650; }
 
+
+.mobile-profile-account-actions { display: none; }
+.mobile-profile-logout { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
 /* My equipment — approved mobile list */
 .mobile-equipment-shell { display: none; }
 .my-equipment-page { min-width: 0; }
@@ -1188,6 +1194,8 @@ body {
 }
 
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .page-content { padding: 15px 12px 95px; }
   .executive-kpis { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
   .executive-kpi { min-height: 108px; padding: 13px; }
@@ -1265,6 +1273,8 @@ body {
 }
 
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .topbar { display: none; }
 }
 
@@ -1439,6 +1449,8 @@ body {
 }
 
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .asset-editor-modal,
   .asset-detail-modal { width: 100%; }
   .equipment-detail-sections dl { grid-template-columns: 1fr; }
@@ -1450,6 +1462,8 @@ body {
 }
 
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .mobile-equipment-filters {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1683,6 +1697,8 @@ body {
   white-space: nowrap;
 }
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .user-account-table .table-wrap { overflow: visible; }
   .user-account-table .table-wrap table { table-layout: auto; }
   .user-account-table .table-wrap th,
@@ -1770,6 +1786,8 @@ body {
 }
 
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .content-grid { grid-template-columns: 1fr; }
   .side-panel { position: static; }
   .dashboard-kpi-six { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -1850,6 +1868,8 @@ body {
 .mobile-ops-home { display: none; }
 
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .dashboard-page { margin: -15px -12px -95px; min-height: 100svh; background: #f7f9fb; }
   .dashboard-page > :not(.mobile-ops-home) { display: none !important; }
   .mobile-ops-home {
@@ -2038,6 +2058,8 @@ body {
 .mobile-loan-return-list { display: none; }
 
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .loan-mobile-page { min-width: 0; }
   .loan-mobile-page > .page-header { display: none; }
   .loan-mobile-page > .stat-grid { display: none; }
@@ -2146,6 +2168,8 @@ body {
 @media(max-width:760px){.management-mode-grid{grid-template-columns:1fr}.management-mode-card{padding:12px}}
 
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .mobile-loan-action-inbox { display: grid; gap: 8px; margin: 10px 0 12px; }
   .mobile-loan-action-card { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: #fff; box-shadow: var(--shadow-xs); }
   .mobile-loan-action-copy { display: grid; min-width: 0; gap: 3px; }
@@ -2161,6 +2185,8 @@ body {
 
 /* Mobile V1.6.9 — home tinh gọn, card để xem, nút + để thao tác mới */
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .mobile-ops-header-v2 {
     margin: 0 -12px;
     padding: 10px 14px 9px;
@@ -2340,6 +2366,8 @@ body {
 /* Mobile V1.6.10 — card để xem, dấu + để tạo thao tác */
 .mobile-repair-list { display: none; }
 @media (max-width: 760px) {
+  .mobile-profile-account-actions { display: block; }
+
   .loan-mobile-page:not(.mobile-mode-create) .side-panel { display: none !important; }
   .loan-mobile-page.mobile-mode-create .mobile-loan-action-inbox,
   .loan-mobile-page.mobile-mode-create .mobile-loan-return-list { display: none !important; }
