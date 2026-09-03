@@ -13,7 +13,7 @@ export function LoginForm() {
   const [state, action, pending] = useActionState(loginAction, initialState);
   return (
     <form action={action} className="auth-form" noValidate>
-      <FormField label="Tên đăng nhập" required><input name="username" autoComplete="username" placeholder="Nhập tên đăng nhập" /></FormField>
+      <FormField label="Số danh bộ" required><input name="employeeCode" autoComplete="username" inputMode="numeric" placeholder="Nhập số danh bộ" /></FormField>
       <FormField label="Mật khẩu" required><PasswordInput name="password" autoComplete="current-password" placeholder="Nhập mật khẩu" /></FormField>
       {state.error ? <p className="form-message error" role="alert">{state.error}</p> : null}
       <Button type="submit" size="lg" disabled={pending}><LogIn size={16} />{pending ? "Đang đăng nhập..." : "Đăng nhập"}</Button>

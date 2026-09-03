@@ -2,7 +2,7 @@ import { z } from "zod";
 import { USERNAME_PATTERN } from "@/lib/constants";
 
 export const loginSchema = z.object({
-  username: z.string().transform((v) => v.trim().toLowerCase()).refine((v) => USERNAME_PATTERN.test(v), "Tên đăng nhập không hợp lệ."),
+  employeeCode: z.string().trim().min(1, "Vui lòng nhập số danh bộ.").max(30),
   password: z.string().min(1, "Vui lòng nhập mật khẩu."),
 });
 
