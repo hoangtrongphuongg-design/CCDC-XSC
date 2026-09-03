@@ -13,7 +13,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { activityLogs, equipment, groups, machineLoans, quickLoans, repairs, transfers } from "@/lib/db/schema";
+import { activityLogs, equipment, groups, machineLoans, quickLoans, repairs, transfers, users } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,7 +84,17 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
     db.select().from(quickLoans).where(inArray(quickLoans.status, [...openQuickLoanStatuses])).orderBy(desc(quickLoans.createdAt)),
     db.select().from(repairs).where(inArray(repairs.status, [...openRepairStatuses])).orderBy(desc(repairs.createdAt)),
     db.select().from(transfers).where(inArray(transfers.status, [...openTransferStatuses])).orderBy(desc(transfers.createdAt)),
-    db.select().from(activityLogs).orderBy(desc(activityLogs.createdAt)).limit(30),
+    db.select({
+      id: activityLogs.id,
+      action: activityLogs.action,
+      description: activityLogs.description,
+      createdAt: activityLogs.createdAt,
+      actorGroupId: activityLogs.actorGroupId,
+      actorName: users.fullName,
+      actorEmployeeCode: users.employeeCode,
+    }).from(activityLogs)
+      .leftJoin(users, eq(activityLogs.actorUserId, users.id))
+      .orderBy(desc(activityLogs.createdAt)).limit(30),
   ]);
 
   const groupMap = new Map(groupRows.map((group) => [group.id, group.name]));
@@ -432,7 +442,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
           <CardHeader><CardTitle>Hoạt động gần đây</CardTitle><Link href="/activities">Xem tất cả</Link></CardHeader>
           <CardContent>
             {scopedRecent.length ? <div className="recent-activity-list">
-              {scopedRecent.map((row) => <div className="recent-activity-row" key={row.id}><span className="activity-icon"><Activity size={15} /></span><div><strong>{row.action}</strong><span>{row.description}</span></div><time>{formatDateTime(row.createdAt)}</time></div>)}
+              {scopedRecent.map((row) => <div className="recent-activity-row" key={row.id}><span className="activity-icon"><Activity size={15} /></span><div><strong>{row.actorName || "Hệ thống"}</strong><span>{row.description}</span></div><time>{formatDateTime(row.createdAt)}</time></div>)}
             </div> : <EmptyState description="Chưa có hoạt động được ghi nhận." />}
           </CardContent>
         </Card>
