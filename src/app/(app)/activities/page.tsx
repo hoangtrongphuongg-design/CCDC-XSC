@@ -12,6 +12,7 @@ export default async function ActivitiesPage() {
   const rows = await db.select({
     createdAt: activityLogs.createdAt,
     actor: users.fullName,
+    employeeCode: users.employeeCode,
     actorRole: activityLogs.actorRole,
     groupName: groups.name,
     action: activityLogs.action,
@@ -30,10 +31,11 @@ export default async function ActivitiesPage() {
         <CardHeader><CardTitle>300 hoạt động gần nhất</CardTitle><Activity size={18} /></CardHeader>
         <CardContent>
           <DataTable
-            headers={["Thời gian", "Người thực hiện", "Vai trò", "Nhóm", "Hành động", "Đối tượng", "Nội dung", "Lý do"]}
+            headers={["Thời gian", "Người thực hiện", "Số danh bộ", "Vai trò", "Nhóm", "Hành động", "Đối tượng", "Nội dung", "Lý do"]}
             rows={rows.map((r) => [
               formatDateTime(r.createdAt),
               r.actor || "Hệ thống",
+              r.employeeCode || "—",
               r.actorRole || "—",
               r.groupName || "—",
               r.action,
