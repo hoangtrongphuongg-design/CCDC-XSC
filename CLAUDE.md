@@ -10,10 +10,10 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts
+npm test           # tsx --test tests/*.test.ts — 24 pass
 ```
 
-Không có ESLint script. `npm test` hiện có **3 test fail sẵn** (xem phần "Nợ kỹ thuật").
+Không có ESLint script.
 
 ## Kiến trúc
 
@@ -99,6 +99,5 @@ GitHub → Vercel (`main`). `next.config.ts` hiện **trống** (không có secu
 
 ## Nợ kỹ thuật đã biết
 
-- `npm test`: 21 pass / 3 fail. Các test fail là **assert khớp chuỗi source đã lỗi thời** (không phải bug runtime): `tests/groups.test.ts` (đếm 13 nhóm, thực tế 15), `tests/loan-policy.test.ts` (kỳ vọng `confirmMachineReturnAction`/`closeQuickLoanAction` cần `"viewer"`, code hiện cần `"operator"` theo README V1.6.4/V1.6.7). Sửa test cho khớp code khi có dịp.
-- JSDoc trong `machine-loans.ts` / `quick-loans.ts` ("mọi thành viên/viewer được xác nhận nhận lại") không khớp code (`operator`).
-- Không có `.gitignore`.
+- `tests/loan-policy.test.ts` và một phần `tests/groups.test.ts` là **assert khớp chuỗi source** (đọc file `.ts` bằng regex), không phải test hành vi thật — dễ vỡ khi refactor tên hàm / đổi chuỗi. Khi sửa `src/actions/machine-loans.ts` hoặc `quick-loans.ts` nhớ chạy lại `npm test`.
+- Quy tắc quyền của bước "xác nhận nhận lại": **operator+ của nhóm sở hữu/cho mượn** (machine-loan V1.6.4, quick-loan V1.6.7) — không phải viewer.

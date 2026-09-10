@@ -2,16 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getGroupCategory, STANDARD_GROUPS, normalizeGroupCode } from "../src/lib/group-structure";
 
-test("cơ cấu chuẩn có 13 nhóm nghiệp vụ và 1 nhóm hệ thống", () => {
-  assert.equal(STANDARD_GROUPS.filter((group) => !group.isSystem).length, 13);
+test("cơ cấu chuẩn có 15 nhóm nghiệp vụ và 1 nhóm hệ thống", () => {
+  assert.equal(STANDARD_GROUPS.filter((group) => !group.isSystem).length, 15);
   assert.equal(STANDARD_GROUPS.filter((group) => group.isSystem).length, 1);
   assert.equal(STANDARD_GROUPS.find((group) => group.isSystem)?.code, "KHO_TL");
 });
 
-test("cơ cấu nghiệp vụ gồm 8 nhóm cơ, 4 nhóm điện và 1 nhóm khác", () => {
+test("cơ cấu nghiệp vụ gồm 8 nhóm cơ, 4 nhóm điện, 2 nhóm quản lý và 1 nhóm khác", () => {
   const operational = STANDARD_GROUPS.filter((group) => !group.isSystem);
   assert.equal(operational.filter((group) => group.category === "mechanical").length, 8);
   assert.equal(operational.filter((group) => group.category === "electrical").length, 4);
+  assert.equal(operational.filter((group) => group.category === "management").length, 2);
   assert.equal(operational.filter((group) => group.category === "external").length, 1);
   assert.equal(getGroupCategory("WORKSHOP"), "mechanical");
 });

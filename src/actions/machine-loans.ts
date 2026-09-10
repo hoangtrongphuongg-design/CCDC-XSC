@@ -256,8 +256,8 @@ export async function requestMachineReturnAction(formData: FormData) {
 }
 
 /**
- * Bước nhận lại không phải là phê duyệt: bất kỳ nhân viên đang có quyền trong
- * nhóm cho mượn đều được xác nhận thực nhận và tình trạng máy.
+ * Xác nhận nhận lại máy và chốt tình trạng. Theo V1.6.4 chỉ Kỹ sư giám sát hoặc
+ * Đốc công (operator+) của nhóm sở hữu được thực hiện; backend kiểm tra lại quyền.
  */
 export async function confirmMachineReturnAction(formData: FormData) {
   const loanId = String(formData.get("loanId") || "");
