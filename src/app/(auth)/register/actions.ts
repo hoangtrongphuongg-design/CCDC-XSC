@@ -1,19 +1,17 @@
 "use server";
 
 import { or, eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { groups, users } from "@/lib/db/schema";
 import { registerSchema } from "@/lib/validation";
 import { hashPassword } from "@/lib/auth/password";
-import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { checkRateLimit, getClientIp } from "@/lib/auth/rate-limit";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 
 export type RegisterState = { error?: string; success?: string };
 
 export async function registerAction(_: RegisterState, formData: FormData): Promise<RegisterState> {
-  const headerStore = await headers();
-  const ip = (headerStore.get("x-forwarded-for") || "unknown").split(",")[0].trim();
+  const ip = await getClientIp();
   const allowed = await checkRateLimit(`register:ip:${ip}`, 5, 3600);
   if (!allowed) return { error: "Đã có quá nhiều yêu cầu đăng ký. Vui lòng thử lại sau." };
 

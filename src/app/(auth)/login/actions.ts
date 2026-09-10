@@ -1,11 +1,10 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { checkRateLimit, resetRateLimit } from "@/lib/auth/rate-limit";
+import { checkRateLimit, getClientIp, resetRateLimit } from "@/lib/auth/rate-limit";
 import { verifyPassword } from "@/lib/auth/password";
 import { setSessionCookie } from "@/lib/auth/session";
 import { loginSchema } from "@/lib/validation";
@@ -20,8 +19,7 @@ export async function loginAction(_: LoginState, formData: FormData): Promise<Lo
   if (!parsed.success) return { error: parsed.error.issues[0]?.message || "Thông tin đăng nhập không hợp lệ." };
 
   const { employeeCode, password } = parsed.data;
-  const headerStore = await headers();
-  const ip = (headerStore.get("x-forwarded-for") || "unknown").split(",")[0].trim();
+  const ip = await getClientIp();
   const [ipOk, userOk] = await Promise.all([
     checkRateLimit(`login:ip:${ip}`, 20, 300),
     checkRateLimit(`login:user:${employeeCode}`, 5, 300),
