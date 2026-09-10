@@ -20,9 +20,12 @@ export async function loginAction(_: LoginState, formData: FormData): Promise<Lo
 
   const { employeeCode, password } = parsed.data;
   const ip = await getClientIp();
+  // Khóa theo (tài khoản, IP) thay vì chỉ (tài khoản) để kẻ tấn công biết số
+  // danh bộ không khóa được nạn nhân trên IP khác; giới hạn IP tổng vẫn chặn dò mật khẩu diện rộng.
+  const userKey = `login:user:${employeeCode}:${ip}`;
   const [ipOk, userOk] = await Promise.all([
     checkRateLimit(`login:ip:${ip}`, 20, 300),
-    checkRateLimit(`login:user:${employeeCode}`, 5, 300),
+    checkRateLimit(userKey, 5, 300),
   ]);
   if (!ipOk || !userOk) return { error: "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau vài phút." };
 
@@ -32,7 +35,7 @@ export async function loginAction(_: LoginState, formData: FormData): Promise<Lo
   if (user.accountStatus === "pending") return { error: "Tài khoản đang chờ quản trị viên duyệt." };
   if (user.accountStatus === "blocked" || user.accountStatus === "rejected") return { error: "Tài khoản đã bị khóa hoặc từ chối." };
 
-  await resetRateLimit(`login:user:${employeeCode}`);
+  await resetRateLimit(userKey);
   const [loginUser] = await db.update(users)
     .set({ lastLoginAt: new Date(), updatedAt: new Date() })
     .where(eq(users.id, user.id))

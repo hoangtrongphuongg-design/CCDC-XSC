@@ -78,11 +78,11 @@ Nhiều chỗ dùng `new Date().toISOString().slice(0,10)` cho ngày "hôm nay".
 
 ## Database — thay đổi schema
 
-**Hai nguồn song song, dễ lệch:**
-- `drizzle/*.sql` (0000–0004) + `drizzle.config.ts` — dùng `drizzle-kit`.
-- `database/current_schema.sql` (toàn bộ) + `database/update.sql` (bổ sung cột/bảng, idempotent, `ADD COLUMN IF NOT EXISTS`).
+**Nguồn chân lý:** `src/lib/db/schema.ts` (Drizzle, app đọc lúc chạy) **+** `database/current_schema.sql` / `database/update.sql` (DDL viết tay, áp thủ công). Sửa schema là cập nhật **cả hai** cho khớp. `drizzle/*.sql` (0000–0004) chỉ là lịch sử cũ đã áp xong — xem `drizzle/README.md`, đừng thêm file vào đó.
 
-Quy trình thực tế khi deploy (`docs/DEPLOY_CHECKLIST.md`): chạy `database/update.sql` **một lần** trong Neon SQL Editor **trước** khi deploy code. **Không** chạy `npm run db:push` / `db:init` / `db:seed` trên môi trường có dữ liệu. Khi thêm cột/bảng: nối vào cuối `database/update.sql` theo kiểu idempotent, và cập nhật `schema.ts` cho khớp.
+Quy trình thực tế khi deploy (`docs/DEPLOY_CHECKLIST.md`): chạy `database/update.sql` **một lần** trong Neon SQL Editor **trước** khi deploy code (`update.sql` idempotent: `ADD COLUMN IF NOT EXISTS`, `CREATE TYPE … EXCEPTION WHEN duplicate_object`). **Không** chạy `npm run db:push` / `db:init` / `db:seed` trên môi trường có dữ liệu — chúng chỉ để dựng DB mới ở môi trường thử.
+
+Lỗi vi phạm UNIQUE (race check-then-insert) nhận diện bằng `isUniqueViolation(error)` (`src/lib/db/errors.ts`, SQLSTATE 23505) để trả thông báo tiếng Việt thay vì lỗi thô.
 
 ## Env
 
@@ -96,7 +96,7 @@ Quy trình thực tế khi deploy (`docs/DEPLOY_CHECKLIST.md`): chạy `database
 
 ## Deploy
 
-GitHub → Vercel (`main`). `next.config.ts` hiện **trống** (không có security header). Lịch sử commit chủ yếu là "Add files via upload" (upload qua web GitHub), lịch sử `git` local có thể lệch với origin.
+GitHub → Vercel (`main`). `next.config.ts` set sẵn bộ security header cho mọi route. Lịch sử commit gốc chủ yếu là "Add files via upload" (upload qua web GitHub).
 
 ## Nợ kỹ thuật đã biết
 
