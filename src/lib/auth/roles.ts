@@ -49,3 +49,14 @@ export function hasSystemRole(
   if (role === "wsManager") return auth.isWsManager;
   return auth.isReadOnlyViewer;
 }
+
+/**
+ * Được phép xem dữ liệu tổng hợp toàn XSC: Admin, Quản lý Xưởng, hoặc
+ * Người xem toàn xưởng. Người dùng theo nhóm chỉ thấy phạm vi nhóm mình.
+ * Hàm thuần, dùng được ở cả server và client component.
+ */
+export function canViewWholeWorkshop(
+  auth: Pick<AuthContext, "isAdmin" | "isWsManager" | "isReadOnlyViewer">,
+): boolean {
+  return auth.isAdmin || auth.isWsManager || auth.isReadOnlyViewer;
+}

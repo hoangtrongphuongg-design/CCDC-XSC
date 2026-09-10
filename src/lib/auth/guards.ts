@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 import { getAuthResult, type AuthContext } from "./session";
+import { canViewWholeWorkshop } from "./roles";
+
+export { canViewWholeWorkshop };
 
 export async function requireUser(): Promise<AuthContext> {
   const result = await getAuthResult();
@@ -30,6 +33,15 @@ export async function requireWsManager() {
 
 /** Tương thích các chỗ cũ đang dùng khái niệm quyền toàn Xưởng. */
 export const requireWorkshopAdmin = requireWsManager;
+
+/** Chặn trang tổng hợp toàn Xưởng với người dùng chỉ có phạm vi nhóm. */
+export async function requireWholeWorkshopView() {
+  const auth = await requireUser();
+  if (!canViewWholeWorkshop(auth)) {
+    throw new Error("Trang này chỉ dành cho vai trò xem toàn Xưởng (Admin, Quản lý Xưởng, Người xem toàn xưởng).");
+  }
+  return auth;
+}
 
 export function hasGroupPermission(
   auth: AuthContext,
