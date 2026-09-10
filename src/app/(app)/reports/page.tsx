@@ -2,6 +2,7 @@ import { and, count, eq } from "drizzle-orm";
 import { BarChart3, Boxes, Handshake, Recycle, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, machineLoans, repairs, disposals } from "@/lib/db/schema";
+import { requireWholeWorkshopView } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { DistributionBars } from "@/components/distribution-bars";
@@ -10,7 +11,11 @@ import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { EQUIPMENT_STATUS_LABELS } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 export default async function ReportsPage() {
+  await requireWholeWorkshopView();
+
   const [statusRows, groupRows, [loanTotal], [repairTotal], [disposalTotal]] = await Promise.all([
     db.select({ status: equipment.status, total: count() }).from(equipment).where(eq(equipment.recordStatus, "active")).groupBy(equipment.status).orderBy(equipment.status),
     db.select({ groupId: groups.id, groupName: groups.name, total: count(equipment.id) })

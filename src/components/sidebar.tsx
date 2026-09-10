@@ -22,7 +22,7 @@ import type { LucideIcon } from "lucide-react";
 import type { AuthContext } from "@/lib/auth/session";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { getRoleSummary } from "@/lib/auth/roles";
+import { canViewWholeWorkshop, getRoleSummary } from "@/lib/auth/roles";
 
 type NavItem = readonly [href: string, label: string, icon: LucideIcon];
 
@@ -48,10 +48,8 @@ const workflowItems = [
   ["/disposals", "Thanh lý", Recycle],
 ] as const satisfies readonly NavItem[];
 
-const insightItems = [
-  ["/reports", "Báo cáo", BarChart3],
-  ["/activities", "Lịch sử hoạt động", Activity],
-] as const satisfies readonly NavItem[];
+const reportsItem = ["/reports", "Báo cáo", BarChart3] as const satisfies NavItem;
+const activitiesItem = ["/activities", "Lịch sử hoạt động", Activity] as const satisfies NavItem;
 
 function initials(name: string) {
   return name.trim().split(/\s+/).slice(-2).map((part) => part[0]?.toUpperCase()).join("") || "XS";
@@ -63,6 +61,12 @@ export function Sidebar({ auth }: { auth: AuthContext }) {
   const canUseGroupWorkflows = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasAnyGroupPermission(auth));
   const canTransfer = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasManagerGroupPermission(auth));
   const canDispose = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasManagerGroupPermission(auth));
+
+  // "Báo cáo" tổng hợp toàn Xưởng chỉ cho vai trò xem toàn Xưởng; "Lịch sử hoạt động"
+  // hiện cho mọi người nhưng nội dung đã được lọc theo nhóm ở trang.
+  const insightItems: readonly NavItem[] = canViewWholeWorkshop(auth)
+    ? [reportsItem, activitiesItem]
+    : [activitiesItem];
 
   const visibleOperationItems = operationItems.filter(([href]) => href !== "/my-equipment" || (!auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasAnyGroupPermission(auth))));
   const visibleWorkflowItems = workflowItems.filter(([href]) => {

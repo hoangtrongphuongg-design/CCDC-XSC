@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { activityLogs, equipment, groups, machineLoans, quickLoans, repairs, transfers, users } from "@/lib/db/schema";
-import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
+import { canViewWholeWorkshop, hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const showMobileLoans = one(params.loans) === "1";
   const showMobileReturns = one(params.returns) === "1";
   const showMobileRepairs = one(params.repairs) === "1";
-  const fullWorkshopScope = auth.isAdmin || auth.isWsManager || auth.isReadOnlyViewer;
+  const fullWorkshopScope = canViewWholeWorkshop(auth);
   const allowedGroupIds = new Set(auth.permissions.map((permission) => permission.groupId));
   const today = new Date().toISOString().slice(0, 10);
 
