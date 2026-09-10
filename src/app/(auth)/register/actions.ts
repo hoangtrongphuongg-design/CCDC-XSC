@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { groups, users } from "@/lib/db/schema";
 import { registerSchema } from "@/lib/validation";
 import { hashPassword } from "@/lib/auth/password";
+import { isUniqueViolation } from "@/lib/db/errors";
 import { checkRateLimit, getClientIp } from "@/lib/auth/rate-limit";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 
@@ -34,14 +35,20 @@ export async function registerAction(_: RegisterState, formData: FormData): Prom
   )).limit(1);
   if (duplicate) return { error: "Tên đăng nhập hoặc mã nhân viên đã được sử dụng." };
 
-  await db.insert(users).values({
-    username: data.username,
-    passwordHash: await hashPassword(data.password),
-    employeeCode: data.employeeCode,
-    fullName: data.fullName,
-    requestedGroupId: data.requestedGroupId,
-    accountStatus: "pending",
-  });
+  try {
+    await db.insert(users).values({
+      username: data.username,
+      passwordHash: await hashPassword(data.password),
+      employeeCode: data.employeeCode,
+      fullName: data.fullName,
+      requestedGroupId: data.requestedGroupId,
+      accountStatus: "pending",
+    });
+  } catch (error) {
+    // Race check-then-insert: unique index trên username / employee_code bắt được.
+    if (isUniqueViolation(error)) return { error: "Tên đăng nhập hoặc mã nhân viên đã được sử dụng." };
+    throw error;
+  }
 
   return { success: "Đăng ký thành công. Tài khoản đang chờ quản trị viên duyệt." };
 }

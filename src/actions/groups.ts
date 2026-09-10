@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { equipment, groups, userGroupPermissions, users } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/guards";
+import { isUniqueViolation } from "@/lib/db/errors";
 import { writeAudit } from "@/lib/audit";
 import { LEGACY_GROUP_CODES, normalizeEquipmentPrefix, normalizeGroupCode, STANDARD_GROUPS } from "@/lib/group-structure";
 
@@ -97,21 +98,27 @@ export async function createGroupAction(formData: FormData) {
   const [existing] = await db.select().from(groups).where(eq(groups.code, code)).limit(1);
   if (existing) throw new Error(`Mã nhóm ${code} đã tồn tại.`);
 
-  await db.transaction(async (tx) => {
-    const [created] = await tx
-      .insert(groups)
-      .values({ code, name, equipmentPrefix, isSystem: false, isActive: true })
-      .returning();
+  try {
+    await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(groups)
+        .values({ code, name, equipmentPrefix, isSystem: false, isActive: true })
+        .returning();
 
-    await writeAudit(tx as never, {
-      actorUserId: auth.userId,
-      action: "group.create",
-      entityType: "group",
-      entityId: created.id,
-      description: `Tạo nhóm ${created.code} - ${created.name}`,
-      afterData: created,
+      await writeAudit(tx as never, {
+        actorUserId: auth.userId,
+        action: "group.create",
+        entityType: "group",
+        entityId: created.id,
+        description: `Tạo nhóm ${created.code} - ${created.name}`,
+        afterData: created,
+      });
     });
-  });
+  } catch (error) {
+    // Race check-then-insert: unique index groups_code_unique bắt được.
+    if (isUniqueViolation(error)) throw new Error(`Mã nhóm ${code} đã tồn tại.`);
+    throw error;
+  }
 
   refreshGroupConsumers();
 

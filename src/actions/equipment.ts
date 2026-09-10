@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { equipment, equipmentTypeCatalog, groups, toolCatalog } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
+import { isUniqueViolation } from "@/lib/db/errors";
 import { writeAudit } from "@/lib/audit";
 import { EQUIPMENT_CATEGORIES } from "@/lib/equipment-categories";
 import { nextAssetCode } from "@/lib/workflows";
@@ -377,11 +378,10 @@ export async function saveEquipmentRecordAction(
       afterSave: data.afterSave,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Không thể lưu CCDC.";
-    if (message.toLowerCase().includes("equipment_code_unique") || message.toLowerCase().includes("duplicate key")) {
+    if (isUniqueViolation(error)) {
       return { status: "error", message: "Mã hệ thống đã tồn tại. Vui lòng kiểm tra lại dữ liệu hiệu chỉnh." };
     }
-    return { status: "error", message };
+    return { status: "error", message: error instanceof Error ? error.message : "Không thể lưu CCDC." };
   }
 }
 
@@ -392,6 +392,7 @@ export async function updateEquipmentConditionAction(formData: FormData) {
   const condition = conditionRaw as (typeof conditionValues)[number];
   const [item] = await db.select().from(equipment).where(eq(equipment.id, equipmentId)).limit(1);
   if (!item) throw new Error("Không tìm thấy máy.");
+  if (item.recordStatus !== "active") throw new Error("Dụng cụ chưa hoàn thành hồ sơ nên chưa thể thực hiện nghiệp vụ.");
   const auth = await requireUser();
   if (!hasGroupPermission(auth, item.ownerGroupId, "operator")) throw new Error("Bạn không có quyền cập nhật CCDC này.");
   await db.transaction(async (tx) => {
@@ -479,6 +480,9 @@ export async function createQuantityToolAction(
     refreshEquipmentConsumers();
     return { status: "success", message: `Đã tạo ${code}.`, code, afterSave };
   } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { status: "error", message: "Mã CCDC vừa sinh đã tồn tại. Vui lòng thử lại." };
+    }
     return { status: "error", message: error instanceof Error ? error.message : "Không thể thêm CCDC." };
   }
 }
