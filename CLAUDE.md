@@ -100,5 +100,14 @@ GitHub → Vercel (`main`). `next.config.ts` set sẵn bộ security header cho 
 
 ## Nợ kỹ thuật đã biết
 
-- `tests/loan-policy.test.ts` và một phần `tests/groups.test.ts` là **assert khớp chuỗi source** (đọc file `.ts` bằng regex), không phải test hành vi thật — dễ vỡ khi refactor tên hàm / đổi chuỗi. Khi sửa `src/actions/machine-loans.ts` hoặc `quick-loans.ts` nhớ chạy lại `npm test`.
-- Quy tắc quyền của bước "xác nhận nhận lại": **operator+ của nhóm sở hữu/cho mượn** (machine-loan V1.6.4, quick-loan V1.6.7) — không phải viewer.
+Bản rà soát tháng 9/2026 đã xử lý: security header, `.gitignore` + lockfile, 3 test lỗi thời, scoping `/activities` + `/reports`, rate-limit IP giả mạo được, khóa đăng nhập có chủ đích, race check-then-insert, `recordStatus` ở `updateEquipmentConditionAction`, tài liệu nguồn schema.
+
+Còn tồn (mức thấp, chưa xử lý):
+
+- **Test kiểu khớp chuỗi source.** `tests/loan-policy.test.ts` và một phần `tests/groups.test.ts` đọc file `.ts` bằng regex, không test hành vi thật — dễ vỡ khi đổi tên hàm / chuỗi. Sửa `src/actions/machine-loans.ts` / `quick-loans.ts` / `lib/group-structure.ts` thì chạy lại `npm test`. Quy tắc quyền bước "xác nhận nhận lại" là **operator+** (machine-loan V1.6.4, quick-loan V1.6.7), không phải viewer.
+- **Xử lý ngày theo UTC.** Nhiều chỗ `new Date().toISOString().slice(0,10)` cho ngày "hôm nay"; server Vercel chạy UTC → ngày VN lệch 1 ngày quanh nửa đêm. Chưa có lib timezone.
+- **`auth_rate_limits` phình dần.** `checkRateLimit` chỉ upsert, không dọn dòng cũ; `resetRateLimit` chỉ xóa 1 key khi đăng nhập thành công. Cần cron/TTL dọn định kỳ nếu bảng lớn.
+- **`drizzle.config.ts` `out: "./database/generated"`** trỏ tới thư mục không tồn tại và khác `drizzle/` — `db:generate` sẽ ghi ra chỗ lạ. Không ảnh hưởng runtime (xem `drizzle/README.md`).
+- **`src/lib/db/index.ts`**: `ssl: { rejectUnauthorized: true }` không kèm CA bundle, dựa vào root store hệ thống — chạy được với Neon nhưng dễ vỡ nếu đổi provider.
+- **Flash cookie** để `httpOnly: false` không cần thiết (chỉ dùng phía server).
+- Không có `.env.example`. `next-env.d.ts` cố tình giữ bản 2 dòng tối giản (xem comment trong `.gitignore`).
