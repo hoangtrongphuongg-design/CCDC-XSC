@@ -269,8 +269,8 @@ export async function reportQuickLoanReturnAction(formData: FormData) {
 }
 
 /**
- * Nhận lại là thao tác thực địa, không phải bước phê duyệt. Vì vậy mọi nhân viên
- * thuộc nhóm cho (viewer/operator/manager) đều được chốt số lượng thực nhận.
+ * Chốt số lượng thực nhận khi nhận lại. Theo V1.6.7 chỉ thành viên có quyền thao
+ * tác (operator+) của nhóm cho mượn được thực hiện; backend kiểm tra lại quyền.
  */
 export async function closeQuickLoanAction(formData: FormData) {
   const loanId = String(formData.get("loanId") || "");
