@@ -149,13 +149,11 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         <CardHeader><CardTitle>Danh mục máy/CCDC có mã</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            headers={["Mã", "Mã hiện hữu", "Tên máy", "Nhóm thiết bị", "Loại", "Nhóm quản lý", "Nhóm đang dùng", "Vị trí", "Tình trạng", "Trạng thái"]}
+            headers={["Mã hệ thống", "Mã hiện hữu", "Tên máy", "Nhóm quản lý", "Nhóm đang dùng", "Vị trí", "Tình trạng", "Trạng thái"]}
             rows={filteredRows.map((row) => [
               <strong key="code">{row.code}</strong>,
               row.legacyCode || "—",
               <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.model || "Chưa có model"}</small></div>,
-              getEquipmentCategoryLabel(row.categoryCode),
-              row.type,
               row.ownerGroup,
               groupMap.get(row.currentGroupId) || "—",
               row.currentLocation || "—",
