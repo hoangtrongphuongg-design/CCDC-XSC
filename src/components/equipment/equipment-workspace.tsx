@@ -681,6 +681,7 @@ export function EquipmentWorkspace({
   auditRows,
   isWorkshopAdmin,
   isReadOnlyViewer,
+  defaultGroupId = "all",
 }: {
   permissions: EquipmentPermission[];
   equipmentRows: IndividualEquipmentRow[];
@@ -688,6 +689,8 @@ export function EquipmentWorkspace({
   auditRows: EquipmentAuditRow[];
   isWorkshopAdmin: boolean;
   isReadOnlyViewer: boolean;
+  /** Nhóm được chọn sẵn ở ô lọc nhóm ("all" = tất cả nhóm trong phạm vi quyền). */
+  defaultGroupId?: string;
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>("create");
@@ -696,7 +699,7 @@ export function EquipmentWorkspace({
   const [detailTab, setDetailTab] = useState<DetailTab>("detail");
   const [formKey, setFormKey] = useState(0);
   const [search, setSearch] = useState("");
-  const [groupFilter, setGroupFilter] = useState("all");
+  const [groupFilter, setGroupFilter] = useState(defaultGroupId);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [conditionFilter, setConditionFilter] = useState("all");

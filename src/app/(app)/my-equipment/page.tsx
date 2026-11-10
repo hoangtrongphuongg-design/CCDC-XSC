@@ -58,6 +58,15 @@ export default async function MyEquipmentPage() {
 
   const visibleGroupIds = permissions.map((permission) => permission.groupId);
 
+  // Admin / Quản lý Xưởng / Người xem thấy máy của mọi nhóm, nhưng "Dụng cụ nhóm tôi" phải
+  // mở ra với nhóm của chính tài khoản trước; đổi ô lọc để xem nhóm khác hoặc tất cả.
+  // Tài khoản không có nhóm chính (vd Người xem toàn xưởng) mặc định xem tất cả.
+  const defaultGroupId = (auth.isWorkshopAdmin || auth.isReadOnlyViewer)
+    && auth.primaryGroupId
+    && visibleGroupIds.includes(auth.primaryGroupId)
+    ? auth.primaryGroupId
+    : "all";
+
   const [relevantLoanRows, relevantTransferRows] = visibleGroupIds.length
     ? await Promise.all([
         db.select({
@@ -237,6 +246,7 @@ export default async function MyEquipmentPage() {
         auditRows={auditRows}
         isWorkshopAdmin={auth.isWorkshopAdmin}
         isReadOnlyViewer={auth.isReadOnlyViewer}
+        defaultGroupId={defaultGroupId}
       />
     </div>
   );
