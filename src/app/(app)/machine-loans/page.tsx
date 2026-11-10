@@ -15,6 +15,7 @@ import { FormField } from "@/components/ui/form-field";
 import { SearchableSelect } from "@/components/searchable-select";
 import { formatDate } from "@/lib/utils";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
+import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
 import {
   approveMachineLoanAction,
   confirmMachineReturnAction,
@@ -39,7 +40,7 @@ export default async function MachineLoansPage({ searchParams }: { searchParams?
   const params = searchParams ? await searchParams : {};
   const modeValue = params.mode;
   const mobileMode = (Array.isArray(modeValue) ? modeValue[0] : modeValue) || "view";
-  const [groupRows, availableEquipmentRows, allEquipment, loans, openLoanRows, openTransfers, openRepairs, openDisposals] = await Promise.all([
+  const [groupRows, availableEquipmentRows, allEquipment, openLoans, closedLoans, openLoanRows, openTransfers, openRepairs, openDisposals] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name, isSystem: groups.isSystem })
       .from(groups)
       .where(eq(groups.isActive, true))
@@ -54,13 +55,16 @@ export default async function MachineLoansPage({ searchParams }: { searchParams?
       .orderBy(asc(equipment.code)),
     db.select({ id: equipment.id, code: equipment.code, name: equipment.name })
       .from(equipment),
-    db.select().from(machineLoans).orderBy(desc(machineLoans.createdAt)).limit(100),
-    db.select({ equipmentId: machineLoans.equipmentId }).from(machineLoans).where(inArray(machineLoans.status, ["pending_owner", "approved", "wait_handover", "on_loan", "return_requested", "incident"])),
+    // Phiếu đang mở luôn tải đủ (để vẫn Trả/Nhận lại được dù cũ); phiếu đã đóng chỉ lấy 100 gần nhất.
+    db.select().from(machineLoans).where(inArray(machineLoans.status, [...OPEN_MACHINE_LOAN_STATUSES])).orderBy(desc(machineLoans.createdAt)),
+    db.select().from(machineLoans).where(inArray(machineLoans.status, ["completed", "rejected", "cancelled"])).orderBy(desc(machineLoans.createdAt)).limit(100),
+    db.select({ equipmentId: machineLoans.equipmentId }).from(machineLoans).where(inArray(machineLoans.status, [...OPEN_MACHINE_LOAN_STATUSES])),
     db.select({ equipmentId: transfers.equipmentId }).from(transfers).where(inArray(transfers.status, ["pending_source", "pending_target", "pending_ws", "wait_handover"])),
     db.select({ equipmentId: repairs.equipmentId }).from(repairs).where(inArray(repairs.status, ["pending_acceptance", "repairing", "wait_owner_confirm"])),
     db.select({ equipmentId: disposals.equipmentId }).from(disposals).where(inArray(disposals.status, ["pending_group", "pending_ws", "wait_warehouse"])),
   ]);
 
+  const loans = [...openLoans, ...closedLoans].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const blockedEquipmentIds = new Set([...openLoanRows, ...openTransfers, ...openRepairs, ...openDisposals].map((row) => row.equipmentId));
   const availableEquipment = availableEquipmentRows.filter((item) => !blockedEquipmentIds.has(item.id));
 

@@ -11,7 +11,7 @@ import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { isUniqueViolation } from "@/lib/db/errors";
 import { writeAudit } from "@/lib/audit";
 import { EQUIPMENT_CATEGORIES } from "@/lib/equipment-categories";
-import { nextAssetCode } from "@/lib/workflows";
+import { assertEquipmentHasNoOtherOpenWorkflow, lockEquipment, nextAssetCode } from "@/lib/workflows";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { GROUP_PERMISSION_LABELS } from "@/lib/auth/roles";
 
@@ -24,18 +24,12 @@ export type EquipmentFormState = {
 
 const categoryCodes = EQUIPMENT_CATEGORIES.map((category) => category.code) as [string, ...string[]];
 const conditionValues = ["good", "major_damage", "awaiting_assessment", "irreparable"] as const;
-const statusValues = [
-  "in_use_owner",
-  "wait_handover",
-  "on_loan",
-  "return_requested",
-  "wait_inspection",
-  "repairing",
-  "wait_repair_confirm",
-  "wait_disposal",
-  "disposal_warehouse",
-  "inactive",
-] as const;
+/**
+ * Trạng thái nhập tay được phép đổi trong form sửa. Các trạng thái còn lại (đang mượn,
+ * chờ nhận lại, đang sửa, chờ/ở kho thanh lý, chờ bàn giao...) do quy trình nghiệp vụ
+ * điều khiển và không được ghi đè từ form.
+ */
+const MANUAL_EQUIPMENT_STATUSES = ["in_use_owner", "wait_inspection", "inactive"] as const;
 const originValues = ["existing", "new_purchase", "other"] as const;
 
 const equipmentFormSchema = z.object({
@@ -55,7 +49,7 @@ const equipmentFormSchema = z.object({
   technicalSpecs: z.string().trim().max(8000).optional(),
   technicalNote: z.string().trim().max(4000).optional(),
   condition: z.enum(conditionValues).default("good"),
-  status: z.enum(statusValues).default("in_use_owner"),
+  status: z.string().trim().max(40).optional(),
   currentLocation: z.string().trim().max(255).optional(),
   notes: z.string().trim().max(4000).optional(),
   purchaseDate: z.string().date().optional(),
@@ -155,7 +149,7 @@ export async function saveEquipmentRecordAction(
     technicalSpecs: textOrUndefined(formData, "technicalSpecs"),
     technicalNote: textOrUndefined(formData, "technicalNote"),
     condition: formData.get("condition") || "good",
-    status: formData.get("status") || "in_use_owner",
+    status: textOrUndefined(formData, "status"),
     currentLocation: textOrUndefined(formData, "currentLocation"),
     notes: textOrUndefined(formData, "notes"),
     purchaseDate: textOrUndefined(formData, "purchaseDate"),
@@ -242,6 +236,17 @@ export async function saveEquipmentRecordAction(
           createdBy: auth.userId,
         }).onConflictDoNothing();
 
+        // Chỉ đổi trạng thái khi cả trạng thái HIỆN TẠI (đọc lại sau khi khóa dòng, không tin ảnh
+        // chụp lúc mở form) và trạng thái được chọn đều là loại nhập tay, và máy không có quy
+        // trình nào đang mở. Nhờ vậy lưu form không ghi đè máy vừa được mượn/trả/sửa.
+        const locked = await lockEquipment(tx, before.id);
+        const manual = MANUAL_EQUIPMENT_STATUSES as readonly string[];
+        let nextManualStatus: (typeof MANUAL_EQUIPMENT_STATUSES)[number] | null = null;
+        if (data.status && data.status !== locked.status && manual.includes(locked.status) && manual.includes(data.status)) {
+          await assertEquipmentHasNoOtherOpenWorkflow(tx, before.id);
+          nextManualStatus = data.status as (typeof MANUAL_EQUIPMENT_STATUSES)[number];
+        }
+
         const [updated] = await tx.update(equipment).set({
           code: nextCode,
           legacyCode: data.legacyCode || null,
@@ -259,9 +264,9 @@ export async function saveEquipmentRecordAction(
           originType: nextOriginType,
           originGroupId: nextOriginGroupId,
           ownerGroupId: nextOwnerGroupId,
-          currentGroupId: currentGroupFollowsOwner ? nextOwnerGroupId : before.currentGroupId,
+          ...(nextOwnerGroupId !== before.ownerGroupId && currentGroupFollowsOwner ? { currentGroupId: nextOwnerGroupId } : {}),
           currentLocation: data.currentLocation || null,
-          status: data.status,
+          ...(nextManualStatus ? { status: nextManualStatus } : {}),
           condition: data.condition,
           purchaseDate: data.purchaseDate || null,
           poContractNo: data.poContractNo || null,
@@ -340,7 +345,7 @@ export async function saveEquipmentRecordAction(
         ownerGroupId: data.ownerGroupId,
         currentGroupId: data.ownerGroupId,
         currentLocation: data.currentLocation || null,
-        status: data.status,
+        status: "in_use_owner",
         condition: data.condition,
         purchaseDate: data.purchaseDate || null,
         poContractNo: data.poContractNo || null,

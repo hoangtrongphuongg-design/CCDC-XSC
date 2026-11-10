@@ -2,11 +2,12 @@
 
 import { setFlashMessage } from "@/lib/auth/session";
 
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, gte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { groups, quickLoans, toolCatalog } from "@/lib/db/schema";
 import { requireGroupPermission } from "@/lib/auth/guards";
+import { isNotPastDate } from "@/lib/date-check";
 import { nextWorkflowCode } from "@/lib/workflows";
 import { writeAudit } from "@/lib/audit";
 
@@ -31,8 +32,14 @@ export async function createQuickLoanAction(formData: FormData) {
   const expectedReturnAtRaw = String(formData.get("expectedReturnAt") || "");
   const borrowerNote = String(formData.get("borrowerNote") || "").trim();
 
-  if (!sourceGroupId || !borrowerGroupId || (!toolId && !itemName) || quantityBorrowed <= 0) {
+  if (!sourceGroupId || !borrowerGroupId || (!toolId && !itemName) || !Number.isFinite(quantityBorrowed) || quantityBorrowed <= 0) {
     throw new Error("Thông tin mượn nhanh chưa đầy đủ.");
+  }
+  if (quantityBorrowed > 1_000_000) {
+    throw new Error("Số lượng mượn không hợp lệ.");
+  }
+  if (expectedReturnAtRaw && !isNotPastDate(expectedReturnAtRaw)) {
+    throw new Error("Ngày dự kiến trả không hợp lệ hoặc đã qua.");
   }
   if (sourceGroupId === borrowerGroupId) {
     throw new Error("Nhóm mượn phải khác nhóm cho.");
@@ -122,10 +129,16 @@ export async function approveQuickLoanAction(formData: FormData) {
         throw new Error("Số lượng còn lại không đủ để duyệt phiếu.");
       }
 
-      await tx.update(toolCatalog).set({
+      // Trừ tồn bằng một lệnh có điều kiện (không chỉ kiểm tra rồi trừ riêng) để hai phiếu
+      // duyệt đồng thời không làm tồn kho âm.
+      const [deducted] = await tx.update(toolCatalog).set({
         quantityOnHand: sql`${toolCatalog.quantityOnHand} - ${Number(loan.quantityBorrowed)}`,
         updatedAt: new Date(),
-      }).where(eq(toolCatalog.id, loan.toolId));
+      }).where(and(
+        eq(toolCatalog.id, loan.toolId),
+        gte(toolCatalog.quantityOnHand, String(loan.quantityBorrowed)),
+      )).returning({ id: toolCatalog.id });
+      if (!deducted) throw new Error("Số lượng còn lại không đủ để duyệt phiếu.");
     }
 
     const [updated] = await tx.update(quickLoans).set({
