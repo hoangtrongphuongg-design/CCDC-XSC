@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 39 pass
+npm test           # tsx --test tests/*.test.ts — 47 pass
 ```
 
 Không có ESLint script.
@@ -28,7 +28,7 @@ Next.js 15 App Router + React 19 + TypeScript. Một Postgres (Neon) qua **Drizz
 - **Không có `middleware.ts`.** Bảo vệ route qua `src/app/(app)/layout.tsx` gọi `requireUser()` (`export const dynamic = "force-dynamic"`). Trang trong nhóm `(app)` được bảo vệ nhờ layout này; trang cần quyền cao hơn phải tự gọi `requireAdmin()` / `requireWsManager()` trong thân trang (vd `groups/page.tsx`, `users/page.tsx`).
 - Guards (`guards.ts`): `requireUser` → `requireWsManager` (Quản lý Xưởng hoặc Admin) → `requireAdmin` (Admin hệ thống). `hasGroupPermission(auth, groupId, "viewer"|"operator"|"manager")` / `requireGroupPermission(...)` cho quyền theo nhóm.
 - **Vai trò hệ thống** (cột boolean trên `users`, mỗi user đúng 1 vai trò chính): `isAdmin`, `isWsManager`, `isReadOnlyViewer`, hoặc "người dùng theo nhóm" (không cột nào). `isWorkshopAdmin` = `isAdmin || isWsManager` (dẫn xuất, không lưu DB).
-- **Phạm vi xem dữ liệu tổng hợp:** `canViewWholeWorkshop(auth)` (`lib/auth/roles.ts`, hàm thuần dùng được cả client) = `isAdmin || isWsManager || isReadOnlyViewer` → thấy toàn XSC. Người dùng theo nhóm chỉ thấy nhóm mình. Trang chỉ dành cho phạm vi toàn Xưởng gọi `requireWholeWorkshopView()` (vd `/reports`); trang hiện cho mọi người nhưng lọc nội dung theo `auth.permissions` (vd `/activities`, panel phân tích ở `/dashboard`). Sidebar ẩn link "Báo cáo" nếu không có quyền — chỉ là UX, trang vẫn tự gác. Riêng `/my-equipment` ("Dụng cụ nhóm tôi"): Admin / Quản lý Xưởng / Người xem vẫn tải máy của mọi nhóm nhưng ô lọc nhóm mặc định là nhóm chính của tài khoản (`defaultGroupId`), không có nhóm chính thì "Tất cả nhóm". Máy của nhóm mượn được suy ra từ phiếu mượn đang giữ (`isHeldByBorrower`, `lib/loan-status.ts`), không dựa vào `equipment.current_group_id`.
+- **Phạm vi xem dữ liệu tổng hợp:** `canViewWholeWorkshop(auth)` (`lib/auth/roles.ts`, hàm thuần dùng được cả client) = `isAdmin || isWsManager || isReadOnlyViewer` → thấy toàn XSC. Người dùng theo nhóm chỉ thấy nhóm mình. Trang chỉ dành cho phạm vi toàn Xưởng gọi `requireWholeWorkshopView()` (vd `/reports`); trang hiện cho mọi người nhưng lọc nội dung theo `auth.permissions` (vd panel phân tích ở `/dashboard`). Ngoại lệ chủ ý: `/activities` hiện hoạt động mới nhất của **toàn Xưởng** cho mọi tài khoản (xem mục Lịch sử hoạt động). Sidebar ẩn link "Báo cáo" nếu không có quyền — chỉ là UX, trang vẫn tự gác. Riêng `/my-equipment` ("Dụng cụ nhóm tôi"): Admin / Quản lý Xưởng / Người xem vẫn tải máy của mọi nhóm nhưng ô lọc nhóm mặc định là nhóm chính của tài khoản (`defaultGroupId`), không có nhóm chính thì "Tất cả nhóm". Máy của nhóm mượn được suy ra từ phiếu mượn đang giữ (`isHeldByBorrower`, `lib/loan-status.ts`), không dựa vào `equipment.current_group_id`.
 - **Quyền theo nhóm** (`user_group_permissions`): `viewer` < `operator` < `manager`. `isWorkshopAdmin` bỏ qua bậc này (full mọi nhóm); `isReadOnlyViewer` luôn bị chặn ghi.
 - Chi tiết ngữ nghĩa vai trò: `docs/PROJECT_BRIEF.md`.
 
@@ -78,6 +78,13 @@ Xem `src/actions/*.ts`. Mẫu chuẩn cho mọi hàm chuyển trạng thái work
 - Thư viện `exceljs` (chỉ server; `serverExternalPackages` trong `next.config.ts`). Chuỗi người dùng nhập luôn ghi dạng text, công thức duy nhất là cột "Chênh lệch" của sheet kiểm kê CCDC theo số lượng.
 - Phân tầng: `lib/equipment-data.ts` (truy vấn dùng chung với trang "Dụng cụ nhóm tôi": `loadScopedEquipment`, `loadWorkshopEquipment`, `loadTools`) → `lib/export/equipment-export.ts` (hàm thuần: cây nhóm → loại, ghi chú, tên sheet/file, ngày giờ VN) → `lib/export/equipment-workbook.ts` (dựng file). Test dữ liệu giả ở `tests/equipment-export.test.ts`.
 - `equipmentSearchValues()` phản chiếu các trường tìm kiếm của trang `/equipment` — đổi một nơi thì sửa nơi kia. "Nhóm đang giữ" trong file xuất suy ra từ phiếu mượn (không dùng `current_group_id`). Không xuất đơn giá.
+
+### Lịch sử hoạt động (`/activities`)
+
+- Bảng `activity_logs` do `writeAudit()` ghi (xem trên). Trang `/activities`: **100 hoạt động mới nhất toàn Xưởng**, mọi tài khoản đã đăng nhập thấy, chỉ hiện **tên** người thực hiện (không số danh bộ). Sự kiện `user.*` / `group.*` (tài khoản, quyền, nhóm) **chỉ Admin hệ thống** thấy; bản sao ghi theo máy của bước mượn/trả (`equipment.loan_*`, `equipment.return_requested`) bị ẩn để khỏi trùng — chúng chỉ dùng cho tab Lịch sử từng máy. Quy tắc nằm ở `lib/activity-log.ts` (hàm thuần) + `lib/activity-query.ts` (SQL).
+- `GET /activities/export?from=&to=` (khoảng ngày giờ VN, mặc định từ đầu tháng): Excel mỗi nghiệp vụ một sheet (Cho mượn gộp mượn máy + mượn nhanh, Điều chuyển, Sửa chữa, Thanh lý, CCDC, Tài khoản & nhóm chỉ Admin, Khác), tối đa 20.000 dòng. Định dạng dùng chung `lib/export/workbook-kit.ts`.
+- **Thêm sự kiện audit mới** (`writeAudit` với `action` mới) thì phải thêm vào `ACTIVITY_ACTIONS` (nhãn tiếng Việt + nghiệp vụ); `tests/activity-log.test.ts` quét `src/actions` và sẽ fail nếu thiếu.
+- `formatDateTime` / `formatDate` (`lib/utils.ts`) ép múi giờ `Asia/Ho_Chi_Minh` vì server Vercel chạy UTC.
 
 ### Thời gian
 

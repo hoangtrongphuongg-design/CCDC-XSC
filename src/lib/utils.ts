@@ -1,6 +1,9 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+/** Server (Vercel) chạy UTC: luôn ép giờ Việt Nam khi hiển thị ngày giờ ở server component. */
+const VN_TIME_ZONE = "Asia/Ho_Chi_Minh";
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -8,6 +11,7 @@ export function cn(...inputs: ClassValue[]) {
 export function formatDate(value: Date | string | null | undefined) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: VN_TIME_ZONE,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -17,6 +21,7 @@ export function formatDate(value: Date | string | null | undefined) {
 export function formatDateTime(value: Date | string | null | undefined) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: VN_TIME_ZONE,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
