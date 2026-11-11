@@ -483,12 +483,12 @@ input[type="checkbox"] { accent-color: var(--primary); }
   position: sticky;
   top: 0;
   z-index: 1;
-  color: #777487;
+  color: #475569;
   background: #f8fafc;
   border-bottom-color: var(--border);
-  font-size: 9px;
-  letter-spacing: .045em;
-  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: .01em;
+  text-transform: none;
 }
 .table-wrap tbody tr { transition: background .15s ease, box-shadow .15s ease; }
 .table-wrap tbody tr:hover { background: #faf9ff; }
@@ -788,10 +788,10 @@ input[type="checkbox"] { accent-color: var(--primary); }
   .table-wrap td::before {
     content: attr(data-label);
     color: var(--text-muted);
-    font-size: 9px;
-    font-weight: 750;
-    letter-spacing: .035em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .01em;
+    text-transform: none;
   }
   .table-summary { padding: 10px 13px 14px; }
 
@@ -1083,7 +1083,6 @@ body {
   grid-template-columns: .92fr 1.18fr 1.15fr;
   gap: 14px;
 }
-.dashboard-operations-grid .card { min-height: 326px; }
 .task-list { display: grid; }
 .task-row {
   display: grid;
@@ -1317,21 +1316,11 @@ body {
 }
 .equipment-kpi-grid span { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .equipment-kpi-grid strong { color: var(--text); font-size: 22px; line-height: 1; letter-spacing: -.025em; }
-.equipment-list-table table { table-layout: fixed; width: 100%; }
-.equipment-list-table th:nth-child(1), .equipment-list-table td:nth-child(1) { width: 8%; }
-.equipment-list-table th:nth-child(2), .equipment-list-table td:nth-child(2) { width: 8%; }
-.equipment-list-table th:nth-child(3), .equipment-list-table td:nth-child(3) { width: 15%; }
-.equipment-list-table th:nth-child(4), .equipment-list-table td:nth-child(4) { width: 9%; }
-.equipment-list-table th:nth-child(5), .equipment-list-table td:nth-child(5) { width: 11%; }
-.equipment-list-table th:nth-child(6), .equipment-list-table td:nth-child(6) { width: 8%; }
-.equipment-list-table th:nth-child(7), .equipment-list-table td:nth-child(7) { width: 8%; }
-.equipment-list-table th:nth-child(8), .equipment-list-table td:nth-child(8) { width: 9%; }
-.equipment-list-table th:nth-child(9), .equipment-list-table td:nth-child(9) { width: 10%; }
-.equipment-list-table th:nth-child(10), .equipment-list-table td:nth-child(10) { width: 14%; }
+/* Độ rộng cột của bảng này do quy tắc chung (data-col) quyết định, xem cuối file. */
 .equipment-list-table td { min-width: 0; overflow-wrap: anywhere; }
-.equipment-updated-at { display: inline-block; max-width: 100%; font-size: 10px; line-height: 1.35; white-space: normal; }
+.equipment-updated-at { display: inline-block; max-width: 100%; font-size: 12px; line-height: 1.35; white-space: normal; overflow-wrap: normal; }
 .equipment-row-actions { flex-wrap: wrap; justify-content: center; gap: 3px 5px; }
-.equipment-row-actions .btn { min-height: 30px; padding: 4px 6px; white-space: nowrap; font-size: 10px; }
+.equipment-row-actions .btn { min-height: 34px; padding: 4px 8px; white-space: nowrap; font-size: 12px; }
 
 .mobile-loan-action-inbox { display: none; }
 .asset-editor-modal { width: min(980px, calc(100vw - 32px)); }
@@ -2786,3 +2775,25 @@ body {
 .reports-page > .page-header { margin-bottom: 4px; }
 .report-note { margin: 0 0 10px; font-size: 12px; }
 .report-late { color: var(--danger); }
+
+/* Bảng chia cột theo nội dung (DataTable gắn data-col từ lib/table-columns.ts).
+   Trước đây table-layout: fixed chia đều nên cột Tên bị bó, cột mã/trạng thái thừa chỗ. */
+/* Từ 1366px: đủ rộng để chia theo nội dung mà không tràn; hẹp hơn giữ chia đều như cũ. */
+@media (min-width: 1366px) {
+  .table-wrap table[data-sizing="auto"] { table-layout: auto; }
+  .table-wrap [data-col="fit"] { width: 1%; white-space: nowrap; }
+  .table-wrap th[data-col="fit"] { white-space: normal; }
+  .table-wrap [data-col="status"] { min-width: 11ch; }
+  .table-wrap [data-col="actions"] { width: 1%; min-width: 150px; }
+  .table-wrap [data-col="wide"] { width: 22%; min-width: 16ch; overflow-wrap: anywhere; }
+  .table-wrap [data-col="text"] { min-width: 9ch; overflow-wrap: anywhere; }
+  /* Huy hiệu trong bảng được xuống dòng khi thiếu chỗ thay vì ép cột rộng. */
+  .table-wrap td .status-badge { white-space: normal; text-align: center; line-height: 1.25; }
+}
+@media (min-width: 761px) {
+  .table-wrap th[data-align="left"], .table-wrap td[data-align="left"] { text-align: left; }
+  .table-wrap th[data-align="right"], .table-wrap td[data-align="right"] { text-align: right; }
+  .table-wrap th[data-align="center"], .table-wrap td[data-align="center"] { text-align: center; }
+  /* Hai thẻ cạnh nhau không kéo thẻ ngắn cao theo thẻ dài (tránh khoảng trống thừa). */
+  .content-grid.equal { align-items: start; }
+}
