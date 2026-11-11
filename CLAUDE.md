@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 91 pass
+npm test           # tsx --test tests/*.test.ts — 96 pass
 ```
 
 Không có ESLint script.
@@ -64,11 +64,17 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - Quy tắc: bước cấp nhóm chỉ tính cho **thành viên nhóm** đủ bậc mà Server Action đòi (Admin/Quản lý Xưởng KHÔNG tự có việc của mọi nhóm, dù backend cho họ thao tác); bước cấp Xưởng (tiếp nhận sửa, duyệt điều chuyển/thanh lý) tính cho Quản lý Xưởng/Admin; Kho thanh lý tính cho operator+ nhóm `KHO_TL`; người tạo phiếu không tự thấy việc duyệt phiếu của mình; Người xem toàn xưởng không có việc nào; phiếu sửa "đang sửa" không tính (không phải việc chờ). Quá hạn trả tính cho nhóm đang mượn.
 - **Thêm trạng thái/bước duyệt mới** cho workflow thì thêm quy tắc vào `buildMyTasks` + test trong `tests/my-tasks.test.ts`, kẻo huy hiệu không hiện việc mới.
 
+### Hồ sơ máy (`/equipment/[id]`)
+
+- Một trang gom mọi thứ về một máy: trạng thái / tình trạng / nhóm quản lý / nhóm đang giữ (suy ra từ phiếu mượn `on_loan`/`incident`, không dùng `current_group_id`) / vị trí, **phiếu đang mở** (mượn máy, điều chuyển, sửa chữa, thanh lý; link sang trang nghiệp vụ), thông tin kỹ thuật, nguồn gốc, **lịch sử**. Chỉ xem; thao tác vẫn ở "Dụng cụ nhóm tôi" (nút dẫn sang nếu máy trong phạm vi tài khoản). Route tĩnh `/equipment/export` luôn thắng `[id]`; id sai dạng UUID → 404 (`isUuid`).
+- Quyền: **ai đăng nhập cũng xem được** thông tin chung (như trang Dụng cụ toàn xưởng). **Lịch sử** theo `canViewEquipmentHistory` (cùng quy tắc tab Lịch sử; không đủ quyền thì hiện thông báo). **Đơn giá / PO / nhà cung cấp** chỉ Admin / Quản lý Xưởng hoặc nhóm quản lý máy (`canSeeFinancials`; Người xem toàn xưởng không thấy, như file Excel không xuất đơn giá). **Hồ sơ nháp** (`recordStatus != active`) chỉ người trong phạm vi máy xem được, người khác 404.
+- `lib/machine-profile.ts` (hàm thuần, có test) + `lib/machine-profile-data.ts` (`loadMachineProfile`). Liên kết vào từ danh sách `/equipment` (cột Mã hệ thống) và kết quả `/search`.
+
 ### Tìm kiếm chung (`/search`)
 
 - Ô tìm kiếm ở thanh trên (`components/global-search-box.tsx`, phím `/` để nhảy vào ô) và ở trang chủ điện thoại (thanh trên bị ẩn ở mobile) gửi GET tới `/search?q=`. Mọi tài khoản đăng nhập vào được.
 - Quy tắc khớp ở `lib/global-search.ts` (hàm thuần, có test): **không phân biệt hoa/thường và dấu** ("may han" ra "Máy hàn"), nhiều từ = khớp TẤT CẢ từ (thứ tự tùy ý), xếp hạng trùng hẳn mã hệ thống / tem nhôm / serial > bắt đầu bằng > chứa > khớp ở trường mô tả. Cần ≥ 2 ký tự.
-- `lib/global-search-data.ts` (`globalSearch(auth, q)`): **máy** (đã hoàn thành hồ sơ) và **CCDC theo số lượng** tìm trên TOÀN Xưởng (khớp quyền trang "Dụng cụ toàn xưởng"; máy được lọc bằng JS sau khi tải để bỏ dấu được, hiện 20 máy / 10 CCDC khớp nhất, kèm nhóm đang giữ do mượn); **phiếu** (mượn máy, mượn nhanh, điều chuyển, sửa chữa, thanh lý máy / CCDC) tìm theo **mã phiếu** bằng ILIKE, mỗi loại tối đa 5, chỉ phiếu liên quan nhóm của người dùng (vai trò xem toàn Xưởng thấy hết). Link máy → `/equipment?q=<mã>` (chưa có trang hồ sơ máy riêng).
+- `lib/global-search-data.ts` (`globalSearch(auth, q)`): **máy** (đã hoàn thành hồ sơ) và **CCDC theo số lượng** tìm trên TOÀN Xưởng (khớp quyền trang "Dụng cụ toàn xưởng"; máy được lọc bằng JS sau khi tải để bỏ dấu được, hiện 20 máy / 10 CCDC khớp nhất, kèm nhóm đang giữ do mượn); **phiếu** (mượn máy, mượn nhanh, điều chuyển, sửa chữa, thanh lý máy / CCDC) tìm theo **mã phiếu** bằng ILIKE, mỗi loại tối đa 5, chỉ phiếu liên quan nhóm của người dùng (vai trò xem toàn Xưởng thấy hết). Mã máy bấm vào **hồ sơ máy** `/equipment/[id]`.
 - Lưu ý: ô tìm của chính trang `/equipment` (`equipmentSearchValues`) chưa tìm theo serial; `/search` có.
 
 ### Báo cáo điều hành (`/reports`)
