@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { Boxes, CircleCheck, FileSpreadsheet, PackageOpen, Search, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
@@ -162,7 +163,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
           <DataTable
             headers={["Mã hệ thống", "Tem nhôm", "Tên máy", "Nhóm quản lý", "Nhóm đang dùng", "Vị trí", "Tình trạng", "Trạng thái"]}
             rows={filteredRows.map((row) => [
-              <strong key="code">{row.code}</strong>,
+              <Link key="code" href={`/equipment/${row.id}`}><strong>{row.code}</strong></Link>,
               row.legacyCode || "—",
               <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.model || "Chưa có model"}</small></div>,
               row.ownerGroup,

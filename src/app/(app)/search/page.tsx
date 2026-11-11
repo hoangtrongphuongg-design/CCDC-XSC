@@ -50,7 +50,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                   <DataTable
                     headers={["Mã hệ thống", "Tem nhôm", "Tên CCDC", "Loại", "Nhóm quản lý", "Trạng thái", "Vị trí"]}
                     rows={machines.rows.map((m) => [
-                      <Link key="code" href={equipmentLink(m.code)}><b>{m.code}</b></Link>,
+                      <Link key="code" href={`/equipment/${m.id}`}><b>{m.code}</b></Link>,
                       m.legacyCode || "—",
                       <span key="name">{m.name}{m.serial ? <small className="search-serial"> · Serial {m.serial}</small> : null}</span>,
                       m.type,
