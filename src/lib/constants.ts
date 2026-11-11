@@ -5,7 +5,7 @@ export const USERNAME_PATTERN = /^(?!.*\.\.)[a-z0-9][a-z0-9._]{2,28}[a-z0-9]$/;
 
 export const EQUIPMENT_STATUS_LABELS = {
   in_use_owner: "Sẵn sàng",
-  wait_handover: "Chờ bàn giao",
+  wait_handover: "Đang điều chuyển",
   on_loan: "Đang cho mượn",
   return_requested: "Chờ nhận lại",
   wait_inspection: "Chờ kiểm tra",
@@ -18,12 +18,12 @@ export const EQUIPMENT_STATUS_LABELS = {
 
 export const CONDITION_LABELS = {
   good: "Tốt",
-  limited: "Chờ kiểm tra", // dữ liệu cũ
+  limited: "Chưa đánh giá", // dữ liệu cũ
   minor_damage: "Hư hỏng", // dữ liệu cũ
   major_damage: "Hư hỏng",
-  awaiting_assessment: "Chờ kiểm tra",
-  irreparable: "Thanh lý",
-  unknown: "Chờ kiểm tra", // dữ liệu cũ
+  awaiting_assessment: "Chưa đánh giá",
+  irreparable: "Không thể phục hồi",
+  unknown: "Chưa đánh giá", // dữ liệu cũ
 } as const;
 
 export const WORKFLOW_LABELS: Record<string, string> = {

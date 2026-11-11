@@ -26,7 +26,7 @@ import { approveQuickLoanAction, closeQuickLoanAction, rejectQuickLoanAction, re
 
 const statusMeta = {
   in_use_owner: ["Sẵn sàng", "#7BA7CC"],
-  wait_handover: ["Chờ giao", "#4C91C7"],
+  wait_handover: ["Đang điều chuyển", "#4C91C7"],
   on_loan: ["Đang mượn", "#1F6FAE"],
   return_requested: ["Chờ nhận lại", "#2C83BF"],
   wait_inspection: ["Chờ kiểm tra", "#8AB6D6"],
