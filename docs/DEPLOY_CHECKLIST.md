@@ -34,10 +34,10 @@
 
 - [ ] Tạo CCDC hiện hữu sinh mã đúng prefix nhóm.
 - [ ] Tạo máy mới bởi Quản lý Xưởng / Admin chọn nhóm nhận và sinh mã theo nhóm nhận.
-- [ ] Mã hiện hữu và serial trùng tạo cảnh báo mềm.
+- [ ] Tem nhôm và serial trùng tạo cảnh báo mềm.
 - [ ] Hai người tạo gần đồng thời không nhận cùng mã hệ thống.
 - [ ] `Lưu & thêm tiếp` hoạt động.
-- [ ] `Sao chép để tạo mới` không sao chép serial/mã hiện hữu.
+- [ ] `Sao chép để tạo mới` không sao chép serial/tem nhôm.
 - [ ] Sửa dữ liệu lưu old/new trong lịch sử.
 - [ ] Hiệu chỉnh nhạy cảm bởi Quản lý Xưởng / Admin bắt nhập lý do.
 - [ ] Mobile không phát sinh cuộn ngang toàn trang.

@@ -10,7 +10,7 @@ Milestone này quản lý **CCDC theo từng thiết bị**. Chưa triển khai 
 - Ngày ghi nhận.
 - Tên CCDC.
 - Mã hệ thống tự sinh.
-- Mã hiện hữu / mã đã gán trên máy.
+- Tem nhôm (mã hiện hữu / mã đã gán trên máy).
 - Nhóm thiết bị và Loại dụng cụ.
 - Hãng, model, serial, năm sản xuất, năm đưa vào sử dụng.
 - Thông số kỹ thuật, ghi chú kỹ thuật.

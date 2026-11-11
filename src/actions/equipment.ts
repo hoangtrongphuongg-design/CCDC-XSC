@@ -116,7 +116,7 @@ async function findDuplicateWarning(input: {
       ? and(eq(equipment.legacyCode, input.legacyCode), ne(equipment.id, input.recordId))
       : eq(equipment.legacyCode, input.legacyCode);
     const [duplicate] = await db.select({ code: equipment.code }).from(equipment).where(filters).limit(1);
-    if (duplicate) messages.push(`Mã hiện hữu “${input.legacyCode}” đang được dùng ở ${duplicate.code}.`);
+    if (duplicate) messages.push(`Tem nhôm “${input.legacyCode}” đang được dùng ở ${duplicate.code}.`);
   }
   if (input.serial) {
     const filters = input.recordId

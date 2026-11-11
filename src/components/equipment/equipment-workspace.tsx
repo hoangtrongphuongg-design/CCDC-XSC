@@ -121,7 +121,7 @@ const simpleConditionOptions = [
 
 const auditFieldLabels: Record<string, string> = {
   code: "Mã hệ thống",
-  legacyCode: "Mã hiện hữu",
+  legacyCode: "Tem nhôm",
   name: "Tên CCDC",
   equipmentType: "Loại dụng cụ",
   categoryCode: "Nhóm thiết bị",
@@ -387,7 +387,7 @@ function AssetForm({
                 ))}
               </select>
             </FormField>
-            <FormField label="Mã hiện hữu / mã đã gán"><input name="legacyCode" placeholder="Ví dụ: MH-05" /></FormField>
+            <FormField label="Tem nhôm / mã đã gán"><input name="legacyCode" placeholder="Ví dụ: MH-05" /></FormField>
             <FormField label="Hãng"><input name="brand" placeholder="Ví dụ: Hồng Ký, Bosch, Makita..." /></FormField>
             <FormField label="Đơn giá mua (VNĐ)" hint="Tự hiển thị dấu chấm phân cách hàng nghìn.">
               <input type="text" inputMode="numeric" value={formatPurchasePriceInput(purchasePrice)} onChange={(event) => setPurchasePrice(event.target.value.replace(/\D/g, "").slice(0, 16))} placeholder="Ví dụ: 25.000.000" aria-label="Đơn giá mua" />
@@ -453,10 +453,10 @@ function AssetForm({
       </section>
 
       <section className="asset-form-section">
-        <div className="asset-section-heading"><div><span>02</span><div><strong>Thông tin nhận dạng</strong><small>Mã hệ thống được cấp tự động; mã hiện hữu dùng để đối chiếu máy đã bấm/khắc mã ngoài thực tế.</small></div></div></div>
+        <div className="asset-section-heading"><div><span>02</span><div><strong>Thông tin nhận dạng</strong><small>Mã hệ thống được cấp tự động; tem nhôm là mã đã gắn trên máy, dùng để đối chiếu máy ngoài thực tế.</small></div></div></div>
         <div className="form-grid two">
           <FormField label="Tên CCDC" required><input name="name" defaultValue={record?.name || ""} placeholder="Ví dụ: Máy hàn MIG Panasonic" /></FormField>
-          <FormField label="Mã hiện hữu / mã đã gán"><input name="legacyCode" defaultValue={defaultLegacyCode} placeholder="Ví dụ: MH-05" /></FormField>
+          <FormField label="Tem nhôm / mã đã gán"><input name="legacyCode" defaultValue={defaultLegacyCode} placeholder="Ví dụ: MH-05" /></FormField>
           <FormField label="Hãng"><input name="brand" defaultValue={record?.brand || ""} placeholder="Bosch, Makita, Enerpac..." /></FormField>
           <FormField label="Model"><input name="model" defaultValue={record?.model || ""} /></FormField>
           <FormField label="Serial"><input name="serial" defaultValue={defaultSerial} /></FormField>
@@ -615,7 +615,7 @@ function DetailModal({
         <div className="asset-detail-status-row">
           <StatusBadge label={displayStatus} tone={statusTone(row.status)} />
           <StatusBadge label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />
-          {row.legacyCode ? <span className="legacy-code-chip">Mã hiện hữu: {row.legacyCode}</span> : null}
+          {row.legacyCode ? <span className="legacy-code-chip">Tem nhôm: {row.legacyCode}</span> : null}
         </div>
         <div className="asset-detail-tabs">
           <button type="button" className={tab === "detail" ? "is-active" : ""} onClick={() => onTab("detail")}><ClipboardList size={15} /> Chi tiết</button>
@@ -626,7 +626,7 @@ function DetailModal({
             <div className="equipment-detail-sections">
               <section><h3>Thông tin chung</h3><dl>
                 <div><dt>Mã hệ thống</dt><dd>{row.code}</dd></div>
-                <div><dt>Mã hiện hữu</dt><dd>{row.legacyCode || "—"}</dd></div>
+                <div><dt>Tem nhôm</dt><dd>{row.legacyCode || "—"}</dd></div>
                 <div><dt>Nhóm quản lý</dt><dd>{row.ownerGroupName}</dd></div>
                 <div><dt>Nhóm gốc</dt><dd>{row.originGroupName}</dd></div>
                 <div><dt>Nguồn hình thành</dt><dd>{originLabels[row.originType]}</dd></div>
@@ -848,7 +848,7 @@ export function EquipmentWorkspace({
           <strong>Dụng cụ nhóm tôi</strong>
           <div><button type="button" aria-label="Tìm kiếm" onClick={() => setMobileSearchOpen((value) => !value)}><Search size={19} /></button><button type="button" aria-label="Bộ lọc" onClick={() => setMobileFiltersOpen((value) => !value)}><Filter size={18} /></button><a href={exportHref} download aria-label="Xuất Excel kiểm kê" title="Xuất Excel kiểm kê"><FileSpreadsheet size={18} /></a></div>
         </header>
-        {mobileSearchOpen ? <div className="mobile-equipment-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Mã, mã hiện hữu, tên, model, serial..." autoFocus /></div> : null}
+        {mobileSearchOpen ? <div className="mobile-equipment-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Mã hệ thống, tem nhôm, tên, model, serial..." autoFocus /></div> : null}
         {mobileFiltersOpen ? <div className="mobile-equipment-filters">
           <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} aria-label="Lọc nhóm"><option value="all">Tất cả nhóm</option>{permissions.map((permission) => <option key={permission.groupId} value={permission.groupId}>{permission.groupName}</option>)}</select>
           <select value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setTypeFilter("all"); }} aria-label="Lọc nhóm thiết bị"><option value="all">Tất cả nhóm thiết bị</option>{EQUIPMENT_CATEGORIES.map((category) => <option key={category.code} value={category.code}>{category.name}</option>)}</select>
@@ -874,7 +874,7 @@ export function EquipmentWorkspace({
         {!isReadOnlyViewer && !isWorkshopAdmin && !actionablePermissions.length ? <div className="viewer-banner"><ShieldCheck size={18} /><div><strong>Công nhân kỹ thuật</strong><span>Bạn được tra cứu CCDC nhưng không được thêm hoặc sửa hồ sơ.</span></div></div> : null}
 
         <div className="equipment-toolbar equipment-toolbar-extended">
-          <div className="equipment-filter-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Mã, mã hiện hữu, tên, model, serial..." aria-label="Tìm dụng cụ" /></div>
+          <div className="equipment-filter-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Mã hệ thống, tem nhôm, tên, model, serial..." aria-label="Tìm dụng cụ" /></div>
           <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} aria-label="Lọc nhóm"><option value="all">Tất cả nhóm</option>{permissions.map((permission) => <option key={permission.groupId} value={permission.groupId}>{permission.groupName}</option>)}</select>
           <select value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setTypeFilter("all"); }} aria-label="Lọc nhóm thiết bị"><option value="all">Tất cả nhóm thiết bị</option>{EQUIPMENT_CATEGORIES.map((category) => <option key={category.code} value={category.code}>{category.name}</option>)}</select>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Lọc loại"><option value="all">Tất cả loại</option>{typeOptions.map((type) => <option key={type} value={type}>{type}</option>)}</select>
@@ -900,7 +900,7 @@ export function EquipmentWorkspace({
           </div>
           <div className="card-content equipment-list-table">
             <DataTable
-              headers={["Mã", "Mã hiện hữu", "Tên CCDC", "Loại", "Hãng / Model", "Vị trí", "Tình trạng", "Trạng thái", "Cập nhật", "Thao tác"]}
+              headers={["Mã hệ thống", "Tem nhôm", "Tên CCDC", "Loại", "Hãng / Model", "Vị trí", "Tình trạng", "Trạng thái", "Cập nhật", "Thao tác"]}
               rows={filteredEquipment.map((row) => [
                 <strong key="code">{row.code}</strong>,
                 row.legacyCode || "—",
