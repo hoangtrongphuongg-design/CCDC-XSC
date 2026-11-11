@@ -9,6 +9,7 @@ import {
   BarChart3,
   Boxes,
   ChevronRight,
+  ClipboardCheck,
   ClipboardList,
   FileSpreadsheet,
   Gauge,
@@ -41,6 +42,7 @@ const operationItems = [
   ["/dashboard", "Tổng quan", Gauge],
   ["/equipment", "Dụng cụ toàn xưởng", Boxes],
   ["/my-equipment", "Dụng cụ nhóm tôi", ClipboardList],
+  ["/inventory", "Kiểm kê", ClipboardCheck],
   ["/labels", "In tem QR", QrCode],
 ] as const satisfies readonly NavItem[];
 

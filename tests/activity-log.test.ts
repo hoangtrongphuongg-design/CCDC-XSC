@@ -54,6 +54,7 @@ test("bản sao theo máy luôn bị ẩn; sự kiện tài khoản/nhóm chỉ 
     "equipment.loan_requested",
     "equipment.loan_started",
     "equipment.return_requested",
+    "inventory.check",
   ]);
   for (const action of MIRROR_ACTIONS) {
     assert.equal(isVisibleActivity(action, true), false, `${action} phải ẩn cả với Admin`);

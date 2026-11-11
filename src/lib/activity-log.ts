@@ -79,6 +79,10 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   "equipment.create": { label: "Tạo CCDC", category: "ccdc" },
   "equipment.initial_allocation": { label: "Cấp phát ban đầu", category: "ccdc" },
   "equipment.import": { label: "Nhập CCDC từ Excel", category: "ccdc" },
+  "inventory.create": { label: "Mở đợt kiểm kê", category: "ccdc" },
+  "inventory.close": { label: "Đóng đợt kiểm kê", category: "ccdc" },
+  // Kết quả kiểm từng máy: chỉ cho tab Lịch sử của máy, ẩn khỏi bảng tin để khỏi ngập khi kiểm cả nhóm.
+  "inventory.check": { label: "Kiểm kê máy (ghi theo máy)", category: "ccdc", mirror: true },
   // Bản ghi theo từng máy của đợt nhập Excel: chỉ cho tab Lịch sử của máy, ẩn khỏi bảng tin để khỏi ngập.
   "equipment.import_create": { label: "Tạo CCDC (nhập Excel, ghi theo máy)", category: "ccdc", mirror: true },
   "equipment.update": { label: "Cập nhật CCDC", category: "ccdc" },

@@ -10,6 +10,9 @@ import { requireUser } from "@/lib/auth/guards";
 import { CONDITION_LABELS, EQUIPMENT_STATUS_LABELS } from "@/lib/constants";
 import { getEquipmentCategoryLabel } from "@/lib/equipment-categories";
 import { loadMachineProfile } from "@/lib/machine-profile-data";
+import { loadInventoryPromptsForMachine } from "@/lib/inventory-data";
+import { markInventoryFromProfileAction } from "@/actions/inventory";
+import { INVENTORY_RESULT_LABELS } from "@/lib/inventory";
 import { ORIGIN_LABELS } from "@/lib/machine-profile";
 import { dmy, formatVnd } from "@/lib/reports";
 import { formatDateTime } from "@/lib/utils";
@@ -30,6 +33,7 @@ export default async function MachineProfilePage({ params }: { params: Promise<{
   if (machine.recordStatus !== "active" && !inMyScope) notFound();
 
   const name = (gid: string) => groupNames.get(gid) ?? "—";
+  const inventoryPrompts = await loadInventoryPromptsForMachine(auth, machine.id, [machine.ownerGroupId]);
   const statusTone = machine.status === "in_use_owner" ? "success" : machine.status === "disposal_warehouse" || machine.status === "inactive" ? "danger" : "info";
   const conditionTone = machine.condition === "good" ? "success" : machine.condition === "irreparable" ? "danger" : "warning";
 
@@ -46,6 +50,30 @@ export default async function MachineProfilePage({ params }: { params: Promise<{
           </>
         }
       />
+
+      {inventoryPrompts.map((prompt) => (
+        <section className="inventory-prompt" key={prompt.sessionId} aria-label={`Kiểm kê ${prompt.code}`}>
+          <div>
+            <strong>Đang kiểm kê {prompt.code}</strong>
+            <span>{prompt.groupName}</span>
+            <small>
+              {prompt.result ? `Máy này: ${INVENTORY_RESULT_LABELS[prompt.result]}` : prompt.inList ? "Máy này chưa được kiểm." : "Máy này không có trong danh sách — nếu đang thấy tại nhóm, ghi nhận là máy thừa."}
+            </small>
+          </div>
+          <form action={markInventoryFromProfileAction} className="inventory-prompt-actions">
+            <input type="hidden" name="sessionId" value={prompt.sessionId} />
+            <input type="hidden" name="equipmentId" value={machine.id} />
+            {prompt.result ? (
+              <button type="submit" name="result" value="undo" className="btn btn-secondary">Hoàn tác</button>
+            ) : (
+              <>
+                <button type="submit" name="result" value="found" className="btn btn-primary">Có mặt</button>
+                {prompt.inList ? <button type="submit" name="result" value="missing" className="btn btn-secondary">Không thấy</button> : null}
+              </>
+            )}
+          </form>
+        </section>
+      ))}
 
       {machine.recordStatus !== "active" ? <p className="notice warning">Hồ sơ máy này chưa hoàn thành (bản nháp), chưa thể dùng trong nghiệp vụ.</p> : null}
       {machine.archivedAt ? <p className="notice warning">Máy này đã được lưu trữ.</p> : null}
