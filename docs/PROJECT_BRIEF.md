@@ -4,7 +4,7 @@
 
 - Một máy có một mã hệ thống duy nhất dùng suốt vòng đời.
 - Mã không đổi khi mượn, điều chuyển, sửa chữa, ngừng sử dụng hoặc thanh lý.
-- Mã hiện hữu đã bấm/khắc/dán trên máy được lưu riêng để đối chiếu.
+- Tem nhôm (mã hiện hữu, trường `legacyCode`) đã bấm/khắc/dán trên máy được lưu riêng để đối chiếu.
 - Nhóm quản lý hiện tại khác với nhóm gốc cấp mã ban đầu.
 - Không hard-delete hồ sơ nghiệp vụ; mọi hiệu chỉnh cần có lịch sử.
 

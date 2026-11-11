@@ -6,7 +6,7 @@ async function source(relativePath: string) {
   return readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 }
 
-test("Dụng cụ nhóm tôi có mã hiện hữu, cấp phát ban đầu và audit hiệu chỉnh Admin", async () => {
+test("Dụng cụ nhóm tôi có tem nhôm (mã đã gắn), cấp phát ban đầu và audit hiệu chỉnh Admin", async () => {
   const action = await source("src/actions/equipment.ts");
   assert.match(action, /legacyCode/);
   assert.match(action, /new_purchase/);
@@ -27,7 +27,8 @@ test("giao diện có Lưu & thêm tiếp, sao chép và lịch sử", async () 
   assert.match(ui, /Lưu & thêm tiếp/);
   assert.match(ui, /Sao chép để tạo mới/);
   assert.match(ui, /Lịch sử/);
-  assert.match(ui, /Mã hiện hữu \/ mã đã gán/);
+  assert.match(ui, /Tem nhôm \/ mã đã gán/);
+  assert.match(ui, /"Mã hệ thống", "Tem nhôm", "Tên CCDC"/);
 });
 
 test("migration chỉ bổ sung dữ liệu cho milestone CCDC", async () => {

@@ -132,7 +132,7 @@ function totalOf(tree: GroupBucket[]): number {
 const WORKSHOP_COLUMNS: ColumnDef[] = [
   { header: "STT", width: 6 },
   { header: "Mã hệ thống", width: 15 },
-  { header: "Mã hiện hữu", width: 14 },
+  { header: "Tem nhôm", width: 14 },
   { header: "Tên máy", width: 34 },
   { header: "Hãng / Model", width: 22 },
   { header: "Nhóm thiết bị", width: 26 },
@@ -206,7 +206,7 @@ export async function buildWorkshopWorkbook(input: {
 const INVENTORY_COLUMNS: ColumnDef[] = [
   { header: "STT", width: 6 },
   { header: "Mã hệ thống", width: 15 },
-  { header: "Mã hiện hữu", width: 14 },
+  { header: "Tem nhôm", width: 14 },
   { header: "Tên CCDC", width: 34 },
   { header: "Hãng / Model", width: 22 },
   { header: "Serial", width: 16 },

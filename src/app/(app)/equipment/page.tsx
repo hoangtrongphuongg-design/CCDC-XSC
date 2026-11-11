@@ -107,7 +107,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
               <input
                 name="q"
                 defaultValue={searchText}
-                placeholder="Mã, tên máy, loại, nhóm, vị trí..."
+                placeholder="Mã hệ thống, tem nhôm, tên máy, loại, nhóm, vị trí..."
                 aria-label="Tìm dụng cụ toàn xưởng"
               />
               <button type="submit">Tìm</button>
@@ -160,7 +160,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         <CardHeader><CardTitle>Danh mục máy/CCDC có mã</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            headers={["Mã hệ thống", "Mã hiện hữu", "Tên máy", "Nhóm quản lý", "Nhóm đang dùng", "Vị trí", "Tình trạng", "Trạng thái"]}
+            headers={["Mã hệ thống", "Tem nhôm", "Tên máy", "Nhóm quản lý", "Nhóm đang dùng", "Vị trí", "Tình trạng", "Trạng thái"]}
             rows={filteredRows.map((row) => [
               <strong key="code">{row.code}</strong>,
               row.legacyCode || "—",

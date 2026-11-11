@@ -219,7 +219,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
 
         <form className="mobile-ops-search" action="/equipment" method="get" role="search">
           <Search size={18} aria-hidden="true" />
-          <input name="q" placeholder="Tìm mã hoặc tên CCDC..." aria-label="Tìm CCDC" />
+          <input name="q" placeholder="Tìm mã, tem nhôm hoặc tên CCDC..." aria-label="Tìm CCDC" />
         </form>
 
         {canOperate ? (
@@ -369,7 +369,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
           <CardHeader><CardTitle>Tìm kiếm & phân tích CCDC</CardTitle><Search size={18} /></CardHeader>
           <CardContent>
             <form method="get" className="dashboard-search-form">
-              <label className="dashboard-search-box"><Search size={17} /><input name="q" defaultValue={q} placeholder="Gõ mã, tên máy, model, loại, vị trí..." /></label>
+              <label className="dashboard-search-box"><Search size={17} /><input name="q" defaultValue={q} placeholder="Gõ mã hệ thống, tem nhôm, tên máy, model, loại, vị trí..." /></label>
               <select name="group" defaultValue={filterGroup} aria-label="Lọc theo nhóm">
                 <option value="">Tất cả nhóm</option>
                 {groupRows.filter((group) => fullWorkshopScope || allowedGroupIds.has(group.id)).map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
