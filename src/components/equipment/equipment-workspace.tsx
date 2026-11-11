@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CONDITION_LABELS, EQUIPMENT_STATUS_LABELS } from "@/lib/constants";
+import { isHeldByBorrower } from "@/lib/loan-status";
 import {
   EQUIPMENT_CATEGORIES,
   EQUIPMENT_DISCIPLINE_LABELS,
@@ -101,6 +102,8 @@ type DetailTab = "detail" | "history";
 type KpiFilter = "all" | "available" | "borrowed" | "lent" | "repair" | "transfer";
 
 const initialState: EquipmentFormState = { status: "idle" };
+/** Khớp MANUAL_EQUIPMENT_STATUSES ở actions/equipment.ts: trạng thái được đổi tay. */
+const MANUAL_STATUS_KEYS: string[] = ["in_use_owner", "wait_inspection", "inactive"];
 const disciplineOrder: EquipmentDiscipline[] = ["mechanical", "electrical", "other"];
 const originLabels = {
   existing: "CCDC hiện hữu",
@@ -299,7 +302,9 @@ function AssetForm({
   const [categoryCode, setCategoryCode] = useState(record?.categoryCode || "CK_HAN_CAT");
   const [originType, setOriginType] = useState<IndividualEquipmentRow["originType"]>(isClone && !isWorkshopAdmin ? "existing" : record?.originType || "existing");
   const [condition, setCondition] = useState<string>(record?.condition || "good");
-  const [status, setStatus] = useState<string>(record?.status || "in_use_owner");
+  // Chỉ loại trạng thái nhập tay mới sửa được; máy đang mượn/sửa/chờ thanh lý... do quy trình điều khiển.
+  const [status, setStatus] = useState<string>(isEditing ? record?.status || "in_use_owner" : "in_use_owner");
+  const statusIsManual = !isEditing || MANUAL_STATUS_KEYS.includes(record?.status || "in_use_owner");
   const [purchasePrice, setPurchasePrice] = useState(() => normalizePurchasePrice(record?.purchasePrice));
   const [managementMode, setManagementMode] = useState<"individual" | "quantity">("individual");
 
@@ -356,7 +361,6 @@ function AssetForm({
 
         <input type="hidden" name="recordId" value="" />
         <input type="hidden" name="originType" value="existing" />
-        <input type="hidden" name="status" value="in_use_owner" />
         <input type="hidden" name="purchasePrice" value={purchasePrice} />
 
         <section className="asset-form-section">
@@ -506,9 +510,11 @@ function AssetForm({
               {record && !simpleConditionOptions.some(([value]) => value === record.condition) ? <option value={record.condition}>{CONDITION_LABELS[record.condition]}</option> : null}
             </select>
           </FormField>
-          <FormField label="Trạng thái nghiệp vụ" required hint="Giai đoạn nhập dữ liệu ban đầu cho phép chọn theo thực tế. Sau này workflow sẽ tự điều khiển trạng thái.">
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
-              {Object.entries(EQUIPMENT_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          <FormField label="Trạng thái nghiệp vụ" required hint={statusIsManual ? "Chỉ đổi tay được giữa Sẵn sàng, Chờ kiểm tra và Ngừng sử dụng. Mượn, sửa, điều chuyển, thanh lý do quy trình tự điều khiển." : "Trạng thái này do quy trình mượn/sửa/điều chuyển/thanh lý điều khiển nên không sửa tay được."}>
+            <select value={status} onChange={(event) => setStatus(event.target.value)} disabled={!statusIsManual}>
+              {Object.entries(EQUIPMENT_STATUS_LABELS)
+                .filter(([value]) => (statusIsManual ? MANUAL_STATUS_KEYS.includes(value) : value === status))
+                .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </FormField>
           <FormField label="Vị trí"><input name="currentLocation" defaultValue={record?.currentLocation || ""} placeholder="Kho Workshop, Tủ số 2..." /></FormField>
@@ -675,6 +681,7 @@ export function EquipmentWorkspace({
   auditRows,
   isWorkshopAdmin,
   isReadOnlyViewer,
+  defaultGroupId = "all",
 }: {
   permissions: EquipmentPermission[];
   equipmentRows: IndividualEquipmentRow[];
@@ -682,6 +689,8 @@ export function EquipmentWorkspace({
   auditRows: EquipmentAuditRow[];
   isWorkshopAdmin: boolean;
   isReadOnlyViewer: boolean;
+  /** Nhóm được chọn sẵn ở ô lọc nhóm ("all" = tất cả nhóm trong phạm vi quyền). */
+  defaultGroupId?: string;
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>("create");
@@ -690,7 +699,7 @@ export function EquipmentWorkspace({
   const [detailTab, setDetailTab] = useState<DetailTab>("detail");
   const [formKey, setFormKey] = useState(0);
   const [search, setSearch] = useState("");
-  const [groupFilter, setGroupFilter] = useState("all");
+  const [groupFilter, setGroupFilter] = useState(defaultGroupId);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [conditionFilter, setConditionFilter] = useState("all");
@@ -720,7 +729,7 @@ export function EquipmentWorkspace({
     const haystack = `${row.code} ${row.legacyCode || ""} ${row.name} ${row.equipmentType} ${row.brand || ""} ${row.model || ""} ${row.serial || ""} ${row.ownerGroupName} ${row.currentGroupName}`.toLocaleLowerCase("vi");
     const matchesGroup = groupFilter === "all"
       || row.ownerGroupId === groupFilter
-      || row.currentGroupId === groupFilter
+      || (isHeldByBorrower(row.activeLoanStatus) && row.activeLoanBorrowerGroupId === groupFilter)
       || row.activeTransferSourceGroupId === groupFilter
       || row.activeTransferTargetGroupId === groupFilter;
     return (!normalizedSearch || haystack.includes(normalizedSearch))
@@ -732,9 +741,10 @@ export function EquipmentWorkspace({
       && (mobileTab === "all" || row.status === mobileTab);
   });
 
+  // Nhóm mượn chỉ còn "đang mượn" khi thực sự giữ máy; đã báo trả (return_requested)
+  // thì máy chuyển sang phía nhóm chủ với nhãn "Chờ nhận lại".
   const isBorrowedByScope = (row: IndividualEquipmentRow) => Boolean(
-    row.activeLoanStatus
-      && physicalLoanStatuses.has(row.activeLoanStatus)
+    isHeldByBorrower(row.activeLoanStatus)
       && inScope(row.activeLoanBorrowerGroupId),
   );
   const isLentByScope = (row: IndividualEquipmentRow) => Boolean(

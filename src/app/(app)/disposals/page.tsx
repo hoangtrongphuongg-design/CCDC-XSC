@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { CheckCircle2, Clock3, PackageCheck, Plus, Recycle } from "lucide-react";
 import { db } from "@/lib/db";
 import { disposals, equipment, groups, toolCatalog, toolDisposals } from "@/lib/db/schema";
@@ -26,7 +26,13 @@ export default async function DisposalsPage() {
   const auth = await requireUser();
   const [groupRows, equipmentRows, rows, toolRows, toolDisposalRows] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
-    db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId }).from(equipment).where(and(eq(equipment.status, "wait_disposal"), eq(equipment.recordStatus, "active"))).orderBy(asc(equipment.code)),
+    db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId }).from(equipment).where(and(
+      // Khớp điều kiện của createDisposalAction: máy đã kết luận không thể phục hồi
+      // (tình trạng Thanh lý, kể cả máy vừa trả về ở trạng thái Chờ kiểm tra) hoặc đang chờ thanh lý.
+      or(eq(equipment.status, "wait_disposal"), eq(equipment.condition, "irreparable")),
+      inArray(equipment.status, ["in_use_owner", "wait_inspection", "wait_disposal"]),
+      eq(equipment.recordStatus, "active"),
+    )).orderBy(asc(equipment.code)),
     db.select().from(disposals).orderBy(desc(disposals.createdAt)).limit(100),
     db.select().from(toolCatalog).where(eq(toolCatalog.isActive, true)).orderBy(asc(toolCatalog.name)),
     db.select().from(toolDisposals).orderBy(desc(toolDisposals.createdAt)).limit(100),

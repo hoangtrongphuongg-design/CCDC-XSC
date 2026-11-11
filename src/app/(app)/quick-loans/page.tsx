@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
 import { CheckCircle2, Clock3, PackageCheck, Plus, ShieldCheck, Zap } from "lucide-react";
 import { db } from "@/lib/db";
 import { groups, quickLoans, toolCatalog } from "@/lib/db/schema";
@@ -39,7 +39,7 @@ export default async function QuickLoansPage({ searchParams }: { searchParams?: 
   const params = searchParams ? await searchParams : {};
   const modeValue = params.mode;
   const mobileMode = (Array.isArray(modeValue) ? modeValue[0] : modeValue) || "view";
-  const [groupRows, tools, rows] = await Promise.all([
+  const [groupRows, tools, openRows, closedRows] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name, isSystem: groups.isSystem })
       .from(groups)
       .where(eq(groups.isActive, true))
@@ -47,8 +47,11 @@ export default async function QuickLoansPage({ searchParams }: { searchParams?: 
     db.select().from(toolCatalog)
       .where(and(eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active"), gt(toolCatalog.quantityOnHand, "0")))
       .orderBy(asc(toolCatalog.name)),
-    db.select().from(quickLoans).orderBy(desc(quickLoans.createdAt)).limit(100),
+    // Phiếu đang mở luôn tải đủ (để vẫn Báo trả/Nhận lại được dù cũ); phiếu đã đóng chỉ lấy 100 gần nhất.
+    db.select().from(quickLoans).where(inArray(quickLoans.status, ["pending_approval", "pending_receipt", "borrowed", "return_reported"])).orderBy(desc(quickLoans.createdAt)),
+    db.select().from(quickLoans).where(inArray(quickLoans.status, ["completed", "rejected", "cancelled"])).orderBy(desc(quickLoans.createdAt)).limit(100),
   ]);
+  const rows = [...openRows, ...closedRows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   const groupMap = new Map(groupRows.map((group) => [group.id, group.name]));
   const operationalGroups = groupRows.filter((group) => !group.isSystem && isOfficialOperationalGroupCode(group.code));

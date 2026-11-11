@@ -144,6 +144,36 @@ export async function markExternalIrreparableAction(formData: FormData) {
     await tx.update(repairs).set({ status: "irreparable", resultNotes: resultNotes || "Đơn vị sửa ngoài kết luận không thể phục hồi", cost: String(Math.max(0, cost)), completedBy: auth.userId, completedAt: new Date(), updatedAt: new Date() }).where(eq(repairs.id, repair.id));
     await tx.update(equipment).set({ status: "wait_disposal", condition: "irreparable", updatedAt: new Date() }).where(eq(equipment.id, repair.equipmentId));
     await writeAudit(tx as never, { actorUserId: auth.userId, action: "repair.irreparable", entityType: "repair", entityId: repair.id, description: `Sửa ngoài kết luận không thể phục hồi ${repair.code}`, afterData: { resultNotes, cost } });
+
+    // Máy hỏng khi đang được mượn: kết luận không thể phục hồi phải đóng luôn phiếu mượn
+    // nguồn và trả máy về nhóm quản lý, nếu không phiếu kẹt "có sự cố" mãi, chặn đề xuất
+    // thanh lý và máy cứ nằm ở nhóm mượn.
+    if (repair.sourceLoanId) {
+      const [closedLoan] = await tx.update(machineLoans).set({
+        status: "completed",
+        closedBy: auth.userId,
+        closedAt: new Date(),
+        incidentNotes: "Kết thúc do máy được kết luận không thể phục hồi; máy chuyển chờ thanh lý.",
+        updatedAt: new Date(),
+      }).where(and(eq(machineLoans.id, repair.sourceLoanId), eq(machineLoans.status, "incident"))).returning();
+
+      if (closedLoan) {
+        await tx.update(equipment).set({
+          currentGroupId: closedLoan.ownerGroupId,
+          currentHolderId: null,
+          updatedAt: new Date(),
+        }).where(eq(equipment.id, repair.equipmentId));
+        await writeAudit(tx as never, {
+          actorUserId: auth.userId,
+          actorGroupId: closedLoan.ownerGroupId,
+          action: "machine_loan.close_irreparable",
+          entityType: "machine_loan",
+          entityId: closedLoan.id,
+          description: `Đóng phiếu mượn ${closedLoan.code} vì máy không thể phục hồi (phiếu sửa ${repair.code})`,
+          afterData: closedLoan,
+        });
+      }
+    }
   });
   refresh();
 

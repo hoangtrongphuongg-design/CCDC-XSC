@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { equipment, groups, machineLoans } from "@/lib/db/schema";
 import { requireGroupPermission } from "@/lib/auth/guards";
+import { isNotPastDate } from "@/lib/date-check";
 import { assertEquipmentHasNoOtherOpenWorkflow, lockEquipment, nextWorkflowCode } from "@/lib/workflows";
 import { writeAudit } from "@/lib/audit";
 
@@ -31,6 +32,9 @@ export async function createMachineLoanAction(formData: FormData) {
 
   if (!equipmentId || !borrowerGroupId || !purpose || !expectedReturnDate) {
     throw new Error("Vui lòng nhập đủ thông tin mượn máy.");
+  }
+  if (!isNotPastDate(expectedReturnDate)) {
+    throw new Error("Ngày dự kiến trả không hợp lệ hoặc đã qua.");
   }
 
   const auth = await requireGroupPermission(borrowerGroupId, "viewer");

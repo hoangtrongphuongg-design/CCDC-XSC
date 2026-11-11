@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { activityLogs, equipment, equipmentTypeCatalog, groups, machineLoans, repairs, transfers, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
@@ -10,6 +10,7 @@ import {
   type IndividualEquipmentRow,
 } from "@/components/equipment/equipment-workspace";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
+import { OPEN_MACHINE_LOAN_STATUSES, isHeldByBorrower } from "@/lib/loan-status";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,15 @@ export default async function MyEquipmentPage() {
 
   const visibleGroupIds = permissions.map((permission) => permission.groupId);
 
+  // Admin / Quản lý Xưởng / Người xem thấy máy của mọi nhóm, nhưng "Dụng cụ nhóm tôi" phải
+  // mở ra với nhóm của chính tài khoản trước; đổi ô lọc để xem nhóm khác hoặc tất cả.
+  // Tài khoản không có nhóm chính (vd Người xem toàn xưởng) mặc định xem tất cả.
+  const defaultGroupId = (auth.isWorkshopAdmin || auth.isReadOnlyViewer)
+    && auth.primaryGroupId
+    && visibleGroupIds.includes(auth.primaryGroupId)
+    ? auth.primaryGroupId
+    : "all";
+
   const [relevantLoanRows, relevantTransferRows] = visibleGroupIds.length
     ? await Promise.all([
         db.select({
@@ -66,7 +76,10 @@ export default async function MyEquipmentPage() {
           status: machineLoans.status,
           updatedAt: machineLoans.updatedAt,
         }).from(machineLoans)
-          .where(or(inArray(machineLoans.ownerGroupId, visibleGroupIds), inArray(machineLoans.borrowerGroupId, visibleGroupIds)))
+          .where(and(
+            inArray(machineLoans.status, [...OPEN_MACHINE_LOAN_STATUSES]),
+            or(inArray(machineLoans.ownerGroupId, visibleGroupIds), inArray(machineLoans.borrowerGroupId, visibleGroupIds)),
+          ))
           .orderBy(desc(machineLoans.updatedAt)),
         db.select({
           equipmentId: transfers.equipmentId,
@@ -86,18 +99,22 @@ export default async function MyEquipmentPage() {
       .map((row) => row.equipmentId),
   ));
 
+  // Máy nhóm mình đang giữ do đi mượn: suy ra từ phiếu mượn đang mở (nhóm mượn
+  // thực sự giữ máy), KHÔNG dựa vào equipment.current_group_id để máy đã trả
+  // (hoặc dữ liệu cũ lệch) không hiện mãi ở nhóm mượn.
+  const heldAsBorrowerEquipmentIds = relevantLoanRows
+    .filter((row) => isHeldByBorrower(row.status) && visibleGroupIds.includes(row.borrowerGroupId))
+    .map((row) => row.equipmentId);
+  const extraEquipmentIds = Array.from(new Set([...openTransferEquipmentIds, ...heldAsBorrowerEquipmentIds]));
+
   const rawEquipmentRows = visibleGroupIds.length
     ? await db.select().from(equipment)
-        .where(openTransferEquipmentIds.length
+        .where(extraEquipmentIds.length
           ? or(
               inArray(equipment.ownerGroupId, visibleGroupIds),
-              inArray(equipment.currentGroupId, visibleGroupIds),
-              inArray(equipment.id, openTransferEquipmentIds),
+              inArray(equipment.id, extraEquipmentIds),
             )
-          : or(
-              inArray(equipment.ownerGroupId, visibleGroupIds),
-              inArray(equipment.currentGroupId, visibleGroupIds),
-            ))
+          : inArray(equipment.ownerGroupId, visibleGroupIds))
         .orderBy(asc(equipment.code))
     : [];
 
@@ -229,6 +246,7 @@ export default async function MyEquipmentPage() {
         auditRows={auditRows}
         isWorkshopAdmin={auth.isWorkshopAdmin}
         isReadOnlyViewer={auth.isReadOnlyViewer}
+        defaultGroupId={defaultGroupId}
       />
     </div>
   );

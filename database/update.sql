@@ -89,3 +89,39 @@ CREATE TABLE IF NOT EXISTS tool_disposals (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS tool_disposals_status_idx ON tool_disposals(status);
+
+
+-- V1.6.12: Chuẩn hóa dữ liệu mượn/trả cũ. Idempotent: chạy lần 2 không đổi thêm gì.
+-- NÊN backup trước khi chạy. Chỉ sửa các dòng lệch rõ ràng, không xóa dữ liệu.
+
+-- (a) Phiếu mượn kẹt "có sự cố" dù phiếu sửa nguồn đã kết luận không thể phục hồi
+--     và không còn phiếu sửa nào đang mở: đóng phiếu mượn.
+UPDATE machine_loans l
+SET status = 'completed',
+    closed_at = COALESCE(l.closed_at, now()),
+    incident_notes = COALESCE(l.incident_notes, '') || ' [Tự đóng: máy đã kết luận không thể phục hồi]',
+    updated_at = now()
+WHERE l.status = 'incident'
+  AND EXISTS (SELECT 1 FROM repairs r WHERE r.source_loan_id = l.id AND r.status = 'irreparable')
+  AND NOT EXISTS (
+    SELECT 1 FROM repairs r2
+    WHERE r2.source_loan_id = l.id AND r2.status IN ('pending_acceptance','repairing','wait_owner_confirm')
+  );
+
+-- (b) Máy không còn phiếu mượn/điều chuyển nào đang mở thì phải ở nhóm quản lý
+--     (trước đây máy có thể bị kẹt ở nhóm đã mượn và hiện mãi ở "Dụng cụ nhóm tôi" của nhóm đó).
+UPDATE equipment e
+SET current_group_id = e.owner_group_id,
+    current_holder_id = NULL,
+    updated_at = now()
+WHERE e.current_group_id <> e.owner_group_id
+  AND NOT EXISTS (
+    SELECT 1 FROM machine_loans l
+    WHERE l.equipment_id = e.id
+      AND l.status IN ('pending_owner','approved','wait_handover','on_loan','return_requested','incident')
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM transfers t
+    WHERE t.equipment_id = e.id
+      AND t.status IN ('pending_source','pending_target','pending_ws','wait_handover')
+  );
