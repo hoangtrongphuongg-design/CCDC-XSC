@@ -21,10 +21,11 @@ import {
   createToolDisposalAction,
   receiveDisposalWarehouseAction,
 } from "@/actions/disposals";
+import { CLOSED_DISPOSAL_STATUSES, OPEN_DISPOSAL_STATUSES, RECENT_CLOSED_LIMIT } from "@/lib/workflow-status";
 
 export default async function DisposalsPage() {
   const auth = await requireUser();
-  const [groupRows, equipmentRows, rows, toolRows, toolDisposalRows] = await Promise.all([
+  const [groupRows, equipmentRows, openRows, closedRows, toolRows, openToolDisposalRows, closedToolDisposalRows] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
     db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId }).from(equipment).where(and(
       // Khớp điều kiện của createDisposalAction: máy đã kết luận không thể phục hồi
@@ -33,10 +34,15 @@ export default async function DisposalsPage() {
       inArray(equipment.status, ["in_use_owner", "wait_inspection", "wait_disposal"]),
       eq(equipment.recordStatus, "active"),
     )).orderBy(asc(equipment.code)),
-    db.select().from(disposals).orderBy(desc(disposals.createdAt)).limit(100),
+    // Phiếu đang mở luôn tải đủ; phiếu đã đóng chỉ lấy gần nhất.
+    db.select().from(disposals).where(inArray(disposals.status, [...OPEN_DISPOSAL_STATUSES])).orderBy(desc(disposals.createdAt)),
+    db.select().from(disposals).where(inArray(disposals.status, [...CLOSED_DISPOSAL_STATUSES])).orderBy(desc(disposals.createdAt)).limit(RECENT_CLOSED_LIMIT),
     db.select().from(toolCatalog).where(eq(toolCatalog.isActive, true)).orderBy(asc(toolCatalog.name)),
-    db.select().from(toolDisposals).orderBy(desc(toolDisposals.createdAt)).limit(100),
+    db.select().from(toolDisposals).where(inArray(toolDisposals.status, [...OPEN_DISPOSAL_STATUSES])).orderBy(desc(toolDisposals.createdAt)),
+    db.select().from(toolDisposals).where(inArray(toolDisposals.status, [...CLOSED_DISPOSAL_STATUSES])).orderBy(desc(toolDisposals.createdAt)).limit(RECENT_CLOSED_LIMIT),
   ]);
+  const rows = [...openRows, ...closedRows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const toolDisposalRows = [...openToolDisposalRows, ...closedToolDisposalRows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const groupMap = new Map(groupRows.map((g) => [g.id, g.name]));
   const equipmentMap = new Map((await db.select({ id: equipment.id, code: equipment.code, name: equipment.name }).from(equipment)).map((e) => [e.id, e]));
   const warehouse = groupRows.find((g) => g.code === "KHO_TL");
@@ -53,7 +59,7 @@ export default async function DisposalsPage() {
       <PageHeader title="Thanh lý" description="Kiểm soát đề xuất, phê duyệt và bàn giao Kho thanh lý; mã máy luôn được giữ trong lịch sử." />
       <section className="stat-grid">
         <StatCard title="Chờ nhóm xác nhận" value={pendingGroup} icon={Clock3} tone="warning" />
-        <StatCard title="Chờ WS phê duyệt" value={pendingWs} icon={Recycle} tone="danger" />
+        <StatCard title="Chờ Quản lý Xưởng duyệt" value={pendingWs} icon={Recycle} tone="danger" />
         <StatCard title="Chờ nhập kho" value={waitingWarehouse} icon={PackageCheck} tone="violet" />
         <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
       </section>
@@ -64,7 +70,7 @@ export default async function DisposalsPage() {
             <DataTable headers={["Phiếu", "Máy", "Nhóm quản lý", "Lý do", "Trạng thái", "Thao tác"]} rows={rows.map((row) => {
               const actions = [] as React.ReactNode[];
               if (row.status === "pending_group" && hasGroupPermission(auth, row.ownerGroupId, "manager")) actions.push(<form action={confirmDisposalByGroupAction} key="group"><input type="hidden" name="disposalId" value={row.id} /><Button size="sm">Nhóm xác nhận</Button></form>);
-              if (row.status === "pending_ws" && auth.isWorkshopAdmin) actions.push(<form action={approveDisposalByWsAction} key="ws"><input type="hidden" name="disposalId" value={row.id} /><Button size="sm">WS duyệt</Button></form>);
+              if (row.status === "pending_ws" && auth.isWorkshopAdmin) actions.push(<form action={approveDisposalByWsAction} key="ws"><input type="hidden" name="disposalId" value={row.id} /><Button size="sm">Quản lý Xưởng duyệt</Button></form>);
               if (row.status === "wait_warehouse" && warehouse && hasGroupPermission(auth, warehouse.id, "operator")) actions.push(<form action={receiveDisposalWarehouseAction} key="warehouse"><input type="hidden" name="disposalId" value={row.id} /><Button size="sm">Nhập kho</Button></form>);
               const machine = equipmentMap.get(row.equipmentId);
               return [<strong key="code">{row.code}</strong>, machine ? `${machine.code} — ${machine.name}` : row.equipmentId, groupMap.get(row.ownerGroupId) || "—", row.reason, <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={row.status === "completed" ? "success" : "warning"} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];
@@ -96,7 +102,7 @@ export default async function DisposalsPage() {
                   actions.push(<form action={confirmToolDisposalByGroupAction} key="group"><input type="hidden" name="disposalId" value={row.id} /><Button size="sm">Nhóm xác nhận</Button></form>);
                 }
                 if (row.status === "pending_ws" && auth.isWorkshopAdmin) {
-                  actions.push(<form action={approveToolDisposalByWsAction} key="ws"><input type="hidden" name="disposalId" value={row.id} /><Button size="sm">WS duyệt</Button></form>);
+                  actions.push(<form action={approveToolDisposalByWsAction} key="ws"><input type="hidden" name="disposalId" value={row.id} /><Button size="sm">Quản lý Xưởng duyệt</Button></form>);
                 }
                 const tool = toolMap.get(row.toolId);
                 return [
