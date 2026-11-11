@@ -68,6 +68,34 @@ export async function nextAssetCode(
     : `${input.equipmentPrefix}-VT-${serial}`;
 }
 
+/**
+ * Cấp liền `count` mã máy (cùng nhóm) bằng MỘT câu lệnh — dùng cho nhập Excel hàng trăm máy
+ * để khỏi gọi `nextAssetCode` từng dòng. Cùng cơ chế bộ đếm/ON CONFLICT nên không đụng mã
+ * đang có và không trùng khi nhiều người tạo cùng lúc. Trả về đúng `count` mã liên tiếp.
+ */
+export async function nextAssetCodes(
+  tx: DbTx,
+  input: { groupCode: string; equipmentPrefix: string; count: number },
+): Promise<string[]> {
+  if (!Number.isInteger(input.count) || input.count < 1) return [];
+  const key = `ASSET:${input.groupCode}`;
+  const prefix = `${input.equipmentPrefix}-`;
+  const result = (await tx.execute(sql`
+    insert into workflow_counters (key, value, updated_at)
+    select ${key},
+           coalesce(max(nullif(regexp_replace(${equipment.code}, ${"^.*-([0-9]+)$"}, ${"\\1"}), ${equipment.code})::integer), 0) + ${input.count},
+           now()
+    from ${equipment}
+    where ${equipment.code} like ${`${prefix}%`}
+    on conflict (key) do update
+      set value = greatest(workflow_counters.value + ${input.count}, excluded.value),
+          updated_at = now()
+    returning value
+  `)) as { rows: Array<{ value: number | string }> };
+  const last = Number(result.rows[0]?.value ?? input.count);
+  return Array.from({ length: input.count }, (_, index) => `${prefix}${String(last - input.count + 1 + index).padStart(4, "0")}`);
+}
+
 export type LockedEquipment = {
   id: string;
   code: string;

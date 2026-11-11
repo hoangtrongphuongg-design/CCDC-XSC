@@ -10,6 +10,7 @@ import {
   Boxes,
   ChevronRight,
   ClipboardList,
+  FileSpreadsheet,
   Gauge,
   Handshake,
   Network,
@@ -119,6 +120,7 @@ export function Sidebar({ auth, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthCo
         {auth.isAdmin ? renderGroup("QUẢN TRỊ", [
           ["/groups", "Cơ cấu nhóm Xưởng", Network],
           ["/users", "Người dùng & phân quyền", ShieldCheck],
+          ["/import", "Nhập dữ liệu", FileSpreadsheet],
         ]) : null}
       </nav>
 

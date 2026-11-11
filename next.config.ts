@@ -15,6 +15,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // exceljs chỉ chạy ở server (route xuất Excel); không cho Next bundle nó.
   serverExternalPackages: ["exceljs"],
+  // Trang Nhập máy từ Excel tải lên file tới 2 MB qua Server Action (mặc định chỉ 1 MB).
+  experimental: { serverActions: { bodySizeLimit: "3mb" } },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

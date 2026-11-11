@@ -78,6 +78,9 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   // CCDC
   "equipment.create": { label: "Tạo CCDC", category: "ccdc" },
   "equipment.initial_allocation": { label: "Cấp phát ban đầu", category: "ccdc" },
+  "equipment.import": { label: "Nhập CCDC từ Excel", category: "ccdc" },
+  // Bản ghi theo từng máy của đợt nhập Excel: chỉ cho tab Lịch sử của máy, ẩn khỏi bảng tin để khỏi ngập.
+  "equipment.import_create": { label: "Tạo CCDC (nhập Excel, ghi theo máy)", category: "ccdc", mirror: true },
   "equipment.update": { label: "Cập nhật CCDC", category: "ccdc" },
   "equipment.admin_correction": { label: "Admin hiệu chỉnh CCDC", category: "ccdc" },
   "equipment.condition.update": { label: "Cập nhật tình trạng CCDC", category: "ccdc" },

@@ -28,3 +28,32 @@ export async function writeAudit(
     reason: input.reason ?? null,
   });
 }
+
+/** Ghi nhiều dòng nhật ký bằng một câu lệnh (nhập hàng loạt); cùng cột với `writeAudit`. */
+export async function writeAuditBatch(
+  tx: any,
+  inputs: Array<{
+    actorUserId?: string | null;
+    actorGroupId?: string | null;
+    actorRole?: string | null;
+    action: string;
+    entityType: string;
+    entityId?: string | null;
+    description: string;
+    afterData?: unknown;
+  }>,
+) {
+  if (!inputs.length) return;
+  await tx.insert(activityLogs).values(inputs.map((input) => ({
+    actorUserId: input.actorUserId ?? null,
+    actorGroupId: input.actorGroupId ?? null,
+    actorRole: input.actorRole ?? null,
+    action: input.action,
+    entityType: input.entityType,
+    entityId: input.entityId ?? null,
+    description: input.description,
+    beforeData: null,
+    afterData: input.afterData ?? null,
+    reason: null,
+  })));
+}

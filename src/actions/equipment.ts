@@ -12,6 +12,7 @@ import { isUniqueViolation } from "@/lib/db/errors";
 import { writeAudit } from "@/lib/audit";
 import { EQUIPMENT_CATEGORIES } from "@/lib/equipment-categories";
 import { assertEquipmentHasNoOtherOpenWorkflow, lockEquipment, nextAssetCode } from "@/lib/workflows";
+import { insertEquipmentRecord } from "@/lib/equipment-create";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { GROUP_PERMISSION_LABELS } from "@/lib/auth/roles";
 
@@ -312,64 +313,15 @@ export async function saveEquipmentRecordAction(
 
     let createdCode = "";
     await db.transaction(async (tx) => {
-      createdCode = await nextAssetCode(tx, {
-        groupCode: ownerGroup.code,
-        equipmentPrefix: ownerGroup.equipmentPrefix,
-        mode: "individual",
-      });
-
-      await tx.insert(equipmentTypeCatalog).values({
-        categoryCode: data.categoryCode,
-        name: data.equipmentType,
-        createdBy: auth.userId,
-      }).onConflictDoNothing();
-
-      const [created] = await tx.insert(equipment).values({
-        code: createdCode,
-        legacyCode: data.legacyCode || null,
-        name: data.name,
-        equipmentType: data.equipmentType,
-        categoryCode: data.categoryCode,
-        technicalSpecs: data.technicalSpecs || null,
-        technicalNote: data.technicalNote || null,
-        unit: "cái",
-        recordStatus: "active",
+      const created = await insertEquipmentRecord(tx, {
+        actorUserId: auth.userId,
+        actorRole: getActorRoleLabel(auth, data.ownerGroupId),
+        ownerGroup: { id: ownerGroup.id, code: ownerGroup.code, name: ownerGroup.name, equipmentPrefix: ownerGroup.equipmentPrefix },
         originType: data.originType,
         recordedDate: data.recordedDate,
-        brand: data.brand || null,
-        model: data.model || null,
-        serial: data.serial || null,
-        manufactureYear: data.manufactureYear || null,
-        commissionYear: data.commissionYear || null,
-        originGroupId: data.ownerGroupId,
-        ownerGroupId: data.ownerGroupId,
-        currentGroupId: data.ownerGroupId,
-        currentLocation: data.currentLocation || null,
-        status: "in_use_owner",
-        condition: data.condition,
-        purchaseDate: data.purchaseDate || null,
-        poContractNo: data.poContractNo || null,
-        supplierName: data.supplierName || null,
-        purchasePrice: data.purchasePrice === undefined ? null : String(data.purchasePrice),
-        warrantyUntil: data.warrantyUntil || null,
-        purchaseNote: data.purchaseNote || null,
-        notes: data.notes || null,
-        createdBy: auth.userId,
-        updatedBy: auth.userId,
-      }).returning();
-
-      await writeAudit(tx as never, {
-        actorUserId: auth.userId,
-        actorGroupId: data.ownerGroupId,
-        actorRole: getActorRoleLabel(auth, data.ownerGroupId),
-        action: data.originType === "new_purchase" ? "equipment.initial_allocation" : "equipment.create",
-        entityType: "equipment",
-        entityId: created.id,
-        description: data.originType === "new_purchase"
-          ? `Tiếp nhận và cấp phát ban đầu ${created.code} cho ${ownerGroup.name}`
-          : `Tạo CCDC hiện hữu ${created.code}`,
-        afterData: created,
+        fields: data,
       });
+      createdCode = created.code;
     });
 
     await setFlashMessage("success", "Đã thêm CCDC mới", `CCDC ${createdCode} đã được tạo thành công.`);
