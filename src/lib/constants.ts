@@ -1,6 +1,14 @@
 export const APP_NAME = "QUẢN LÝ CCDC - XSC";
 export const SESSION_COOKIE = "ccdc_xsc_session_v2";
+/** Phiên đăng nhập thường: 8 giờ. */
 export const SESSION_TTL_SECONDS = 8 * 60 * 60;
+/** Phiên khi người dùng chọn "Ghi nhớ đăng nhập trên thiết bị này": 30 ngày. */
+export const REMEMBER_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+/** Thời hạn phiên (giây): ghi nhớ thiết bị → 30 ngày, không thì 8 giờ. */
+export function sessionTtlSeconds(remember: boolean): number {
+  return remember ? REMEMBER_SESSION_TTL_SECONDS : SESSION_TTL_SECONDS;
+}
 export const USERNAME_PATTERN = /^(?!.*\.\.)[a-z0-9][a-z0-9._]{2,28}[a-z0-9]$/;
 
 export const EQUIPMENT_STATUS_LABELS = {

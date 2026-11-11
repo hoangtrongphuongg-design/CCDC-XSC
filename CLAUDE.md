@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 110 pass
+npm test           # tsx --test tests/*.test.ts — 112 pass
 ```
 
 Không có ESLint script.
@@ -23,7 +23,7 @@ Next.js 15 App Router + React 19 + TypeScript. Một Postgres (Neon) qua **Drizz
 
 ### Xác thực & phân quyền (`src/lib/auth/`)
 
-- Không dùng NextAuth. Tự làm: đăng nhập bằng `employeeCode` + mật khẩu (`bcryptjs`, cost 12) → JWT ký HS256 bằng `AUTH_SECRET` (`jose`), lưu cookie `ccdc_xsc_session_v2` (httpOnly, 8h, `SESSION_TTL_SECONDS`).
+- Không dùng NextAuth. Tự làm: đăng nhập bằng `employeeCode` + mật khẩu (`bcryptjs`, cost 12) → JWT ký HS256 bằng `AUTH_SECRET` (`jose`), lưu cookie `ccdc_xsc_session_v2` (httpOnly; **8h** thường — `SESSION_TTL_SECONDS`, hoặc **30 ngày** khi đăng nhập có tích "Ghi nhớ đăng nhập trên thiết bị này", mặc định đã tích — `REMEMBER_SESSION_TTL_SECONDS`/`sessionTtlSeconds()` trong `lib/constants.ts`; JWT và cookie cùng hạn).
 - `getAuthResult()` (`session.ts`) verify JWT **và** đối chiếu `sessionVersion` trong token với DB. Mọi thao tác thay quyền/khóa tài khoản/đổi mật khẩu đều `sessionVersion + 1` để vô hiệu hóa mọi phiên cũ.
 - **Không có `middleware.ts`.** Bảo vệ route qua `src/app/(app)/layout.tsx` gọi `requireUser()` (`export const dynamic = "force-dynamic"`). Trang trong nhóm `(app)` được bảo vệ nhờ layout này; trang cần quyền cao hơn phải tự gọi `requireAdmin()` / `requireWsManager()` trong thân trang (vd `groups/page.tsx`, `users/page.tsx`).
 - Guards (`guards.ts`): `requireUser` → `requireWsManager` (Quản lý Xưởng hoặc Admin) → `requireAdmin` (Admin hệ thống). `hasGroupPermission(auth, groupId, "viewer"|"operator"|"manager")` / `requireGroupPermission(...)` cho quyền theo nhóm.

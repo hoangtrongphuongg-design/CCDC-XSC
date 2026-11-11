@@ -3,7 +3,7 @@ import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { groups, userGroupPermissions, users } from "@/lib/db/schema";
-import { SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/constants";
+import { SESSION_COOKIE, sessionTtlSeconds } from "@/lib/constants";
 
 const secretValue = process.env.AUTH_SECRET || (process.env.NODE_ENV === "production" ? "" : "development-only-secret-change-me");
 if (!secretValue) throw new Error("Thiếu AUTH_SECRET trong môi trường production.");
@@ -85,19 +85,24 @@ export type AuthResult =
   | { auth: AuthContext; reason: null }
   | { auth: null; reason: AuthFailureReason };
 
-export async function createSessionToken(userId: string, sessionVersion: number) {
+export async function createSessionToken(userId: string, sessionVersion: number, ttlSeconds: number = sessionTtlSeconds(false)) {
   return new SignJWT({ sessionVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
+    .setExpirationTime(`${ttlSeconds}s`)
     .sign(secret);
 }
 
-export async function setSessionCookie(userId: string, sessionVersion: number) {
-  const token = await createSessionToken(userId, sessionVersion);
+/**
+ * `remember` = người dùng chọn ghi nhớ thiết bị: cookie và JWT cùng hết hạn sau 30 ngày thay vì 8 giờ.
+ * Đổi quyền / khóa tài khoản / đổi mật khẩu vẫn tăng `sessionVersion` nên vô hiệu mọi phiên đã ghi nhớ.
+ */
+export async function setSessionCookie(userId: string, sessionVersion: number, remember = false) {
+  const ttl = sessionTtlSeconds(remember);
+  const token = await createSessionToken(userId, sessionVersion, ttl);
   const store = await cookies();
-  const expires = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+  const expires = new Date(Date.now() + ttl * 1000);
 
   // V2 dùng tên cookie mới để loại trừ cookie cũ/stale từ các bản trước.
   // Lax vẫn bảo vệ tốt cho ứng dụng nội bộ và ổn định hơn Strict với điều hướng/refresh.
@@ -106,7 +111,7 @@ export async function setSessionCookie(userId: string, sessionVersion: number) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: SESSION_TTL_SECONDS,
+    maxAge: ttl,
     expires,
     priority: "high",
   });

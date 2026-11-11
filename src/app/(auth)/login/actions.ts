@@ -40,6 +40,7 @@ export async function loginAction(_: LoginState, formData: FormData): Promise<Lo
     .set({ lastLoginAt: new Date(), updatedAt: new Date() })
     .where(eq(users.id, user.id))
     .returning({ sessionVersion: users.sessionVersion });
-  await setSessionCookie(user.id, loginUser?.sessionVersion ?? user.sessionVersion);
+  const remember = formData.get("remember") === "on";
+  await setSessionCookie(user.id, loginUser?.sessionVersion ?? user.sessionVersion, remember);
   redirect("/dashboard");
 }
