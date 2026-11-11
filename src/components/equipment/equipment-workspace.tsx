@@ -27,6 +27,7 @@ import { FormField } from "@/components/ui/form-field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CONDITION_LABELS, EQUIPMENT_STATUS_LABELS } from "@/lib/constants";
 import { isHeldByBorrower } from "@/lib/loan-status";
+import { rankLabels } from "@/lib/canonical-text";
 import {
   EQUIPMENT_CATEGORIES,
   EQUIPMENT_DISCIPLINE_LABELS,
@@ -286,6 +287,7 @@ function AssetForm({
   record,
   permissions,
   typeRows,
+  locationOptions,
   isWorkshopAdmin,
   onSaved,
   onCancel,
@@ -294,6 +296,7 @@ function AssetForm({
   record: IndividualEquipmentRow | null;
   permissions: EquipmentPermission[];
   typeRows: EquipmentTypeRow[];
+  locationOptions: string[];
   isWorkshopAdmin: boolean;
   onSaved: (afterSave: "close" | "add_next") => void;
   onCancel: () => void;
@@ -523,7 +526,7 @@ function AssetForm({
                 .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </FormField>
-          <FormField label="Vị trí"><input name="currentLocation" defaultValue={record?.currentLocation || ""} placeholder="Kho Workshop, Tủ số 2..." /></FormField>
+          <FormField label="Vị trí"><input name="currentLocation" defaultValue={record?.currentLocation || ""} list="equipment-locations" placeholder="Kho Workshop, Tủ số 2..." /><datalist id="equipment-locations">{locationOptions.map((location) => <option key={location} value={location} />)}</datalist></FormField>
           <FormField label="Ghi chú"><textarea name="notes" rows={3} defaultValue={record?.notes || ""} /></FormField>
         </div>
       </section>
@@ -735,6 +738,7 @@ export function EquipmentWorkspace({
       .catch(() => setHistoryByKey((prev) => ({ ...prev, [key]: { status: "error", message: "Không tải được lịch sử. Vui lòng thử lại." } })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailRecord, detailTab, historyKey]);
+  const locationOptions = useMemo(() => rankLabels(equipmentRows.map((row) => row.currentLocation)), [equipmentRows]);
   const typeOptions = useMemo(() => Array.from(new Set(equipmentRows.filter((row) => categoryFilter === "all" || row.categoryCode === categoryFilter).map((row) => row.equipmentType))).sort((a, b) => a.localeCompare(b, "vi")), [equipmentRows, categoryFilter]);
   const normalizedSearch = search.trim().toLocaleLowerCase("vi");
   const canAdd = !isReadOnlyViewer && (isWorkshopAdmin || actionablePermissions.length > 0);
@@ -946,7 +950,7 @@ export function EquipmentWorkspace({
             <div><span className="modal-kicker">DỤNG CỤ NHÓM TÔI</span><h2 id="asset-dialog-title">{editorMode === "edit" ? `Cập nhật ${editorRecord?.code}` : editorMode === "clone" ? "Sao chép để tạo CCDC mới" : isWorkshopAdmin ? "Thêm / cấp phát CCDC" : "Thêm dụng cụ"}</h2><p>Mã hệ thống được cấp tự động theo nhóm quản lý ban đầu và không tái sử dụng.</p></div>
             <button type="button" className="icon-button" onClick={closeEditor} aria-label="Đóng"><X size={18} /></button>
           </header>
-          <div className="asset-modal-body"><AssetForm key={formKey} mode={editorMode} record={editorRecord} permissions={permissions} typeRows={typeRows} isWorkshopAdmin={isWorkshopAdmin} onSaved={handleSaved} onCancel={closeEditor} /></div>
+          <div className="asset-modal-body"><AssetForm key={formKey} mode={editorMode} record={editorRecord} permissions={permissions} typeRows={typeRows} locationOptions={locationOptions} isWorkshopAdmin={isWorkshopAdmin} onSaved={handleSaved} onCancel={closeEditor} /></div>
         </section>
       </div> : null}
 

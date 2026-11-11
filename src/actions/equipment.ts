@@ -13,6 +13,8 @@ import { writeAudit } from "@/lib/audit";
 import { EQUIPMENT_CATEGORIES } from "@/lib/equipment-categories";
 import { assertEquipmentHasNoOtherOpenWorkflow, lockEquipment, nextAssetCode } from "@/lib/workflows";
 import { insertEquipmentRecord } from "@/lib/equipment-create";
+import { loadCanonicalizers } from "@/lib/canonical-data";
+import { cleanLabel } from "@/lib/canonical-text";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { GROUP_PERMISSION_LABELS } from "@/lib/auth/roles";
 
@@ -172,11 +174,20 @@ export async function saveEquipmentRecordAction(
     return { status: "error", message: parsed.error.issues[0]?.message || "Dữ liệu không hợp lệ." };
   }
 
-  const data = parsed.data;
+  let data = parsed.data;
 
   try {
     const auth = await requireUser();
     if (auth.isReadOnlyViewer) return { status: "error", message: "Người xem toàn xưởng chỉ có quyền xem dữ liệu." };
+
+    // Đưa Loại máy / Vị trí về đúng cách viết đã có (không phân biệt hoa thường, gộp khoảng trắng);
+    // loại/vị trí chưa có vẫn được thêm như cũ.
+    const { canonicalType, canonicalLocation } = await loadCanonicalizers();
+    data = {
+      ...data,
+      equipmentType: canonicalType(data.categoryCode, data.equipmentType) || cleanLabel(data.name),
+      currentLocation: data.currentLocation ? canonicalLocation(data.currentLocation) || undefined : undefined,
+    };
 
     const duplicateWarnings = await findDuplicateWarning({
       recordId: data.recordId,

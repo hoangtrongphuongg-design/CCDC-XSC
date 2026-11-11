@@ -125,3 +125,84 @@ WHERE e.current_group_id <> e.owner_group_id
     WHERE t.equipment_id = e.id
       AND t.status IN ('pending_source','pending_target','pending_ws','wait_handover')
   );
+
+
+-- V1.6.13: Chuẩn hóa chữ Loại máy / Vị trí đã nhập tự do ("Máy hàn que" / "máy hàn  que " / "MÁY HÀN QUE").
+-- Idempotent: chạy lần 2 không đổi thêm gì. NÊN backup trước khi chạy.
+-- Cách chọn cách viết chuẩn (khớp lib/canonical-text.ts): cách viết xuất hiện nhiều nhất; hòa thì
+-- ưu tiên chữ đầu viết hoa, rồi thứ tự chữ cái. Loại máy gộp theo từng nhóm thiết bị (category_code).
+-- Chỉ gộp các dòng chỉ khác nhau ở hoa/thường và khoảng trắng; không đổi dấu, không xóa dữ liệu.
+
+-- (0) XEM TRƯỚC (chỉ SELECT, chạy trước để biết sẽ đổi gì): các cách viết sẽ bị gộp.
+--   Bỏ dấu "--" ở đầu từng dòng của khối dưới đây để chạy.
+-- WITH counted AS (
+--   SELECT category_code,
+--          lower(btrim(regexp_replace(equipment_type, '\s+', ' ', 'g'))) AS k,
+--          btrim(regexp_replace(equipment_type, '\s+', ' ', 'g')) AS spelling,
+--          count(*) AS n
+--   FROM equipment WHERE btrim(coalesce(equipment_type, '')) <> '' GROUP BY 1, 2, 3
+-- ), ranked AS (
+--   SELECT *, row_number() OVER (PARTITION BY category_code, k
+--          ORDER BY n DESC, (spelling ~ '^[[:upper:]]') DESC, spelling ASC) AS rn
+--   FROM counted
+-- )
+-- SELECT r.category_code, r.spelling AS "chuẩn", o.spelling AS "sẽ đổi từ", o.n AS "số máy"
+-- FROM ranked r JOIN ranked o ON o.category_code = r.category_code AND o.k = r.k AND o.rn > 1
+-- WHERE r.rn = 1 ORDER BY 1, 2;
+
+-- (a) Loại máy: gộp về cách viết chuẩn trong cùng nhóm thiết bị.
+WITH counted AS (
+  SELECT category_code,
+         lower(btrim(regexp_replace(equipment_type, '\s+', ' ', 'g'))) AS k,
+         btrim(regexp_replace(equipment_type, '\s+', ' ', 'g')) AS spelling,
+         count(*) AS n
+  FROM equipment WHERE btrim(coalesce(equipment_type, '')) <> '' GROUP BY 1, 2, 3
+), canonical AS (
+  SELECT category_code, k, spelling FROM (
+    SELECT *, row_number() OVER (PARTITION BY category_code, k
+           ORDER BY n DESC, (spelling ~ '^[[:upper:]]') DESC, spelling ASC) AS rn
+    FROM counted
+  ) ranked WHERE rn = 1
+)
+UPDATE equipment e
+SET equipment_type = c.spelling, updated_at = now()
+FROM canonical c
+WHERE c.category_code = e.category_code
+  AND c.k = lower(btrim(regexp_replace(e.equipment_type, '\s+', ' ', 'g')))
+  AND e.equipment_type IS DISTINCT FROM c.spelling;
+
+-- (b) Vị trí: cùng quy tắc, gộp toàn xưởng (không theo nhóm thiết bị).
+WITH counted AS (
+  SELECT lower(btrim(regexp_replace(current_location, '\s+', ' ', 'g'))) AS k,
+         btrim(regexp_replace(current_location, '\s+', ' ', 'g')) AS spelling,
+         count(*) AS n
+  FROM equipment WHERE btrim(coalesce(current_location, '')) <> '' GROUP BY 1, 2
+), canonical AS (
+  SELECT k, spelling FROM (
+    SELECT *, row_number() OVER (PARTITION BY k
+           ORDER BY n DESC, (spelling ~ '^[[:upper:]]') DESC, spelling ASC) AS rn
+    FROM counted
+  ) ranked WHERE rn = 1
+)
+UPDATE equipment e
+SET current_location = c.spelling, updated_at = now()
+FROM canonical c
+WHERE c.k = lower(btrim(regexp_replace(e.current_location, '\s+', ' ', 'g')))
+  AND e.current_location IS DISTINCT FROM c.spelling;
+
+-- (c) Danh mục loại máy: tắt (không xóa) các bản "na ná" không còn máy nào dùng,
+--     để ô gợi ý không còn hiện hai cách viết của cùng một loại.
+UPDATE equipment_type_catalog t
+SET is_active = false, updated_at = now()
+WHERE t.is_active
+  AND NOT EXISTS (
+    SELECT 1 FROM equipment e
+    WHERE e.category_code = t.category_code AND e.equipment_type = t.name
+  )
+  AND EXISTS (
+    SELECT 1 FROM equipment_type_catalog o
+    WHERE o.category_code = t.category_code AND o.id <> t.id AND o.is_active
+      AND lower(btrim(regexp_replace(o.name, '\s+', ' ', 'g'))) = lower(btrim(regexp_replace(t.name, '\s+', ' ', 'g')))
+      AND (EXISTS (SELECT 1 FROM equipment e2 WHERE e2.category_code = o.category_code AND e2.equipment_type = o.name)
+           OR o.name < t.name)
+  );
