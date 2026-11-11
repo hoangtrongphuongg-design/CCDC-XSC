@@ -2547,3 +2547,9 @@ body {
 @media (max-width: 760px) {
   .import-row { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* Báo cáo điều hành */
+.reports-page { display: grid; gap: 14px; }
+.reports-page > .page-header { margin-bottom: 4px; }
+.report-note { margin: 0 0 10px; font-size: 12px; }
+.report-late { color: var(--danger); }

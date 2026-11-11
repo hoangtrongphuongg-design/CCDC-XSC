@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 79 pass
+npm test           # tsx --test tests/*.test.ts — 85 pass
 ```
 
 Không có ESLint script.
@@ -63,6 +63,11 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - `lib/my-tasks.ts` (hàm thuần) quyết định phiếu nào đang chờ **chính người dùng**; `lib/my-tasks-data.ts` chỉ đọc các phiếu **đang mở** (`loadMyTasks(auth)`, bọc `react.cache` để layout và trang dùng chung một lần truy vấn, lỗi DB thì trả rỗng chứ không làm hỏng trang). `(app)/layout.tsx` tính số đếm → `AppShell` → huy hiệu ở Sidebar (Mượn – Trả, Điều chuyển, Sửa chữa, Thanh lý), MobileNav (Trang chủ = tổng, Mượn/Trả = mượn) và chuông `Topbar` (link `/dashboard#viec-cho-toi`). Thẻ "Việc chờ tôi xử lý" ở `/dashboard` (tối đa 8 việc, chờ lâu nhất lên đầu).
 - Quy tắc: bước cấp nhóm chỉ tính cho **thành viên nhóm** đủ bậc mà Server Action đòi (Admin/Quản lý Xưởng KHÔNG tự có việc của mọi nhóm, dù backend cho họ thao tác); bước cấp Xưởng (tiếp nhận sửa, duyệt điều chuyển/thanh lý) tính cho Quản lý Xưởng/Admin; Kho thanh lý tính cho operator+ nhóm `KHO_TL`; người tạo phiếu không tự thấy việc duyệt phiếu của mình; Người xem toàn xưởng không có việc nào; phiếu sửa "đang sửa" không tính (không phải việc chờ). Quá hạn trả tính cho nhóm đang mượn.
 - **Thêm trạng thái/bước duyệt mới** cho workflow thì thêm quy tắc vào `buildMyTasks` + test trong `tests/my-tasks.test.ts`, kẻo huy hiệu không hiện việc mới.
+
+### Báo cáo điều hành (`/reports`)
+
+- Chỉ vai trò xem toàn Xưởng (`requireWholeWorkshopView`). Ngoài các số đếm cũ (cơ cấu theo trạng thái / nhóm) có thêm: **phiếu quá hạn trả** (mượn máy đang `on_loan`/`incident` + mượn nhanh `borrowed`, trễ nhiều ngày nhất lên đầu), **chi phí sửa chữa 12 tháng gần nhất** theo tháng và theo nhóm quản lý máy (tính theo `repairs.completed_at` giờ VN, cộng `cost`), **máy nằm không** (Sẵn sàng + tình trạng Tốt, không có phiếu mượn nào ngoài rejected/cancelled trong 180 ngày; chưa từng mượn thì tính từ `recorded_date`; liệt kê 50 máy lâu nhất).
+- Phân tầng: `lib/reports.ts` (hàm thuần, ngày theo giờ VN, có test) → `lib/reports-data.ts` (`loadOperationsReport()`, MỘT nguồn cho cả trang và Excel) → `lib/export/report-workbook.ts` → `GET /reports/export` (3 sheet: Quá hạn trả / Chi phí sửa chữa / Máy nằm không; chi phí ghi dạng số). Ngưỡng 180 ngày / 12 tháng / 50 dòng là hằng ở đầu `lib/reports.ts`.
 
 ### Chuẩn hóa Loại máy / Vị trí
 
