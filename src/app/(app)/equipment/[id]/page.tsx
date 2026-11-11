@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ClipboardList } from "lucide-react";
+import { ArrowLeft, ClipboardList, QrCode } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
@@ -41,6 +41,7 @@ export default async function MachineProfilePage({ params }: { params: Promise<{
         actions={
           <>
             <Link className="btn btn-secondary" href={`/equipment?q=${encodeURIComponent(machine.code)}`}><ArrowLeft size={16} /> Dụng cụ toàn xưởng</Link>
+            <Link className="btn btn-secondary" href={`/labels?ids=${machine.id}`}><QrCode size={16} /> In tem QR</Link>
             {inMyScope ? <Link className="btn btn-primary" href="/my-equipment"><ClipboardList size={16} /> Dụng cụ nhóm tôi</Link> : null}
           </>
         }

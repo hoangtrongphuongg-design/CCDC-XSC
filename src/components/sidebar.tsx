@@ -14,6 +14,7 @@ import {
   Gauge,
   Handshake,
   Network,
+  QrCode,
   Recycle,
   ShieldCheck,
   Wrench,
@@ -40,6 +41,7 @@ const operationItems = [
   ["/dashboard", "Tổng quan", Gauge],
   ["/equipment", "Dụng cụ toàn xưởng", Boxes],
   ["/my-equipment", "Dụng cụ nhóm tôi", ClipboardList],
+  ["/labels", "In tem QR", QrCode],
 ] as const satisfies readonly NavItem[];
 
 const workflowItems = [

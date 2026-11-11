@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 96 pass
+npm test           # tsx --test tests/*.test.ts — 103 pass
 ```
 
 Không có ESLint script.
@@ -69,6 +69,12 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - Một trang gom mọi thứ về một máy: trạng thái / tình trạng / nhóm quản lý / nhóm đang giữ (suy ra từ phiếu mượn `on_loan`/`incident`, không dùng `current_group_id`) / vị trí, **phiếu đang mở** (mượn máy, điều chuyển, sửa chữa, thanh lý; link sang trang nghiệp vụ), thông tin kỹ thuật, nguồn gốc, **lịch sử**. Chỉ xem; thao tác vẫn ở "Dụng cụ nhóm tôi" (nút dẫn sang nếu máy trong phạm vi tài khoản). Route tĩnh `/equipment/export` luôn thắng `[id]`; id sai dạng UUID → 404 (`isUuid`).
 - Quyền: **ai đăng nhập cũng xem được** thông tin chung (như trang Dụng cụ toàn xưởng). **Lịch sử** theo `canViewEquipmentHistory` (cùng quy tắc tab Lịch sử; không đủ quyền thì hiện thông báo). **Đơn giá / PO / nhà cung cấp** chỉ Admin / Quản lý Xưởng hoặc nhóm quản lý máy (`canSeeFinancials`; Người xem toàn xưởng không thấy, như file Excel không xuất đơn giá). **Hồ sơ nháp** (`recordStatus != active`) chỉ người trong phạm vi máy xem được, người khác 404.
 - `lib/machine-profile.ts` (hàm thuần, có test) + `lib/machine-profile-data.ts` (`loadMachineProfile`). Liên kết vào từ danh sách `/equipment` (cột Mã hệ thống) và kết quả `/search`.
+
+### Tem QR dán máy (`/labels`)
+
+- Trang in tem decal **A4, lưới 3 cột × 8 hàng = 24 tem/tờ, mỗi tem 70 × 37 mm** (khổ phổ biến). Mỗi tem: mã QR (27 mm) + mã hệ thống + tem nhôm + tên + nhóm; quét → `/equipment/<id>` (hồ sơ máy; dùng UUID nên không đổi dù máy điều chuyển; chưa đăng nhập thì bị `requireUser` đưa về `/login`). Vào từ menu "In tem QR" (chọn nhóm quản lý; Admin/Quản lý Xưởng/Người xem toàn xưởng mọi nhóm, người dùng theo nhóm chỉ nhóm mình) hoặc nút "In tem QR" ở hồ sơ máy (`/labels?ids=<id>`, tối đa 100 id). Có ô "Bắt đầu từ ô số" cho tờ decal đã bóc dở, tối đa 240 tem (10 tờ) mỗi lần.
+- **Địa chỉ trong QR** mặc định lấy theo host của yêu cầu (`x-forwarded-host`/`host`) và có ô sửa (`?base=`, `normalizeBaseUrl` chỉ giữ gốc http(s), từ chối `javascript:`/có tài khoản). **Phải in từ bản chạy thật, không phải bản Preview**, vì tem dán lên máy dùng lâu.
+- `lib/labels.ts` (hàm thuần, có test: địa chỉ, chia trang, ô bắt đầu) + `lib/labels-data.ts` (SVG QR bằng thư viện `qrcode`, sinh ở server, chỉ chứa UUID máy nên `dangerouslySetInnerHTML` an toàn). In: `@page labels { size: A4; margin: 0 }` đặt tên để không ảnh hưởng trang khác; `@media print` ẩn sidebar/topbar/nav, ô trống ẩn bằng `visibility`. Người dùng cần in A4 **100%** (không Fit to page), lề "Không có". Đổi khổ tem thì sửa hằng ở `lib/labels.ts` và CSS `.labels-page`/`.label-cell` (mm) cùng lúc — test canh `70mm`/`37.125mm`.
 
 ### Tìm kiếm chung (`/search`)
 
