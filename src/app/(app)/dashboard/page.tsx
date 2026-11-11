@@ -4,24 +4,29 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeftRight,
+  BarChart3,
   Boxes,
+  CheckCircle2,
   ChevronRight,
-  Clock3,
+  ClipboardCheck,
+  FileSpreadsheet,
   Handshake,
-  Plus,
+  RotateCcw,
   Search,
   Wrench,
+  type LucideIcon,
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { activityLogs, equipment, groups, machineLoans, quickLoans, repairs, transfers, users } from "@/lib/db/schema";
 import { canViewWholeWorkshop, hasGroupPermission, requireUser } from "@/lib/auth/guards";
-import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { formatDateTime } from "@/lib/utils";
 import { WORKFLOW_LABELS } from "@/lib/constants";
 import { loadMyTasks } from "@/lib/my-tasks-data";
+import { buildHomeActions, greetingFor, kpiLinks, shortName, type HomeActionIcon } from "@/lib/home-actions";
+import { getRoleSummary } from "@/lib/auth/roles";
 import { approveMachineLoanAction, confirmMachineReturnAction, rejectMachineLoanAction, requestMachineReturnAction } from "@/actions/machine-loans";
 import { approveQuickLoanAction, closeQuickLoanAction, rejectQuickLoanAction, reportQuickLoanReturnAction } from "@/actions/quick-loans";
 
@@ -47,6 +52,32 @@ export const dynamic = "force-dynamic";
 
 /** Số việc hiện sẵn trên thẻ "Việc chờ tôi xử lý"; còn lại bấm vào từng trang nghiệp vụ. */
 const MY_TASKS_SHOWN = 8;
+const MOBILE_TASKS_SHOWN = 5;
+
+const ACTION_ICONS: Record<HomeActionIcon, LucideIcon> = {
+  loan: Handshake,
+  return: RotateCcw,
+  repair: Wrench,
+  search: Search,
+  inventory: ClipboardCheck,
+  approve: CheckCircle2,
+  report: BarChart3,
+  import: FileSpreadsheet,
+  equipment: Boxes,
+};
+
+/** Ô số liệu: bấm được để mở danh sách tương ứng (không có trang với vai trò này thì chỉ hiện số). */
+function Kpi({ href, label, value, note, icon: Icon, focus }: { href: string | null; label: string; value: number; note: string; icon: LucideIcon; focus?: boolean }) {
+  const content = (
+    <>
+      <div><span>{label}</span><strong>{value}</strong></div>
+      <Icon size={23} aria-hidden="true" />
+      <small>{note}</small>
+    </>
+  );
+  const className = focus ? "executive-kpi is-focus" : "executive-kpi";
+  return href ? <Link href={href} className={className + " is-link"}>{content}</Link> : <article className={className}>{content}</article>;
+}
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -62,9 +93,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const filterStatus = one(params.status);
   const showMobileInbox = one(params.inbox) === "1";
   const showMobileRelated = one(params.related) === "1";
-  const showMobileLoans = one(params.loans) === "1";
-  const showMobileReturns = one(params.returns) === "1";
-  const showMobileRepairs = one(params.repairs) === "1";
   const fullWorkshopScope = canViewWholeWorkshop(auth);
   const allowedGroupIds = new Set(auth.permissions.map((permission) => permission.groupId));
   const today = new Date().toISOString().slice(0, 10);
@@ -198,7 +226,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const filteredTransfers = [...filteredIds].filter((id) => transferEquipmentIds.has(id)).length;
 
   const scopeLabel = fullWorkshopScope ? "toàn XSC" : auth.permissions.length === 1 ? auth.permissions[0].groupName : "các nhóm được phân quyền";
-  const canOperate = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.length > 0);
+  const homeActions = buildHomeActions(auth, { pendingTasks: myTasks.length });
+  const links = kpiLinks(auth);
+  const todayLabel = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
   const borrowedCountForMobile = machineBorrowedByMe + quickBorrowedByMe;
   const lentCountForMobile = machineLentByMe + quickLentByMe;
   const returnWaitingCount = mobileRelatedMachine.filter((row) => row.status === "return_requested").length
@@ -220,57 +250,32 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
           <input name="q" placeholder="Tìm máy, tem nhôm, serial, mã phiếu..." aria-label="Tìm kiếm chung" />
         </form>
 
-        {canOperate ? (
-          <div className="mobile-ops-primary mobile-ops-primary-v2" id="mobile-actions">
-            <Link href="/dashboard?loans=1#mobile-loan-overview" className="mobile-action-card">
-              <span><Handshake size={20} /></span><div><strong>Mượn CCDC</strong><small>{borrowedCountForMobile ? `${borrowedCountForMobile} đang mượn` : "Xem phiếu mượn"}</small></div><ChevronRight size={16} />
-            </Link>
-            <Link href="/dashboard?returns=1#mobile-return-overview" className="mobile-action-card">
-              <span><Clock3 size={20} /></span><div><strong>Trả CCDC</strong><small>{returnWaitingCount ? `${returnWaitingCount} chờ nhận lại` : "Xem CCDC cần trả"}</small></div><ChevronRight size={16} />
-            </Link>
-            <Link href="/dashboard?repairs=1#mobile-repair-overview" className="mobile-action-card is-compact">
-              <span><Wrench size={18} /></span><div><strong>Báo hư</strong><small>{repairCount ? `${repairCount} phiếu đang mở` : "Xem phiếu báo hư"}</small></div><ChevronRight size={16} />
-            </Link>
-            <Link href="/my-equipment" className="mobile-action-card is-compact">
-              <span><Boxes size={18} /></span><div><strong>CCDC nhóm tôi</strong><small>{scopedEquipment.length} CCDC</small></div><ChevronRight size={16} />
-            </Link>
+        <section className="mobile-ops-block mobile-tasks" id="mobile-my-tasks" aria-label="Việc chờ tôi">
+          <div className="mobile-ops-block-title">
+            <div><strong>Việc chờ tôi</strong><small>{auth.isReadOnlyViewer ? "Tài khoản chỉ xem" : myTasks.length ? "Bấm vào việc để xử lý" : "Không có việc nào đang chờ bạn"}</small></div>
+            <span>{myTasks.length}</span>
           </div>
-        ) : (
-          <div className="mobile-ops-primary mobile-ops-primary-v2 viewer-only">
-            <Link href="/equipment" className="mobile-action-card"><span><Boxes size={20} /></span><div><strong>Dụng cụ toàn xưởng</strong><small>Xem và tra cứu</small></div><ChevronRight size={16} /></Link>
-          </div>
-        )}
+          {myTasks.slice(0, MOBILE_TASKS_SHOWN).map((task) => (
+            <Link href={task.href} key={task.key} className="mobile-task-card" data-tone={task.tone}>
+              <div><strong>{task.action}</strong><span>{task.label}</span><small>{task.detail}</small></div>
+              <ChevronRight size={18} aria-hidden="true" />
+            </Link>
+          ))}
+          {myTasks.length > MOBILE_TASKS_SHOWN ? <p className="mobile-ops-empty">Còn {myTasks.length - MOBILE_TASKS_SHOWN} việc nữa — mở mục Mượn – Trả, Điều chuyển… trong menu (có số đỏ).</p> : null}
+        </section>
 
-        {showMobileLoans ? (
-          <section className="mobile-ops-block mobile-ops-summary mobile-home-detail" id="mobile-loan-overview">
-            <Link className="mobile-ops-block-title is-link" href="/dashboard"><div><strong>Phiếu mượn CCDC</strong><small>Các phiếu đang liên quan đến nhóm của bạn</small></div><span>{mobileRelatedCount}</span><ChevronRight size={17} /></Link>
-            <div className="mobile-related-list">
-              {mobileRelatedMachine.slice(0, 8).map((loan) => { const machine = equipmentMap.get(loan.equipmentId); const ownerView = hasGroupPermission(auth, loan.ownerGroupId, "viewer"); const label = loan.status === "return_requested" ? (ownerView ? "Chờ nhận lại" : "Đã báo trả") : (ownerView ? "Đang cho mượn" : "Đang mượn"); return <Link href="/machine-loans" key={`loan-home-machine-${loan.id}`} className="mobile-related-item"><div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || loan.code} · {groupMap.get(loan.ownerGroupId) || "—"} → {groupMap.get(loan.borrowerGroupId) || "—"}</span></div><small>{label}</small></Link>; })}
-              {mobileRelatedQuick.slice(0, 8).map((loan) => { const ownerView = hasGroupPermission(auth, loan.sourceGroupId, "viewer"); const label = loan.status === "return_reported" ? (ownerView ? "Chờ nhận lại" : "Đã báo trả") : (ownerView ? "Đang cho mượn" : "Đang mượn"); return <Link href="/quick-loans" key={`loan-home-quick-${loan.id}`} className="mobile-related-item"><div><strong>{loan.itemName}</strong><span>{loan.quantityBorrowed} {loan.unit} · {groupMap.get(loan.sourceGroupId) || "—"} → {groupMap.get(loan.borrowerGroupId) || "—"}</span></div><small>{label}</small></Link>; })}
-              {!mobileRelatedCount ? <p className="mobile-ops-empty">Chưa có phiếu mượn đang diễn ra.</p> : null}
-            </div>
-          </section>
-        ) : null}
-
-        {showMobileReturns ? (
-          <section className="mobile-ops-block mobile-ops-summary mobile-home-detail" id="mobile-return-overview">
-            <Link className="mobile-ops-block-title is-link" href="/dashboard"><div><strong>Theo dõi trả CCDC</strong><small>Đang mượn · đã báo trả · chờ nhận lại</small></div><span>{borrowedCountForMobile + returnWaitingCount}</span><ChevronRight size={17} /></Link>
-            <div className="mobile-related-list">
-              {mobileRelatedMachine.filter((loan) => hasGroupPermission(auth, loan.borrowerGroupId, "viewer") || loan.status === "return_requested").slice(0, 8).map((loan) => { const machine = equipmentMap.get(loan.equipmentId); return <Link href="/machine-loans?mode=return#mobile-active-loans" key={`return-home-machine-${loan.id}`} className="mobile-related-item"><div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || loan.code} · {groupMap.get(loan.ownerGroupId) || "—"}</span></div><small>{loan.status === "return_requested" ? "Đã báo trả" : "Đang mượn"}</small></Link>; })}
-              {mobileRelatedQuick.filter((loan) => hasGroupPermission(auth, loan.borrowerGroupId, "viewer") || loan.status === "return_reported").slice(0, 8).map((loan) => <Link href="/quick-loans?mode=return#mobile-active-loans" key={`return-home-quick-${loan.id}`} className="mobile-related-item"><div><strong>{loan.itemName}</strong><span>{loan.quantityBorrowed} {loan.unit} · {groupMap.get(loan.sourceGroupId) || "—"}</span></div><small>{loan.status === "return_reported" ? "Đã báo trả" : "Đang mượn"}</small></Link>)}
-            </div>
-          </section>
-        ) : null}
-
-        {showMobileRepairs ? (
-          <section className="mobile-ops-block mobile-ops-summary mobile-home-detail" id="mobile-repair-overview">
-            <Link className="mobile-ops-block-title is-link" href="/dashboard"><div><strong>Phiếu báo hư</strong><small>Các phiếu sửa chữa đang mở trong phạm vi của bạn</small></div><span>{scopedRepairs.length}</span><ChevronRight size={17} /></Link>
-            <div className="mobile-related-list">
-              {scopedRepairs.slice(0, 10).map((repair) => { const machine = equipmentMap.get(repair.equipmentId); return <Link href="/repairs" key={`repair-home-${repair.id}`} className="mobile-related-item"><div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || repair.code} · {groupMap.get(repair.reportedByGroupId) || "—"}</span></div><small>{repair.status === "repairing" ? "Đang sửa chữa" : WORKFLOW_LABELS[repair.status] || repair.status}</small></Link>; })}
-              {!scopedRepairs.length ? <p className="mobile-ops-empty">Không có phiếu báo hư đang mở.</p> : null}
-            </div>
-          </section>
-        ) : null}
+        <div className="mobile-ops-primary mobile-ops-primary-v2" id="mobile-actions">
+          {homeActions.map((action) => {
+            const Icon = ACTION_ICONS[action.icon];
+            return (
+              <Link href={action.href} key={action.key} className="mobile-action-card">
+                <span><Icon size={20} /></span>
+                <div><strong>{action.label}</strong><small>{action.hint}</small></div>
+                {action.badge ? <b className="home-action-badge">{action.badge}</b> : <ChevronRight size={16} />}
+              </Link>
+            );
+          })}
+        </div>
 
         <section className="mobile-ops-block mobile-ops-summary" id="mobile-work-inbox">
           <Link className="mobile-ops-block-title is-link" href={showMobileInbox ? "/dashboard" : "/dashboard?inbox=1#mobile-work-inbox"}>
@@ -342,16 +347,29 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
           ) : null}
         </section>
       </section>
-      <PageHeader
-        title="Tổng quan vận hành"
-        description={`Theo dõi tình hình CCDC, cảnh báo và công việc cần xử lý trong ${scopeLabel}.`}
-        actions={!auth.isReadOnlyViewer ? (
-          <>
-            <Link href="/machine-loans" className="btn btn-secondary"><Handshake size={16} /> Tạo phiếu mượn</Link>
-            <Link href="/my-equipment" className="btn btn-primary"><Plus size={16} /> Thêm dụng cụ</Link>
-          </>
-        ) : null}
-      />
+      <section className="home-hero" aria-label="Xin chào">
+        <div className="home-hero-copy">
+          <span className="home-date">{todayLabel}</span>
+          <h1>{greetingFor()}, {shortName(auth.fullName)}</h1>
+          <p>{getRoleSummary(auth)} · {scopeLabel}</p>
+          <p className="home-hero-status" data-state={auth.isReadOnlyViewer ? "view" : myTasks.length ? "busy" : "clear"}>
+            {auth.isReadOnlyViewer ? "Tài khoản chỉ xem: tra cứu máy và xem báo cáo." : myTasks.length ? `Bạn có ${myTasks.length} việc đang chờ xử lý.` : "Không có việc nào đang chờ bạn."}
+          </p>
+        </div>
+        <div className="home-actions">
+          {homeActions.map((action) => {
+            const Icon = ACTION_ICONS[action.icon];
+            return (
+              <Link href={action.href} key={action.key} className="home-action">
+                <span className="home-action-icon"><Icon size={22} aria-hidden="true" /></span>
+                <strong>{action.label}</strong>
+                <small>{action.hint}</small>
+                {action.badge ? <b className="home-action-badge" aria-label={`${action.badge} việc`}>{action.badge}</b> : null}
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="my-tasks" id="viec-cho-toi" aria-label="Việc chờ tôi xử lý">
         <Card>
@@ -386,14 +404,27 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
       </section>
 
       <section className="executive-kpis dashboard-kpi-six" aria-label="Chỉ số vận hành">
-        <article className="executive-kpi is-focus"><div><span>Chờ tôi xử lý</span><strong>{myTasks.length}</strong></div><AlertTriangle size={24} /><small>{myTasks.length ? "Xem danh sách bên dưới" : "Không có việc đang chờ bạn"}</small></article>
-        <article className="executive-kpi"><div><span>Tổng CCDC</span><strong>{totalEquipment}</strong></div><Boxes size={23} /><small>{scopeLabel}</small></article>
-        <article className="executive-kpi"><div><span>Sẵn sàng</span><strong>{readyCount}</strong></div><Boxes size={23} /><small>Trạng thái sẵn sàng · tình trạng tốt</small></article>
-        <article className="executive-kpi"><div><span>Đang mượn</span><strong>{onLoanEquipmentIds.size}</strong></div><Handshake size={23} /><small>{overdueLoanCount} phiếu quá hạn</small></article>
-        <article className="executive-kpi"><div><span>Sửa chữa</span><strong>{repairCount}</strong></div><Wrench size={23} /><small>Phiếu sửa đang mở</small></article>
-        <article className="executive-kpi"><div><span>Điều chuyển</span><strong>{transferCount}</strong></div><ArrowLeftRight size={23} /><small>Phiếu điều chuyển đang mở</small></article>
+        <Kpi focus href={links.tasks} label="Chờ tôi xử lý" value={myTasks.length} note={myTasks.length ? "Xem danh sách phía trên" : "Không có việc đang chờ bạn"} icon={AlertTriangle} />
+        <Kpi href={links.total} label="Tổng CCDC" value={totalEquipment} note={scopeLabel} icon={Boxes} />
+        <Kpi href={links.ready} label="Sẵn sàng" value={readyCount} note="Sẵn sàng · tình trạng tốt" icon={Boxes} />
+        <Kpi href={links.loans} label="Đang mượn" value={onLoanEquipmentIds.size} note={`${overdueLoanCount} phiếu quá hạn`} icon={Handshake} />
+        <Kpi href={links.repairs} label="Sửa chữa" value={repairCount} note="Phiếu sửa đang mở" icon={Wrench} />
+        <Kpi href={links.transfers} label="Điều chuyển" value={transferCount} note="Phiếu điều chuyển đang mở" icon={ArrowLeftRight} />
       </section>
 
+      <section className="home-recent" aria-label="Hoạt động gần đây">
+          <Card className="recent-card">
+            <CardHeader><CardTitle>Hoạt động gần đây</CardTitle><Link href="/activities">Xem tất cả</Link></CardHeader>
+            <CardContent>
+              {scopedRecent.length ? <div className="recent-activity-list">
+                {scopedRecent.map((row) => <div className="recent-activity-row" key={row.id}><span className="activity-icon"><Activity size={15} /></span><div><strong>{row.actorName || "Hệ thống"}</strong><span>{row.description}</span></div><time>{formatDateTime(row.createdAt)}</time></div>)}
+              </div> : <EmptyState description="Chưa có hoạt động được ghi nhận." />}
+            </CardContent>
+          </Card>
+      </section>
+
+      <details className="home-more" open={hasDynamicFilter}>
+        <summary><BarChart3 size={18} aria-hidden="true" /> <span>Biểu đồ và phân tích</span> <small>Trạng thái dụng cụ, phân bố theo nhóm, tìm kiếm phân tích</small></summary>
       <section className="dashboard-search-analysis" aria-label="Tìm kiếm và phân tích CCDC">
         <Card>
           <CardHeader><CardTitle>Tìm kiếm & phân tích CCDC</CardTitle><Search size={18} /></CardHeader>
@@ -455,15 +486,8 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
           </CardContent>
         </Card>
 
-        <Card className="recent-card">
-          <CardHeader><CardTitle>Hoạt động gần đây</CardTitle><Link href="/activities">Xem tất cả</Link></CardHeader>
-          <CardContent>
-            {scopedRecent.length ? <div className="recent-activity-list">
-              {scopedRecent.map((row) => <div className="recent-activity-row" key={row.id}><span className="activity-icon"><Activity size={15} /></span><div><strong>{row.actorName || "Hệ thống"}</strong><span>{row.description}</span></div><time>{formatDateTime(row.createdAt)}</time></div>)}
-            </div> : <EmptyState description="Chưa có hoạt động được ghi nhận." />}
-          </CardContent>
-        </Card>
       </section>
+      </details>
     </div>
   );
 }
