@@ -27,6 +27,7 @@ import { FormField } from "@/components/ui/form-field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CONDITION_LABELS, EQUIPMENT_STATUS_LABELS } from "@/lib/constants";
 import { isHeldByBorrower } from "@/lib/loan-status";
+import { conditionTone, equipmentStatusTone as statusTone } from "@/lib/status-style";
 import { rankLabels } from "@/lib/canonical-text";
 import {
   EQUIPMENT_CATEGORIES,
@@ -232,21 +233,6 @@ function getAuditChanges(row: EquipmentAuditRow, groupNames?: Map<string, string
       newValue: printableAuditValue(key, after[key], groupNames),
     }));
 }
-
-function statusTone(status: IndividualEquipmentRow["status"]): "neutral" | "info" | "success" | "warning" | "danger" {
-  if (status === "in_use_owner") return "success";
-  if (status === "repairing" || status === "wait_repair_confirm" || status === "wait_inspection") return "warning";
-  if (status === "wait_disposal" || status === "disposal_warehouse" || status === "inactive") return "danger";
-  return "info";
-}
-
-function conditionTone(condition: IndividualEquipmentRow["condition"]): "neutral" | "info" | "success" | "warning" | "danger" {
-  if (condition === "good") return "success";
-  if (["major_damage", "irreparable"].includes(condition)) return "danger";
-  if (condition === "unknown") return "neutral";
-  return "warning";
-}
-
 
 function QuantityToolForm({ permissions, isWorkshopAdmin, onCancel, onBack, onSaved }: { permissions: EquipmentPermission[]; typeRows: EquipmentTypeRow[]; isWorkshopAdmin: boolean; onCancel: () => void; onBack: () => void; onSaved: (afterSave: "close" | "add_next") => void; }) {
   const [state, action, pending] = useActionState(createQuantityToolAction, initialState);

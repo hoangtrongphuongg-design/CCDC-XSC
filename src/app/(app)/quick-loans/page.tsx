@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { workflowTone as tone } from "@/lib/status-style";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -23,13 +24,6 @@ import {
   reportQuickLoanReturnAction,
 } from "@/actions/quick-loans";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
-
-function tone(status: string) {
-  if (status === "completed") return "success" as const;
-  if (status === "rejected" || status === "cancelled") return "danger" as const;
-  if (status === "pending_approval" || status === "return_reported") return "warning" as const;
-  return "info" as const;
-}
 
 export const dynamic = "force-dynamic";
 
