@@ -23,6 +23,7 @@ import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { canViewWholeWorkshop, getRoleSummary } from "@/lib/auth/roles";
 import { isActivePath } from "@/lib/nav-active";
+import { EMPTY_TASK_COUNTS, formatBadge, type TaskSection } from "@/lib/my-tasks";
 
 type NavItem = readonly [href: string, label: string, icon: LucideIcon];
 
@@ -47,6 +48,14 @@ const workflowItems = [
   ["/disposals", "Thanh lý", Recycle],
 ] as const satisfies readonly NavItem[];
 
+/** Mục menu nào hiện số "việc chờ tôi". */
+const TASK_SECTION_BY_HREF: Record<string, TaskSection> = {
+  "/machine-loans": "loans",
+  "/transfers": "transfers",
+  "/repairs": "repairs",
+  "/disposals": "disposals",
+};
+
 const reportsItem = ["/reports", "Báo cáo", BarChart3] as const satisfies NavItem;
 const activitiesItem = ["/activities", "Lịch sử hoạt động", Activity] as const satisfies NavItem;
 
@@ -54,7 +63,7 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(-2).map((part) => part[0]?.toUpperCase()).join("") || "XS";
 }
 
-export function Sidebar({ auth }: { auth: AuthContext }) {
+export function Sidebar({ auth, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthContext; taskCounts?: Record<TaskSection, number> }) {
   const pathname = usePathname();
   const roleLabel = getRoleSummary(auth);
   const canUseGroupWorkflows = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasAnyGroupPermission(auth));
@@ -81,10 +90,13 @@ export function Sidebar({ auth }: { auth: AuthContext }) {
       <div className="nav-section-list">
         {items.map(([href, itemLabel, Icon]) => {
           const active = isActivePath(pathname, href);
+          const section = TASK_SECTION_BY_HREF[href];
+          const pending = section ? taskCounts[section] : 0;
           return (
             <Link href={href} key={href} className={cn("nav-link", active && "is-active")} aria-current={active ? "page" : undefined}>
               <span className="nav-icon"><Icon size={18} strokeWidth={1.9} aria-hidden="true" /></span>
               <span className="nav-label">{itemLabel}</span>
+              {pending > 0 ? <span className="nav-badge" title={`${pending} việc chờ bạn xử lý`} aria-label={`${pending} việc chờ bạn xử lý`}>{formatBadge(pending)}</span> : null}
               <ChevronRight className="nav-chevron" size={15} aria-hidden="true" />
             </Link>
           );

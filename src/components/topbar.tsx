@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { Bell, CalendarDays, LogOut, ShieldCheck } from "lucide-react";
 import type { AuthContext } from "@/lib/auth/session";
 import { logoutAction } from "@/actions/auth";
 import { getRoleSummary } from "@/lib/auth/roles";
+import { EMPTY_TASK_COUNTS, formatBadge, type TaskSection } from "@/lib/my-tasks";
 
 function initials(name: string) {
   return name
@@ -12,7 +14,7 @@ function initials(name: string) {
     .join("") || "XS";
 }
 
-export function Topbar({ auth }: { auth: AuthContext }) {
+export function Topbar({ auth, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthContext; taskCounts?: Record<TaskSection, number> }) {
   const today = new Intl.DateTimeFormat("vi-VN", {
     weekday: "long",
     day: "2-digit",
@@ -21,6 +23,8 @@ export function Topbar({ auth }: { auth: AuthContext }) {
     timeZone: "Asia/Ho_Chi_Minh",
   }).format(new Date());
   const roleLabel = getRoleSummary(auth);
+  const pending = taskCounts.loans + taskCounts.transfers + taskCounts.repairs + taskCounts.disposals;
+  const bellLabel = pending > 0 ? `${pending} việc chờ bạn xử lý` : "Không có việc chờ bạn xử lý";
 
   return (
     <header className="topbar" data-slot="topbar">
@@ -37,9 +41,10 @@ export function Topbar({ auth }: { auth: AuthContext }) {
           <CalendarDays size={16} aria-hidden="true" />
           <span>{today}</span>
         </div>
-        <button className="icon-button notification-button" type="button" aria-label="Thông báo">
+        <Link href="/dashboard#viec-cho-toi" className="icon-button notification-button" aria-label={bellLabel} title={bellLabel}>
           <Bell size={18} />
-        </button>
+          {pending > 0 ? <span className="bell-badge" aria-hidden="true">{formatBadge(pending)}</span> : null}
+        </Link>
         <div className="topbar-user">
           <div className="topbar-avatar">{initials(auth.fullName)}</div>
           <div><strong>{auth.fullName}</strong><span>{auth.primaryGroupName || "Chưa gán nhóm"}</span></div>

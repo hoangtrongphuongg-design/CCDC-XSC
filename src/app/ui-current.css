@@ -2400,3 +2400,90 @@ body {
 @media (max-width: 760px) {
   .activity-export-bar > * { flex: 1 1 100%; }
 }
+
+/* Việc chờ tôi xử lý: huy hiệu số (menu, chuông, thanh dưới điện thoại) + thẻ ở Tổng quan */
+.nav-link .nav-badge {
+  position: absolute;
+  top: 50%;
+  right: 30px;
+  transform: translateY(-50%);
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 20px;
+  text-align: center;
+}
+.notification-button .bell-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 14px;
+  text-align: center;
+  box-sizing: content-box;
+}
+.mobile-nav-icon { position: relative; }
+.mobile-nav-badge {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 13px;
+  text-align: center;
+  box-sizing: content-box;
+}
+.my-tasks { scroll-margin-top: 80px; }
+.my-tasks-count {
+  min-width: 26px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 750;
+  text-align: center;
+}
+.my-tasks-count.is-zero { background: var(--primary-soft); color: var(--primary); }
+.my-task-list { display: grid; }
+.my-task-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 10px 12px;
+  border-bottom: 1px solid #e7edf2;
+  border-left: 3px solid var(--primary);
+}
+.my-task-row:last-child { border-bottom: 0; }
+.my-task-row[data-tone="red"] { border-left-color: var(--danger); }
+.my-task-row[data-tone="orange"] { border-left-color: #d98a14; }
+.my-task-row[data-tone="sky"] { border-left-color: #147cad; }
+.my-task-main { display: grid; gap: 2px; min-width: 0; }
+.my-task-main strong { font-size: 13px; }
+.my-task-main span { font-size: 13px; overflow-wrap: anywhere; }
+.my-task-main small { color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.my-tasks-more { margin: 8px 0 0; color: var(--text-muted); font-size: 12px; }
+@media (max-width: 760px) {
+  .my-task-row { grid-template-columns: 1fr; }
+}

@@ -18,8 +18,9 @@ import {
 import type { AuthContext, FlashMessage } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 import { isActivePath } from "@/lib/nav-active";
+import { EMPTY_TASK_COUNTS, formatBadge, type TaskSection } from "@/lib/my-tasks";
 
-export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMessage | null }) {
+export function MobileNav({ auth, flash, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthContext; flash?: FlashMessage | null; taskCounts?: Record<TaskSection, number> }) {
   const [toast, setToast] = useState<FlashMessage | null>(flash || null);
   const [quickOpen, setQuickOpen] = useState(false);
   const pathname = usePathname();
@@ -32,6 +33,9 @@ export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMes
     const timer = window.setTimeout(() => setToast(null), 3600);
     return () => window.clearTimeout(timer);
   }, [flash?.id]);
+
+  const totalPending = taskCounts.loans + taskCounts.transfers + taskCounts.repairs + taskCounts.disposals;
+  const pendingByHref: Record<string, number> = { "/dashboard": totalPending, "/machine-loans": taskCounts.loans };
 
   const navItems = [
     ["/dashboard", "Trang chủ", Gauge],
@@ -77,9 +81,10 @@ export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMes
       <nav className="mobile-nav mobile-nav-v2" aria-label="Điều hướng điện thoại">
         {navItems.slice(0, 2).map(([href, label, Icon]) => {
           const active = isActivePath(pathname, href);
+          const pending = pendingByHref[href] ?? 0;
           return (
             <Link href={href} key={href} className={cn(active && "is-active")} aria-current={active ? "page" : undefined}>
-              <span className="mobile-nav-icon"><Icon size={20} strokeWidth={2} /></span><span>{label}</span>
+              <span className="mobile-nav-icon"><Icon size={20} strokeWidth={2} />{pending > 0 ? <b className="mobile-nav-badge" aria-label={`${pending} việc chờ`}>{formatBadge(pending)}</b> : null}</span><span>{label}</span>
             </Link>
           );
         })}
@@ -92,9 +97,10 @@ export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMes
 
         {navItems.slice(2).map(([href, label, Icon]) => {
           const active = isActivePath(pathname, href);
+          const pending = pendingByHref[href] ?? 0;
           return (
             <Link href={href} key={href} className={cn(active && "is-active")} aria-current={active ? "page" : undefined}>
-              <span className="mobile-nav-icon"><Icon size={20} strokeWidth={2} /></span><span>{label}</span>
+              <span className="mobile-nav-icon"><Icon size={20} strokeWidth={2} />{pending > 0 ? <b className="mobile-nav-badge" aria-label={`${pending} việc chờ`}>{formatBadge(pending)}</b> : null}</span><span>{label}</span>
             </Link>
           );
         })}

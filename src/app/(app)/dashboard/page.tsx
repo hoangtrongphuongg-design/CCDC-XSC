@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { formatDateTime } from "@/lib/utils";
 import { WORKFLOW_LABELS } from "@/lib/constants";
+import { loadMyTasks } from "@/lib/my-tasks-data";
 import { approveMachineLoanAction, confirmMachineReturnAction, rejectMachineLoanAction, requestMachineReturnAction } from "@/actions/machine-loans";
 import { approveQuickLoanAction, closeQuickLoanAction, rejectQuickLoanAction, reportQuickLoanReturnAction } from "@/actions/quick-loans";
 
@@ -44,6 +45,9 @@ const openTransferStatuses = ["pending_source", "pending_target", "pending_ws", 
 
 export const dynamic = "force-dynamic";
 
+/** Số việc hiện sẵn trên thẻ "Việc chờ tôi xử lý"; còn lại bấm vào từng trang nghiệp vụ. */
+const MY_TASKS_SHOWN = 8;
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 function one(value: string | string[] | undefined) {
@@ -64,6 +68,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const fullWorkshopScope = canViewWholeWorkshop(auth);
   const allowedGroupIds = new Set(auth.permissions.map((permission) => permission.groupId));
   const today = new Date().toISOString().slice(0, 10);
+
+  const myTasks = await loadMyTasks(auth);
+  const shownTasks = myTasks.slice(0, MY_TASKS_SHOWN);
 
   const [groupRows, equipmentRows, loanRows, quickLoanRows, repairRows, transferRows, recentRows] = await Promise.all([
     db.select({ id: groups.id, name: groups.name, code: groups.code }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
@@ -107,7 +114,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const scopedTransfers = transferRows.filter((row) => fullWorkshopScope || allowedGroupIds.has(row.sourceGroupId) || allowedGroupIds.has(row.targetGroupId));
   const scopedRecent = recentRows.filter((row) => fullWorkshopScope || (row.actorGroupId ? allowedGroupIds.has(row.actorGroupId) : false)).slice(0, 6);
 
-  const pendingLoanCount = scopedLoans.filter((row) => row.status === "pending_owner").length;
   const overdueLoanCount = scopedLoans.filter((row) => row.expectedReturnDate < today && ["on_loan", "return_requested", "incident"].includes(row.status)).length;
   const repairCount = scopedRepairs.length;
   const transferCount = scopedTransfers.length;
@@ -115,7 +121,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const repairEquipmentIds = new Set(scopedRepairs.map((row) => row.equipmentId));
   const transferEquipmentIds = new Set(scopedTransfers.map((row) => row.equipmentId));
   const readyCount = scopedEquipment.filter((item) => item.status === "in_use_owner" && item.condition === "good").length;
-  const actionCount = pendingLoanCount + overdueLoanCount + repairCount + transferCount;
 
   const actionableMachineLoans = scopedLoans.filter((row) =>
     (row.status === "pending_owner" && hasGroupPermission(auth, row.ownerGroupId, "operator")) ||
@@ -191,13 +196,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const filteredLoans = [...filteredIds].filter((id) => onLoanEquipmentIds.has(id)).length;
   const filteredRepairs = [...filteredIds].filter((id) => repairEquipmentIds.has(id)).length;
   const filteredTransfers = [...filteredIds].filter((id) => transferEquipmentIds.has(id)).length;
-
-  const tasks = [
-    { label: "Phiếu mượn chờ duyệt", count: pendingLoanCount, href: "/machine-loans", icon: Handshake, tone: "blue", visible: !auth.isReadOnlyViewer },
-    { label: "Dụng cụ quá hạn trả", count: overdueLoanCount, href: "/machine-loans", icon: AlertTriangle, tone: "red", visible: !auth.isReadOnlyViewer },
-    { label: "Dụng cụ đang sửa chữa", count: repairCount, href: "/repairs", icon: Wrench, tone: "orange", visible: !auth.isReadOnlyViewer },
-    { label: "Đề nghị điều chuyển", count: transferCount, href: "/transfers", icon: ArrowLeftRight, tone: "sky", visible: !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.some((p) => p.level === "manager")) },
-  ].filter((task) => task.visible);
 
   const scopeLabel = fullWorkshopScope ? "toàn XSC" : auth.permissions.length === 1 ? auth.permissions[0].groupName : "các nhóm được phân quyền";
   const canOperate = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.length > 0);
@@ -355,8 +353,40 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
         ) : null}
       />
 
+      <section className="my-tasks" id="viec-cho-toi" aria-label="Việc chờ tôi xử lý">
+        <Card>
+          <CardHeader>
+            <CardTitle>Việc chờ tôi xử lý</CardTitle>
+            <span className={myTasks.length ? "my-tasks-count" : "my-tasks-count is-zero"}>{myTasks.length}</span>
+          </CardHeader>
+          <CardContent>
+            {auth.isReadOnlyViewer ? (
+              <EmptyState title="Chế độ chỉ xem" description="Tài khoản xem toàn xưởng không có phiếu cần xử lý." />
+            ) : myTasks.length ? (
+              <>
+                <div className="my-task-list">
+                  {shownTasks.map((task) => (
+                    <div className="my-task-row" data-tone={task.tone} key={task.key}>
+                      <div className="my-task-main">
+                        <strong>{task.action}</strong>
+                        <span>{task.label}</span>
+                        <small>{task.detail} · chờ từ {formatDateTime(task.since)}</small>
+                      </div>
+                      <Link href={task.href} className="btn btn-primary btn-sm">Xử lý <ChevronRight size={14} /></Link>
+                    </div>
+                  ))}
+                </div>
+                {myTasks.length > shownTasks.length ? <p className="my-tasks-more">Còn {myTasks.length - shownTasks.length} việc nữa — mở từng mục nghiệp vụ trên menu (có số đỏ) để xử lý.</p> : null}
+              </>
+            ) : (
+              <EmptyState title="Không có việc nào đang chờ bạn" description="Phiếu cần bạn duyệt hoặc xác nhận sẽ hiện ở đây và trên chuông thông báo." />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
       <section className="executive-kpis dashboard-kpi-six" aria-label="Chỉ số vận hành">
-        <article className="executive-kpi is-focus"><div><span>Cần xử lý</span><strong>{actionCount}</strong></div><AlertTriangle size={24} /><small>{pendingLoanCount} chờ duyệt · {overdueLoanCount} quá hạn</small></article>
+        <article className="executive-kpi is-focus"><div><span>Chờ tôi xử lý</span><strong>{myTasks.length}</strong></div><AlertTriangle size={24} /><small>{myTasks.length ? "Xem danh sách bên dưới" : "Không có việc đang chờ bạn"}</small></article>
         <article className="executive-kpi"><div><span>Tổng CCDC</span><strong>{totalEquipment}</strong></div><Boxes size={23} /><small>{scopeLabel}</small></article>
         <article className="executive-kpi"><div><span>Sẵn sàng</span><strong>{readyCount}</strong></div><Boxes size={23} /><small>Trạng thái sẵn sàng · tình trạng tốt</small></article>
         <article className="executive-kpi"><div><span>Đang mượn</span><strong>{onLoanEquipmentIds.size}</strong></div><Handshake size={23} /><small>{overdueLoanCount} phiếu quá hạn</small></article>
@@ -403,19 +433,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
       </section>
 
       <section className="dashboard-operations-grid">
-        <Card className="operations-card">
-          <CardHeader><CardTitle>Công việc cần xử lý</CardTitle><Clock3 size={18} /></CardHeader>
-          <CardContent>
-            {tasks.length ? <div className="task-list">
-              {tasks.map(({ label, count: value, href, icon: Icon, tone }) => (
-                <Link href={href} key={label} className="task-row" data-tone={tone}>
-                  <span className="task-icon"><Icon size={17} /></span><strong>{label}</strong><b>{value}</b><ChevronRight size={16} />
-                </Link>
-              ))}
-            </div> : <EmptyState title="Chế độ chỉ xem" description="Không có nghiệp vụ cần thao tác với vai trò hiện tại." />}
-          </CardContent>
-        </Card>
-
         <Card className="status-card">
           <CardHeader><CardTitle>Trạng thái dụng cụ</CardTitle><Boxes size={18} /></CardHeader>
           <CardContent>

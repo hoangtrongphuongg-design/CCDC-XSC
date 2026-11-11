@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 55 pass
+npm test           # tsx --test tests/*.test.ts — 64 pass
 ```
 
 Không có ESLint script.
@@ -57,6 +57,12 @@ Xem `src/actions/*.ts`. Mẫu chuẩn cho mọi hàm chuyển trạng thái work
 `workflows.ts` = helper dùng chung (`lockEquipment`, `assertEquipmentHasNoOtherOpenWorkflow`, các hàm sinh mã).
 
 Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sửa chữa, Thanh lý) luôn tải **đủ phiếu đang mở** + `RECENT_CLOSED_LIMIT` (100) phiếu đã đóng gần nhất — không dùng `limit(100)` chung vì phiếu mở cũ sẽ rớt khỏi danh sách. Hằng trạng thái mở/đóng ở `lib/workflow-status.ts` (mượn máy: `lib/loan-status.ts`); `tests/workflow-status.test.ts` đối chiếu với enum trong `schema.ts` nên thêm trạng thái mới mà quên khai báo thì test fail. Lịch sử từng máy (tab "Lịch sử") tải theo yêu cầu bằng `loadEquipmentHistoryAction` (≤200 dòng, kiểm quyền bằng `canViewEquipmentHistory`), không tải sẵn ở trang.
+
+### Việc chờ tôi xử lý (chuông, số trên menu, thẻ ở Tổng quan)
+
+- `lib/my-tasks.ts` (hàm thuần) quyết định phiếu nào đang chờ **chính người dùng**; `lib/my-tasks-data.ts` chỉ đọc các phiếu **đang mở** (`loadMyTasks(auth)`, bọc `react.cache` để layout và trang dùng chung một lần truy vấn, lỗi DB thì trả rỗng chứ không làm hỏng trang). `(app)/layout.tsx` tính số đếm → `AppShell` → huy hiệu ở Sidebar (Mượn – Trả, Điều chuyển, Sửa chữa, Thanh lý), MobileNav (Trang chủ = tổng, Mượn/Trả = mượn) và chuông `Topbar` (link `/dashboard#viec-cho-toi`). Thẻ "Việc chờ tôi xử lý" ở `/dashboard` (tối đa 8 việc, chờ lâu nhất lên đầu).
+- Quy tắc: bước cấp nhóm chỉ tính cho **thành viên nhóm** đủ bậc mà Server Action đòi (Admin/Quản lý Xưởng KHÔNG tự có việc của mọi nhóm, dù backend cho họ thao tác); bước cấp Xưởng (tiếp nhận sửa, duyệt điều chuyển/thanh lý) tính cho Quản lý Xưởng/Admin; Kho thanh lý tính cho operator+ nhóm `KHO_TL`; người tạo phiếu không tự thấy việc duyệt phiếu của mình; Người xem toàn xưởng không có việc nào; phiếu sửa "đang sửa" không tính (không phải việc chờ). Quá hạn trả tính cho nhóm đang mượn.
+- **Thêm trạng thái/bước duyệt mới** cho workflow thì thêm quy tắc vào `buildMyTasks` + test trong `tests/my-tasks.test.ts`, kẻo huy hiệu không hiện việc mới.
 
 ### Validation
 
