@@ -13,6 +13,17 @@ export async function requireUser(): Promise<AuthContext> {
   return auth;
 }
 
+/**
+ * Dùng cho Route Handler (tải file): route handler không đi qua layout nên phải tự kiểm tra
+ * phiên. Trả null (thay vì redirect) để handler tự chuyển về /login hoặc trả 401/403.
+ */
+export async function getActiveAuthOrNull(): Promise<AuthContext | null> {
+  const result = await getAuthResult();
+  if (!result.auth) return null;
+  if (result.auth.accountStatus !== "active" || result.auth.mustChangePassword) return null;
+  return result.auth;
+}
+
 /** Admin hệ thống: quản trị user, phân quyền, cơ cấu nhóm và cấu hình. */
 export async function requireAdmin() {
   const auth = await requireUser();

@@ -72,6 +72,13 @@ Xem `src/actions/*.ts`. Mẫu chuẩn cho mọi hàm chuyển trạng thái work
 - Sidebar (desktop) và MobileNav ẩn/hiện menu theo vai trò — **chỉ là UX**, backend luôn kiểm tra quyền độc lập.
 - Toast flash message chỉ render trong `MobileNav`; text đi qua JSX (được escape).
 
+### Xuất Excel
+
+- Hai route `GET` (tải file, không phải trang): `/equipment/export?q=` (báo cáo toàn xưởng, mọi tài khoản đã đăng nhập, 1 sheet phân nhóm quản lý → loại) và `/my-equipment/export?group=<id|all>` (kiểm kê, chỉ nhóm trong phạm vi quyền, 403 nếu ngoài). Route handler **không đi qua `(app)/layout.tsx`** nên tự gọi `getActiveAuthOrNull()` (`guards.ts`) và chuyển `/login` nếu chưa đăng nhập.
+- Thư viện `exceljs` (chỉ server; `serverExternalPackages` trong `next.config.ts`). Chuỗi người dùng nhập luôn ghi dạng text, công thức duy nhất là cột "Chênh lệch" của sheet kiểm kê CCDC theo số lượng.
+- Phân tầng: `lib/equipment-data.ts` (truy vấn dùng chung với trang "Dụng cụ nhóm tôi": `loadScopedEquipment`, `loadWorkshopEquipment`, `loadTools`) → `lib/export/equipment-export.ts` (hàm thuần: cây nhóm → loại, ghi chú, tên sheet/file, ngày giờ VN) → `lib/export/equipment-workbook.ts` (dựng file). Test dữ liệu giả ở `tests/equipment-export.test.ts`.
+- `equipmentSearchValues()` phản chiếu các trường tìm kiếm của trang `/equipment` — đổi một nơi thì sửa nơi kia. "Nhóm đang giữ" trong file xuất suy ra từ phiếu mượn (không dùng `current_group_id`). Không xuất đơn giá.
+
 ### Thời gian
 
 Nhiều chỗ dùng `new Date().toISOString().slice(0,10)` cho ngày "hôm nay". Không có lib timezone riêng — server chạy UTC trên Vercel nên ngày VN có thể lệch 1 ngày quanh nửa đêm. Cân nhắc khi sửa logic liên quan ngày.

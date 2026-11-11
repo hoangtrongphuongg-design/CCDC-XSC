@@ -1222,7 +1222,8 @@ body {
     box-shadow: 0 5px 14px rgba(0,74,143,.16);
   }
   .mobile-equipment-header > strong { text-align: center; font-size: 14px; }
-  .mobile-equipment-header button { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; color: inherit; background: transparent; }
+  .mobile-equipment-header button,
+  .mobile-equipment-header > div > a { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; color: inherit; background: transparent; }
   .mobile-equipment-header > div { display: flex; }
   .mobile-equipment-search { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border); background: #f8fafc; }
   .mobile-equipment-search input { min-height: 38px; }
