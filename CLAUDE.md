@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 85 pass
+npm test           # tsx --test tests/*.test.ts — 91 pass
 ```
 
 Không có ESLint script.
@@ -63,6 +63,13 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - `lib/my-tasks.ts` (hàm thuần) quyết định phiếu nào đang chờ **chính người dùng**; `lib/my-tasks-data.ts` chỉ đọc các phiếu **đang mở** (`loadMyTasks(auth)`, bọc `react.cache` để layout và trang dùng chung một lần truy vấn, lỗi DB thì trả rỗng chứ không làm hỏng trang). `(app)/layout.tsx` tính số đếm → `AppShell` → huy hiệu ở Sidebar (Mượn – Trả, Điều chuyển, Sửa chữa, Thanh lý), MobileNav (Trang chủ = tổng, Mượn/Trả = mượn) và chuông `Topbar` (link `/dashboard#viec-cho-toi`). Thẻ "Việc chờ tôi xử lý" ở `/dashboard` (tối đa 8 việc, chờ lâu nhất lên đầu).
 - Quy tắc: bước cấp nhóm chỉ tính cho **thành viên nhóm** đủ bậc mà Server Action đòi (Admin/Quản lý Xưởng KHÔNG tự có việc của mọi nhóm, dù backend cho họ thao tác); bước cấp Xưởng (tiếp nhận sửa, duyệt điều chuyển/thanh lý) tính cho Quản lý Xưởng/Admin; Kho thanh lý tính cho operator+ nhóm `KHO_TL`; người tạo phiếu không tự thấy việc duyệt phiếu của mình; Người xem toàn xưởng không có việc nào; phiếu sửa "đang sửa" không tính (không phải việc chờ). Quá hạn trả tính cho nhóm đang mượn.
 - **Thêm trạng thái/bước duyệt mới** cho workflow thì thêm quy tắc vào `buildMyTasks` + test trong `tests/my-tasks.test.ts`, kẻo huy hiệu không hiện việc mới.
+
+### Tìm kiếm chung (`/search`)
+
+- Ô tìm kiếm ở thanh trên (`components/global-search-box.tsx`, phím `/` để nhảy vào ô) và ở trang chủ điện thoại (thanh trên bị ẩn ở mobile) gửi GET tới `/search?q=`. Mọi tài khoản đăng nhập vào được.
+- Quy tắc khớp ở `lib/global-search.ts` (hàm thuần, có test): **không phân biệt hoa/thường và dấu** ("may han" ra "Máy hàn"), nhiều từ = khớp TẤT CẢ từ (thứ tự tùy ý), xếp hạng trùng hẳn mã hệ thống / tem nhôm / serial > bắt đầu bằng > chứa > khớp ở trường mô tả. Cần ≥ 2 ký tự.
+- `lib/global-search-data.ts` (`globalSearch(auth, q)`): **máy** (đã hoàn thành hồ sơ) và **CCDC theo số lượng** tìm trên TOÀN Xưởng (khớp quyền trang "Dụng cụ toàn xưởng"; máy được lọc bằng JS sau khi tải để bỏ dấu được, hiện 20 máy / 10 CCDC khớp nhất, kèm nhóm đang giữ do mượn); **phiếu** (mượn máy, mượn nhanh, điều chuyển, sửa chữa, thanh lý máy / CCDC) tìm theo **mã phiếu** bằng ILIKE, mỗi loại tối đa 5, chỉ phiếu liên quan nhóm của người dùng (vai trò xem toàn Xưởng thấy hết). Link máy → `/equipment?q=<mã>` (chưa có trang hồ sơ máy riêng).
+- Lưu ý: ô tìm của chính trang `/equipment` (`equipmentSearchValues`) chưa tìm theo serial; `/search` có.
 
 ### Báo cáo điều hành (`/reports`)
 
