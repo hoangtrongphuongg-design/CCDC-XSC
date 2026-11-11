@@ -86,6 +86,8 @@ export const disposalStatusEnum = pgEnum("disposal_status", [
 export const notificationTypeEnum = pgEnum("notification_type", ["info", "success", "warning", "danger"]);
 export const equipmentRecordStatusEnum = pgEnum("equipment_record_status", ["draft", "active"]);
 export const equipmentOriginTypeEnum = pgEnum("equipment_origin_type", ["existing", "new_purchase", "other"]);
+export const inventoryStatusEnum = pgEnum("inventory_status", ["open", "closed"]);
+export const inventoryResultEnum = pgEnum("inventory_result", ["found", "missing"]);
 
 export const groups = pgTable(
   "groups",
@@ -492,4 +494,47 @@ export const importIssues = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("import_issues_batch_idx").on(t.batchId, t.severity)],
+);
+
+/** Đợt kiểm kê CCDC của một nhóm (kiểm trên điện thoại, xuất biên bản Excel khi đóng). */
+export const inventorySessions = pgTable(
+  "inventory_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 40 }).notNull(),
+    groupId: uuid("group_id").notNull().references(() => groups.id),
+    title: varchar("title", { length: 180 }),
+    status: inventoryStatusEnum("status").notNull().default("open"),
+    createdBy: uuid("created_by").notNull().references(() => users.id),
+    closedBy: uuid("closed_by").references(() => users.id),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("inventory_sessions_code_unique").on(t.code), index("inventory_sessions_group_status_idx").on(t.groupId, t.status)],
+);
+
+/**
+ * Danh sách máy cần kiểm của một đợt: chụp lại lúc tạo đợt (máy sau đó điều chuyển/mượn không làm
+ * đổi danh sách). `offsite` = máy đang ở nơi khác theo hồ sơ (cho mượn, đang sửa, chờ bàn giao);
+ * `unexpected` = máy tìm thấy nhưng không có trong danh sách (thừa).
+ */
+export const inventoryItems = pgTable(
+  "inventory_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id").notNull().references(() => inventorySessions.id, { onDelete: "cascade" }),
+    equipmentId: uuid("equipment_id").notNull().references(() => equipment.id),
+    expectedNote: varchar("expected_note", { length: 240 }),
+    offsite: boolean("offsite").notNull().default(false),
+    unexpected: boolean("unexpected").notNull().default(false),
+    result: inventoryResultEnum("result"),
+    note: varchar("note", { length: 240 }),
+    checkedBy: uuid("checked_by").references(() => users.id),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("inventory_items_session_equipment_unique").on(t.sessionId, t.equipmentId),
+    index("inventory_items_session_idx").on(t.sessionId),
+  ],
 );

@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 103 pass
+npm test           # tsx --test tests/*.test.ts — 110 pass
 ```
 
 Không có ESLint script.
@@ -38,7 +38,7 @@ Next.js 15 App Router + React 19 + TypeScript. Một Postgres (Neon) qua **Drizz
 - `tool_catalog` — CCDC nhỏ lẻ **quản lý theo số lượng** (`quantityOnHand`), có thể có `code` hoặc không.
 - 5 workflow, mỗi cái 1 bảng + 1 pgEnum trạng thái: `machine_loans`, `quick_loans`, `transfers`, `repairs`, `disposals` (+ `tool_disposals` cho CCDC theo số lượng).
 - `activity_logs` — audit **append-only**. Mọi hàm ghi gọi `writeAudit(tx, {...})` trong cùng transaction, lưu `beforeData`/`afterData` snapshot. Không hard-delete hồ sơ nghiệp vụ.
-- `workflow_counters` / mã nghiệp vụ: `nextWorkflowCode(tx, "PM"|"CM"|"DC"|"SC"|"TL"|"TLVT")` → `PM-2026-0001`. Mã tài sản: `nextAssetCode(tx, {groupCode, equipmentPrefix, mode})`. Cả hai dùng `INSERT ... ON CONFLICT` để chống race.
+- `workflow_counters` / mã nghiệp vụ: `nextWorkflowCode(tx, "PM"|"CM"|"DC"|"SC"|"TL"|"TLVT"|"KK")` → `PM-2026-0001`. Mã tài sản: `nextAssetCode(tx, {groupCode, equipmentPrefix, mode})`. Cả hai dùng `INSERT ... ON CONFLICT` để chống race.
 - `auth_rate_limits` — rate limit đăng nhập/đăng ký, lưu ở DB (`src/lib/auth/rate-limit.ts`), không phải in-memory. Khóa theo IP lấy từ `getClientIp()` (ưu tiên `x-real-ip`, rồi hop cuối của `x-vercel-forwarded-for`/`x-forwarded-for` — **không** lấy phần tử đầu vì client giả mạo được).
 
 ### Quy ước viết Server Action nghiệp vụ
@@ -69,6 +69,14 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - Một trang gom mọi thứ về một máy: trạng thái / tình trạng / nhóm quản lý / nhóm đang giữ (suy ra từ phiếu mượn `on_loan`/`incident`, không dùng `current_group_id`) / vị trí, **phiếu đang mở** (mượn máy, điều chuyển, sửa chữa, thanh lý; link sang trang nghiệp vụ), thông tin kỹ thuật, nguồn gốc, **lịch sử**. Chỉ xem; thao tác vẫn ở "Dụng cụ nhóm tôi" (nút dẫn sang nếu máy trong phạm vi tài khoản). Route tĩnh `/equipment/export` luôn thắng `[id]`; id sai dạng UUID → 404 (`isUuid`).
 - Quyền: **ai đăng nhập cũng xem được** thông tin chung (như trang Dụng cụ toàn xưởng). **Lịch sử** theo `canViewEquipmentHistory` (cùng quy tắc tab Lịch sử; không đủ quyền thì hiện thông báo). **Đơn giá / PO / nhà cung cấp** chỉ Admin / Quản lý Xưởng hoặc nhóm quản lý máy (`canSeeFinancials`; Người xem toàn xưởng không thấy, như file Excel không xuất đơn giá). **Hồ sơ nháp** (`recordStatus != active`) chỉ người trong phạm vi máy xem được, người khác 404.
 - `lib/machine-profile.ts` (hàm thuần, có test) + `lib/machine-profile-data.ts` (`loadMachineProfile`). Liên kết vào từ danh sách `/equipment` (cột Mã hệ thống) và kết quả `/search`.
+
+### Kiểm kê trên điện thoại (`/inventory`)
+
+- **Đợt kiểm kê** (`inventory_sessions`, mã `KK-2026-0001`, mỗi nhóm một đợt mở) + **danh sách máy chụp lúc mở đợt** (`inventory_items`: máy thuộc nhóm + máy nhóm đang mượn giữ; `offsite` = đang ở nơi khác theo hồ sơ — cho mượn / đang sửa / điều chuyển — không tính vào tiến độ; `unexpected` = máy thừa). Kết quả từng máy: `found` (Có mặt) / `missing` (Không thấy) / chưa kiểm (null); hoàn tác được tới khi đóng đợt. **Bảng mới chỉ có ở `database/update.sql` V1.7.0 + `current_schema.sql` — phải chạy V1.7.0 trong Neon TRƯỚC khi deploy** (theo quy trình thường lệ).
+- Quyền (`lib/inventory.ts`, hàm thuần): **mở / đóng đợt** = Đốc công (manager) của nhóm hoặc Quản lý Xưởng/Admin; **kiểm máy** = mọi thành viên nhóm (kể cả Công nhân kỹ thuật) hoặc Quản lý Xưởng/Admin; **xem + xuất biên bản** = thành viên nhóm hoặc vai trò xem toàn Xưởng; Người xem toàn xưởng không ghi. Đóng đợt khóa kết quả (`UPDATE ... WHERE status='open'`); ghi kết quả khóa dòng đợt (`FOR UPDATE`) nên không ghi được vào đợt vừa đóng.
+- **Quét QR bằng camera điện thoại** (không dùng camera trong web vì `Permissions-Policy` đang chặn `camera`) mở hồ sơ máy `/equipment/<id>`; nếu tài khoản có đợt kiểm kê đang mở thì hồ sơ hiện khung **Có mặt / Không thấy / Hoàn tác** (`markInventoryFromProfileAction`; máy chưa có trong danh sách + "Có mặt" → thêm là **thừa**). `loadInventoryPromptsForMachine` bắt lỗi nên thiếu bảng thì hồ sơ máy vẫn hiện bình thường. Trang `/inventory/[id]` là danh sách bấm tay (tab Cần kiểm / Không thấy / Có mặt / Nơi khác / Thừa, tìm không dấu, cập nhật lạc quan, "Không thấy" hỏi ghi chú).
+- Nhật ký: `inventory.create` / `inventory.close` hiện ở Lịch sử hoạt động; **`inventory.check` (từng máy) khai báo `mirror`** — chỉ ở tab Lịch sử của máy, ẩn khỏi `/activities` để kiểm cả nhóm không làm ngập. Biên bản `GET /inventory/[id]/export` (`lib/export/inventory-workbook.ts`): tóm tắt đầu sheet, các mục Không thấy → Chưa kiểm → Thừa → Nơi khác → Có mặt.
+- Chưa có: kiểm kê CCDC theo số lượng (`tool_catalog`), tự cập nhật hồ sơ máy theo kết quả (đợt kiểm kê chỉ **ghi nhận**, không đổi trạng thái / vị trí máy).
 
 ### Tem QR dán máy (`/labels`)
 

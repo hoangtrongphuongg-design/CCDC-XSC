@@ -398,3 +398,37 @@ CREATE TABLE IF NOT EXISTS tool_disposals (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS tool_disposals_status_idx ON tool_disposals(status);
+
+-- V1.7.0: Kiểm kê CCDC trên điện thoại (đợt kiểm kê + danh sách máy cần kiểm). Idempotent.
+-- Chạy MỘT lần trong Neon SQL Editor TRƯỚC khi deploy bản có chức năng Kiểm kê.
+DO $$ BEGIN CREATE TYPE inventory_status AS ENUM ('open','closed'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE inventory_result AS ENUM ('found','missing'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS inventory_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code varchar(40) NOT NULL UNIQUE,
+  group_id uuid NOT NULL REFERENCES groups(id),
+  title varchar(180),
+  status inventory_status NOT NULL DEFAULT 'open',
+  created_by uuid NOT NULL REFERENCES users(id),
+  closed_by uuid REFERENCES users(id),
+  closed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS inventory_sessions_group_status_idx ON inventory_sessions(group_id, status);
+
+CREATE TABLE IF NOT EXISTS inventory_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL REFERENCES inventory_sessions(id) ON DELETE CASCADE,
+  equipment_id uuid NOT NULL REFERENCES equipment(id),
+  expected_note varchar(240),
+  offsite boolean NOT NULL DEFAULT false,
+  unexpected boolean NOT NULL DEFAULT false,
+  result inventory_result,
+  note varchar(240),
+  checked_by uuid REFERENCES users(id),
+  checked_at timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS inventory_items_session_equipment_unique ON inventory_items(session_id, equipment_id);
+CREATE INDEX IF NOT EXISTS inventory_items_session_idx ON inventory_items(session_id);

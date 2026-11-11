@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Boxes,
+  ClipboardCheck,
   CheckCircle2,
   Gauge,
   Handshake,
@@ -72,6 +73,9 @@ export function MobileNav({ auth, flash, taskCounts = EMPTY_TASK_COUNTS }: { aut
               </Link>
               <Link href="/machine-loans?mode=return#mobile-active-loans" onClick={() => setQuickOpen(false)}>
                 <span><RotateCcw size={21} /></span><div><strong>Trả CCDC</strong><small>Chọn CCDC đang mượn để trả</small></div>
+              </Link>
+              <Link href="/inventory" onClick={() => setQuickOpen(false)}>
+                <span><ClipboardCheck size={21} /></span><div><strong>Kiểm kê</strong><small>Kiểm CCDC của nhóm tại chỗ</small></div>
               </Link>
             </div>
           </section>
