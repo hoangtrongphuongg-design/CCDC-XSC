@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 123 pass
+npm test           # tsx --test tests/*.test.ts — 128 pass
 ```
 
 Không có ESLint script.
@@ -100,6 +100,12 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 
 - Hai ô chữ tự do này được **đưa về đúng cách viết đã có** khi lưu (không phân biệt hoa/thường, gộp khoảng trắng; vẫn phân biệt dấu): `lib/canonical-text.ts` (hàm thuần: `createCanonicalizer`, `pickCanonicalSpellings`, `rankLabels`) + `lib/canonical-data.ts` (`loadCanonicalizers()`: Loại theo từng nhóm thiết bị = gợi ý có sẵn + `equipment_type_catalog`; Vị trí = cách viết đang dùng nhiều nhất trên máy). Áp ở `saveEquipmentRecordAction` và `importEquipmentAction` (`applyCanonicalText`, cả bảng xem trước). Loại/vị trí chưa có vẫn thêm được. Ô Vị trí ở form có `<datalist>` các vị trí đã dùng.
 - Dữ liệu cũ: khối **V1.6.13** trong `database/update.sql` (kèm câu SELECT xem trước, mặc định đang comment) gộp `equipment.equipment_type` (theo nhóm thiết bị) và `current_location` về cách viết phổ biến nhất, tắt (không xóa) bản na ná trong `equipment_type_catalog`. Admin tự chạy sau khi backup; quy tắc chọn cách viết chuẩn phải khớp `pickCanonicalSpellings`.
+
+### Trang chủ theo vai trò (`/dashboard`)
+
+- Thứ tự "việc trước, số liệu sau": **lời chào + nút hành động lớn** (`home-hero`) → **Việc chờ tôi** (`#viec-cho-toi`) → **6 ô số liệu bấm được** → hoạt động gần đây → `<details class="home-more">` **gập lại** chứa tìm kiếm phân tích + biểu đồ trạng thái / phân bố nhóm (tự mở khi đang có bộ lọc `?q=`/`?group=`/`?status=`).
+- `lib/home-actions.ts` (hàm thuần, có test): `buildHomeActions(auth, { pendingTasks })` chọn tối đa 4 nút theo vai trò — Công nhân kỹ thuật: Mượn, Trả, Kiểm kê, Tìm; Kỹ sư giám sát: Mượn, Trả, Báo hỏng, Tìm; Đốc công: Việc chờ xử lý (kèm số), Mượn, Báo hỏng, Kiểm kê; Quản lý Xưởng: Việc chờ, Quá hạn & báo cáo, Kiểm kê, Tìm (Admin thay Tìm bằng Nhập máy từ Excel); Người xem toàn xưởng: Tìm, Dụng cụ toàn xưởng, Báo cáo. `kpiLinks(auth)` cho đường dẫn từng ô số (null = chỉ hiện số, vd Điều chuyển với người không phải Đốc công). `greetingFor` (giờ VN) và `shortName`.
+- Điện thoại (thanh trên bị ẩn; mọi khối desktop bị ẩn bởi `.dashboard-page > :not(.mobile-ops-home)`): thẻ **Việc chờ tôi** (5 việc đầu) + cùng bộ nút hành động; các khối xem phiếu nhúng cũ (`?loans=1`, `?returns=1`, `?repairs=1`) đã bỏ vì nút giờ dẫn thẳng tới trang nghiệp vụ; khối "Việc cần xử lý" (duyệt nhanh bằng nút) và "Đang liên quan" giữ nguyên.
 
 ### Validation
 
