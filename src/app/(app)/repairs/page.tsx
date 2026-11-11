@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { CheckCircle2, Clock3, Plus, ShieldAlert, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, repairs } from "@/lib/db/schema";
@@ -15,6 +15,7 @@ import { FormField } from "@/components/ui/form-field";
 import { formatNumber } from "@/lib/utils";
 import { acceptRepairAction, completeRepairAction, confirmRepairByOwnerAction, createRepairAction, markExternalIrreparableAction, sendExternalRepairAction } from "@/actions/repairs";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
+import { CLOSED_REPAIR_STATUSES, OPEN_REPAIR_STATUSES, RECENT_CLOSED_LIMIT } from "@/lib/workflow-status";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -23,11 +24,14 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Sea
   const params = searchParams ? await searchParams : {};
   const modeValue = params.mode;
   const mobileMode = (Array.isArray(modeValue) ? modeValue[0] : modeValue) || "view";
-  const [groupRows, equipmentRows, rows] = await Promise.all([
+  const [groupRows, equipmentRows, openRows, closedRows] = await Promise.all([
     db.select({ id: groups.id, name: groups.name }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
     db.select({ id: equipment.id, code: equipment.code, name: equipment.name, ownerGroupId: equipment.ownerGroupId, currentGroupId: equipment.currentGroupId }).from(equipment).where(eq(equipment.recordStatus, "active")).orderBy(asc(equipment.code)),
-    db.select().from(repairs).orderBy(desc(repairs.createdAt)).limit(100),
+    // Phiếu đang mở luôn tải đủ; phiếu đã đóng chỉ lấy gần nhất.
+    db.select().from(repairs).where(inArray(repairs.status, [...OPEN_REPAIR_STATUSES])).orderBy(desc(repairs.createdAt)),
+    db.select().from(repairs).where(inArray(repairs.status, [...CLOSED_REPAIR_STATUSES])).orderBy(desc(repairs.createdAt)).limit(RECENT_CLOSED_LIMIT),
   ]);
+  const rows = [...openRows, ...closedRows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const groupMap = new Map(groupRows.map((g) => [g.id, g.name]));
   const equipmentMap = new Map(equipmentRows.map((e) => [e.id, e]));
   const actingGroups = auth.permissions.filter((p) => p.groupCode !== "KHO_TL" && p.level !== "viewer" && isOfficialOperationalGroupCode(p.groupCode));

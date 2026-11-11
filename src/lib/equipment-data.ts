@@ -8,6 +8,7 @@ import { equipment, groups, machineLoans, repairs, toolCatalog, transfers } from
 import type { AuthContext } from "@/lib/auth/session";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { OPEN_MACHINE_LOAN_STATUSES, isHeldByBorrower } from "@/lib/loan-status";
+import { CLOSED_REPAIR_STATUSES, CLOSED_TRANSFER_STATUSES } from "@/lib/workflow-status";
 import type { ExportTool } from "@/lib/export/equipment-export";
 
 export type OperationalGroup = {
@@ -30,8 +31,6 @@ export type ActiveLoan = { equipmentId: string; ownerGroupId: string; borrowerGr
 export type ActiveTransfer = { equipmentId: string; sourceGroupId: string; targetGroupId: string; status: string; updatedAt: Date };
 export type ActiveRepair = { equipmentId: string; status: string; updatedAt: Date };
 
-const CLOSED_TRANSFER_STATUSES = ["completed", "rejected", "cancelled"] as const;
-const CLOSED_REPAIR_STATUSES = ["completed", "cancelled", "irreparable"] as const;
 
 /** Nhóm nghiệp vụ chính thức đang hoạt động (bỏ nhóm hệ thống như Kho thanh lý). */
 export async function loadOperationalGroups(): Promise<OperationalGroup[]> {

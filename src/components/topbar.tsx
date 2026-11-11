@@ -39,7 +39,6 @@ export function Topbar({ auth }: { auth: AuthContext }) {
         </div>
         <button className="icon-button notification-button" type="button" aria-label="Thông báo">
           <Bell size={18} />
-          <span className="notification-dot" aria-hidden="true" />
         </button>
         <div className="topbar-user">
           <div className="topbar-avatar">{initials(auth.fullName)}</div>

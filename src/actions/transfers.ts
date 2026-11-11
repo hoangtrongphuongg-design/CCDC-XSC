@@ -102,7 +102,7 @@ export async function approveTransferByWsAction(formData: FormData) {
   const transferId = String(formData.get("transferId") || "");
   const auth = await requireWsManager();
   const [transfer] = await db.select().from(transfers).where(eq(transfers.id, transferId)).limit(1);
-  if (!transfer || transfer.status !== "pending_ws") throw new Error("Phiếu chưa sẵn sàng để WS duyệt.");
+  if (!transfer || transfer.status !== "pending_ws") throw new Error("Phiếu chưa sẵn sàng để Quản lý Xưởng duyệt.");
 
   await db.transaction(async (tx) => {
     await lockEquipment(tx, transfer.equipmentId);
@@ -123,7 +123,7 @@ export async function approveTransferByWsAction(formData: FormData) {
       action: "transfer.ws_approve",
       entityType: "transfer",
       entityId: transfer.id,
-      description: `WS duyệt điều chuyển ${transfer.code}`,
+      description: `Quản lý Xưởng duyệt điều chuyển ${transfer.code}`,
       afterData: updated,
     });
   });

@@ -39,7 +39,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   incident: "Có sự cố",
   pending_source: "Chờ nhóm giao đồng ý",
   pending_target: "Chờ nhóm nhận đồng ý",
-  pending_ws: "Chờ WS duyệt",
+  pending_ws: "Chờ Quản lý Xưởng duyệt",
   pending_approval: "Chờ nhóm cho duyệt",
   pending_receipt: "Đã duyệt · chờ nhận",
   borrowed: "Đang mượn",

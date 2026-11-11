@@ -21,21 +21,32 @@ import {
   createTransferAction,
 } from "@/actions/transfers";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
+import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
+import {
+  CLOSED_TRANSFER_STATUSES,
+  OPEN_DISPOSAL_STATUSES,
+  OPEN_REPAIR_STATUSES,
+  OPEN_TRANSFER_STATUSES,
+  RECENT_CLOSED_LIMIT,
+} from "@/lib/workflow-status";
 
 export default async function TransfersPage() {
   const auth = await requireUser();
-  const [groupRows, equipmentRows, rows, openLoans, openRepairs, openTransfers, openDisposals] = await Promise.all([
+  const [groupRows, equipmentRows, openRows, closedRows, openLoans, openRepairs, openTransfers, openDisposals] = await Promise.all([
     db.select({ id: groups.id, code: groups.code, name: groups.name, isSystem: groups.isSystem }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)),
     db.select({
       id: equipment.id, code: equipment.code, legacyCode: equipment.legacyCode, name: equipment.name,
       model: equipment.model, equipmentType: equipment.equipmentType, ownerGroupId: equipment.ownerGroupId,
     }).from(equipment).where(and(eq(equipment.status, "in_use_owner"), eq(equipment.recordStatus, "active"))).orderBy(asc(equipment.code)),
-    db.select().from(transfers).orderBy(desc(transfers.createdAt)).limit(100),
-    db.select({ equipmentId: machineLoans.equipmentId }).from(machineLoans).where(inArray(machineLoans.status, ["pending_owner", "approved", "wait_handover", "on_loan", "return_requested", "incident"])),
-    db.select({ equipmentId: repairs.equipmentId }).from(repairs).where(inArray(repairs.status, ["pending_acceptance", "repairing", "wait_owner_confirm"])),
-    db.select({ equipmentId: transfers.equipmentId }).from(transfers).where(inArray(transfers.status, ["pending_source", "pending_target", "pending_ws", "wait_handover"])),
-    db.select({ equipmentId: disposals.equipmentId }).from(disposals).where(inArray(disposals.status, ["pending_group", "pending_ws", "wait_warehouse"])),
+    // Phiếu đang mở luôn tải đủ; phiếu đã đóng chỉ lấy gần nhất.
+    db.select().from(transfers).where(inArray(transfers.status, [...OPEN_TRANSFER_STATUSES])).orderBy(desc(transfers.createdAt)),
+    db.select().from(transfers).where(inArray(transfers.status, [...CLOSED_TRANSFER_STATUSES])).orderBy(desc(transfers.createdAt)).limit(RECENT_CLOSED_LIMIT),
+    db.select({ equipmentId: machineLoans.equipmentId }).from(machineLoans).where(inArray(machineLoans.status, [...OPEN_MACHINE_LOAN_STATUSES])),
+    db.select({ equipmentId: repairs.equipmentId }).from(repairs).where(inArray(repairs.status, [...OPEN_REPAIR_STATUSES])),
+    db.select({ equipmentId: transfers.equipmentId }).from(transfers).where(inArray(transfers.status, [...OPEN_TRANSFER_STATUSES])),
+    db.select({ equipmentId: disposals.equipmentId }).from(disposals).where(inArray(disposals.status, [...OPEN_DISPOSAL_STATUSES])),
   ]);
+  const rows = [...openRows, ...closedRows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const groupMap = new Map(groupRows.map((g) => [g.id, g.name]));
   const equipmentMap = new Map((await db.select({ id: equipment.id, code: equipment.code }).from(equipment)).map((e) => [e.id, e.code]));
   const busyEquipmentIds = new Set([...openLoans, ...openRepairs, ...openTransfers, ...openDisposals].map((row) => row.equipmentId));
@@ -51,7 +62,7 @@ export default async function TransfersPage() {
       <PageHeader title="Điều chuyển" description="Chuyển quyền quản lý cố định sang nhóm khác; mã máy được giữ nguyên suốt vòng đời." />
       <section className="stat-grid">
         <StatCard title="Chờ nhóm xác nhận" value={waitingGroups} icon={Clock3} tone="warning" />
-        <StatCard title="Chờ WS phê duyệt" value={waitingWs} icon={ArrowLeftRight} tone="violet" />
+        <StatCard title="Chờ Quản lý Xưởng duyệt" value={waitingWs} icon={ArrowLeftRight} tone="violet" />
         <StatCard title="Chờ bàn giao" value={handover} icon={PackageCheck} tone="cyan" />
         <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
       </section>
@@ -63,7 +74,7 @@ export default async function TransfersPage() {
               const actions = [] as React.ReactNode[];
               const counterpartGroup = row.status === "pending_target" ? row.targetGroupId : row.status === "pending_source" ? row.sourceGroupId : null;
               if (counterpartGroup && hasGroupPermission(auth, counterpartGroup, "manager")) actions.push(<form action={acceptTransferCounterpartAction} key="accept"><input type="hidden" name="transferId" value={row.id} /><Button size="sm">Đồng ý</Button></form>);
-              if (row.status === "pending_ws" && auth.isWorkshopAdmin) actions.push(<form action={approveTransferByWsAction} key="ws"><input type="hidden" name="transferId" value={row.id} /><Button size="sm">WS duyệt</Button></form>);
+              if (row.status === "pending_ws" && auth.isWorkshopAdmin) actions.push(<form action={approveTransferByWsAction} key="ws"><input type="hidden" name="transferId" value={row.id} /><Button size="sm">Quản lý Xưởng duyệt</Button></form>);
               if (row.status === "wait_handover" && !row.handedOverAt && hasGroupPermission(auth, row.sourceGroupId, "manager")) actions.push(<form action={confirmTransferHandoverAction} key="handover" className="row-actions"><input type="hidden" name="transferId" value={row.id} /><input name="handoverCondition" placeholder="Tình trạng bàn giao" aria-label="Tình trạng bàn giao" className="field-inline-lg" /><Button size="sm" variant="secondary">Đã giao</Button></form>);
               if (row.status === "wait_handover" && row.handedOverAt && hasGroupPermission(auth, row.targetGroupId, "manager")) actions.push(<form action={confirmTransferReceiptAction} key="receive"><input type="hidden" name="transferId" value={row.id} /><Button size="sm">Đã nhận</Button></form>);
               return [<strong key="code">{row.code}</strong>, equipmentMap.get(row.equipmentId) || "—", groupMap.get(row.sourceGroupId) || "—", groupMap.get(row.targetGroupId) || "—", <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={row.status === "completed" ? "success" : "info"} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];

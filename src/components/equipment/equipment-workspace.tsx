@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { createQuantityToolAction, saveEquipmentRecordAction, type EquipmentFormState } from "@/actions/equipment";
+import { loadEquipmentHistoryAction } from "@/actions/equipment-history";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -100,6 +101,10 @@ export type EquipmentAuditRow = {
 type EquipmentTypeRow = { categoryCode: string; name: string };
 type EditorMode = "create" | "edit" | "clone";
 type DetailTab = "detail" | "history";
+type HistoryState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "ready"; rows: EquipmentAuditRow[] };
 type KpiFilter = "all" | "available" | "borrowed" | "lent" | "repair" | "transfer";
 
 const initialState: EquipmentFormState = { status: "idle" };
@@ -584,7 +589,7 @@ function AssetForm({
 function DetailModal({
   row,
   tab,
-  audits,
+  history,
   canEdit,
   onClose,
   onEdit,
@@ -595,7 +600,7 @@ function DetailModal({
 }: {
   row: IndividualEquipmentRow;
   tab: DetailTab;
-  audits: EquipmentAuditRow[];
+  history: HistoryState;
   canEdit: boolean;
   onClose: () => void;
   onEdit: () => void;
@@ -619,7 +624,7 @@ function DetailModal({
         </div>
         <div className="asset-detail-tabs">
           <button type="button" className={tab === "detail" ? "is-active" : ""} onClick={() => onTab("detail")}><ClipboardList size={15} /> Chi tiết</button>
-          <button type="button" className={tab === "history" ? "is-active" : ""} onClick={() => onTab("history")}><History size={15} /> Lịch sử ({audits.length})</button>
+          <button type="button" className={tab === "history" ? "is-active" : ""} onClick={() => onTab("history")}><History size={15} /> Lịch sử{history.status === "ready" ? ` (${history.rows.length})` : ""}</button>
         </div>
         <div className="asset-modal-body asset-detail-body">
           {tab === "detail" ? (
@@ -654,7 +659,7 @@ function DetailModal({
             </div>
           ) : (
             <div className="equipment-history-list">
-              {audits.length ? audits.map((audit) => {
+              {history.status === "loading" ? <p className="muted-copy">Đang tải lịch sử…</p> : history.status === "error" ? <EmptyState title="Không tải được lịch sử" description={history.message} /> : history.rows.length ? history.rows.map((audit) => {
                 const changes = getAuditChanges(audit, groupNames);
                 return <article key={audit.id} className="equipment-history-item">
                   <div className="history-head"><strong>{audit.description}</strong><time>{formatDateTime(audit.createdAt)}</time></div>
@@ -679,7 +684,6 @@ export function EquipmentWorkspace({
   permissions,
   equipmentRows,
   typeRows,
-  auditRows,
   isWorkshopAdmin,
   isReadOnlyViewer,
   defaultGroupId = "all",
@@ -687,7 +691,6 @@ export function EquipmentWorkspace({
   permissions: EquipmentPermission[];
   equipmentRows: IndividualEquipmentRow[];
   typeRows: EquipmentTypeRow[];
-  auditRows: EquipmentAuditRow[];
   isWorkshopAdmin: boolean;
   isReadOnlyViewer: boolean;
   /** Nhóm được chọn sẵn ở ô lọc nhóm ("all" = tất cả nhóm trong phạm vi quyền). */
@@ -713,11 +716,25 @@ export function EquipmentWorkspace({
   const actionablePermissions = permissions.filter((permission) => permissionRank(permission.level) >= 1);
   const permissionByGroup = useMemo(() => new Map(permissions.map((permission) => [permission.groupId, permission])), [permissions]);
   const groupNameById = useMemo(() => new Map(permissions.map((permission) => [permission.groupId, permission.groupName])), [permissions]);
-  const auditByEquipment = useMemo(() => {
-    const map = new Map<string, EquipmentAuditRow[]>();
-    auditRows.forEach((row) => map.set(row.equipmentId, [...(map.get(row.equipmentId) || []), row]));
-    return map;
-  }, [auditRows]);
+  // Lịch sử từng máy chỉ tải khi mở tab "Lịch sử" (không tải trước nhật ký của mọi máy). Khóa theo
+  // id + updatedAt nên sau khi lưu chỉnh sửa (trang tải lại) lịch sử được lấy mới.
+  const [historyByKey, setHistoryByKey] = useState<Record<string, HistoryState>>({});
+  const historyKey = detailRecord ? `${detailRecord.id}:${detailRecord.updatedAt}` : "";
+  const detailHistory: HistoryState = historyByKey[historyKey] ?? { status: "loading" };
+  useEffect(() => {
+    if (!detailRecord || detailTab !== "history") return;
+    const current = historyByKey[historyKey];
+    if (current && current.status !== "error") return;
+    const key = historyKey;
+    setHistoryByKey((prev) => ({ ...prev, [key]: { status: "loading" } }));
+    loadEquipmentHistoryAction(detailRecord.id)
+      .then((result) => setHistoryByKey((prev) => ({
+        ...prev,
+        [key]: result.ok ? { status: "ready", rows: result.rows } : { status: "error", message: result.message },
+      })))
+      .catch(() => setHistoryByKey((prev) => ({ ...prev, [key]: { status: "error", message: "Không tải được lịch sử. Vui lòng thử lại." } })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailRecord, detailTab, historyKey]);
   const typeOptions = useMemo(() => Array.from(new Set(equipmentRows.filter((row) => categoryFilter === "all" || row.categoryCode === categoryFilter).map((row) => row.equipmentType))).sort((a, b) => a.localeCompare(b, "vi")), [equipmentRows, categoryFilter]);
   const normalizedSearch = search.trim().toLocaleLowerCase("vi");
   const canAdd = !isReadOnlyViewer && (isWorkshopAdmin || actionablePermissions.length > 0);
@@ -933,7 +950,7 @@ export function EquipmentWorkspace({
         </section>
       </div> : null}
 
-      {detailRecord ? <DetailModal row={detailRecord} tab={detailTab} audits={auditByEquipment.get(detailRecord.id) || []} canEdit={canEditRow(detailRecord)} onClose={() => setDetailRecord(null)} onEdit={() => openEdit(detailRecord)} onClone={() => openClone(detailRecord)} onTab={setDetailTab} groupNames={groupNameById} displayStatus={displayEquipmentStatus(detailRecord)} /> : null}
+      {detailRecord ? <DetailModal row={detailRecord} tab={detailTab} history={detailHistory} canEdit={canEditRow(detailRecord)} onClose={() => setDetailRecord(null)} onEdit={() => openEdit(detailRecord)} onClone={() => openClone(detailRecord)} onTab={setDetailTab} groupNames={groupNameById} displayStatus={displayEquipmentStatus(detailRecord)} /> : null}
     </>
   );
 }

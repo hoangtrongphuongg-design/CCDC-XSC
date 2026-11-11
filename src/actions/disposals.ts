@@ -88,7 +88,7 @@ export async function approveDisposalByWsAction(formData: FormData) {
       action: "disposal.ws_approve",
       entityType: "disposal",
       entityId: item.id,
-      description: `WS duyệt đề xuất thanh lý ${item.code}`,
+      description: `Quản lý Xưởng duyệt đề xuất thanh lý ${item.code}`,
       afterData: updated,
     });
   });

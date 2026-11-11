@@ -1,5 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { disposals, equipment, machineLoans, repairs, toolCatalog, transfers } from "@/lib/db/schema";
+import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
+import { OPEN_DISPOSAL_STATUSES, OPEN_REPAIR_STATUSES, OPEN_TRANSFER_STATUSES } from "@/lib/workflow-status";
 
 export type DbTx = any; // Transaction object của Drizzle; giữ tương thích giữa các phiên bản Drizzle.
 
@@ -93,25 +95,25 @@ export async function assertEquipmentHasNoOtherOpenWorkflow(
 ) {
   const [loan] = await tx.select({ id: machineLoans.id }).from(machineLoans).where(and(
     eq(machineLoans.equipmentId, equipmentId),
-    inArray(machineLoans.status, ["pending_owner", "approved", "wait_handover", "on_loan", "return_requested", "incident"]),
+    inArray(machineLoans.status, [...OPEN_MACHINE_LOAN_STATUSES]),
   )).limit(1);
   if (loan && except.machineLoanId !== loan.id) throw new Error("Máy đang có phiếu mượn chưa hoàn tất.");
 
   const [transfer] = await tx.select({ id: transfers.id }).from(transfers).where(and(
     eq(transfers.equipmentId, equipmentId),
-    inArray(transfers.status, ["pending_source", "pending_target", "pending_ws", "wait_handover"]),
+    inArray(transfers.status, [...OPEN_TRANSFER_STATUSES]),
   )).limit(1);
   if (transfer && except.transferId !== transfer.id) throw new Error("Máy đang có phiếu điều chuyển chưa hoàn tất.");
 
   const [repair] = await tx.select({ id: repairs.id }).from(repairs).where(and(
     eq(repairs.equipmentId, equipmentId),
-    inArray(repairs.status, ["pending_acceptance", "repairing", "wait_owner_confirm"]),
+    inArray(repairs.status, [...OPEN_REPAIR_STATUSES]),
   )).limit(1);
   if (repair && except.repairId !== repair.id) throw new Error("Máy đang có phiếu sửa chữa chưa hoàn tất.");
 
   const [disposal] = await tx.select({ id: disposals.id }).from(disposals).where(and(
     eq(disposals.equipmentId, equipmentId),
-    inArray(disposals.status, ["pending_group", "pending_ws", "wait_warehouse"]),
+    inArray(disposals.status, [...OPEN_DISPOSAL_STATUSES]),
   )).limit(1);
   if (disposal && except.disposalId !== disposal.id) throw new Error("Máy đang có phiếu thanh lý chưa hoàn tất.");
 }

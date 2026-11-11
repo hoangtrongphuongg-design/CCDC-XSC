@@ -79,7 +79,7 @@ export async function acceptRepairAction(formData: FormData) {
       action: "repair.accept",
       entityType: "repair",
       entityId: repair.id,
-      description: `WS tiếp nhận phiếu sửa ${repair.code}`,
+      description: `Quản lý Xưởng tiếp nhận phiếu sửa ${repair.code}`,
       afterData: updated,
     });
   });

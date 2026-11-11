@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 47 pass
+npm test           # tsx --test tests/*.test.ts — 52 pass
 ```
 
 Không có ESLint script.
@@ -55,6 +55,8 @@ Xem `src/actions/*.ts`. Mẫu chuẩn cho mọi hàm chuyển trạng thái work
 5. `revalidatePath(...)` các trang liên quan + `setFlashMessage("success", ...)`.
 
 `workflows.ts` = helper dùng chung (`lockEquipment`, `assertEquipmentHasNoOtherOpenWorkflow`, các hàm sinh mã).
+
+Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sửa chữa, Thanh lý) luôn tải **đủ phiếu đang mở** + `RECENT_CLOSED_LIMIT` (100) phiếu đã đóng gần nhất — không dùng `limit(100)` chung vì phiếu mở cũ sẽ rớt khỏi danh sách. Hằng trạng thái mở/đóng ở `lib/workflow-status.ts` (mượn máy: `lib/loan-status.ts`); `tests/workflow-status.test.ts` đối chiếu với enum trong `schema.ts` nên thêm trạng thái mới mà quên khai báo thì test fail. Lịch sử từng máy (tab "Lịch sử") tải theo yêu cầu bằng `loadEquipmentHistoryAction` (≤200 dòng, kiểm quyền bằng `canViewEquipmentHistory`), không tải sẵn ở trang.
 
 ### Validation
 

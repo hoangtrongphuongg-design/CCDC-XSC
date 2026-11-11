@@ -1,11 +1,10 @@
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { activityLogs, equipmentTypeCatalog, groups, users } from "@/lib/db/schema";
+import { equipmentTypeCatalog } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/page-header";
 import {
   EquipmentWorkspace,
-  type EquipmentAuditRow,
   type IndividualEquipmentRow,
 } from "@/components/equipment/equipment-workspace";
 import { buildEquipmentPermissions, loadOperationalGroups, loadScopedEquipment } from "@/lib/equipment-data";
@@ -39,7 +38,6 @@ export default async function MyEquipmentPage() {
   } = await loadScopedEquipment(visibleGroupIds);
 
   const groupNameById = new Map(groupRows.map((group) => [group.id, group.name]));
-  const equipmentIds = rawEquipmentRows.map((row) => row.id);
 
   const equipmentRows: IndividualEquipmentRow[] = rawEquipmentRows.map((row) => {
     const loan = activeLoanByEquipment.get(row.id);
@@ -96,35 +94,6 @@ export default async function MyEquipmentPage() {
     .where(eq(equipmentTypeCatalog.isActive, true))
     .orderBy(asc(equipmentTypeCatalog.categoryCode), asc(equipmentTypeCatalog.name));
 
-  const rawAuditRows = equipmentIds.length
-    ? await db.select({
-        id: activityLogs.id,
-        equipmentId: activityLogs.entityId,
-        action: activityLogs.action,
-        description: activityLogs.description,
-        beforeData: activityLogs.beforeData,
-        afterData: activityLogs.afterData,
-        reason: activityLogs.reason,
-        createdAt: activityLogs.createdAt,
-        actorName: users.fullName,
-        actorGroupName: groups.name,
-        actorRole: activityLogs.actorRole,
-      })
-        .from(activityLogs)
-        .leftJoin(users, eq(activityLogs.actorUserId, users.id))
-        .leftJoin(groups, eq(activityLogs.actorGroupId, groups.id))
-        .where(inArray(activityLogs.entityId, equipmentIds))
-        .orderBy(desc(activityLogs.createdAt))
-    : [];
-
-  const auditRows: EquipmentAuditRow[] = rawAuditRows
-    .filter((row): row is typeof row & { equipmentId: string } => Boolean(row.equipmentId))
-    .map((row) => ({
-      ...row,
-      equipmentId: row.equipmentId,
-      createdAt: row.createdAt.toISOString(),
-    }));
-
   return (
     <div className="my-equipment-page">
       <PageHeader
@@ -135,7 +104,6 @@ export default async function MyEquipmentPage() {
         permissions={permissions}
         equipmentRows={equipmentRows}
         typeRows={typeRows}
-        auditRows={auditRows}
         isWorkshopAdmin={auth.isWorkshopAdmin}
         isReadOnlyViewer={auth.isReadOnlyViewer}
         defaultGroupId={defaultGroupId}
