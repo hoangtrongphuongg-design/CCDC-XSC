@@ -921,12 +921,11 @@ export function EquipmentWorkspace({
           </div>
           <div className="card-content equipment-list-table">
             <DataTable
-              headers={["Mã hệ thống", "Tem nhôm", "Tên CCDC", "Loại", "Hãng / Model", "Vị trí", "Tình trạng", "Trạng thái", "Cập nhật", "Thao tác"]}
+              headers={["Mã hệ thống", "Tem nhôm", "Tên CCDC", "Hãng / Model", "Vị trí", "Tình trạng", "Trạng thái", "Cập nhật", "Thao tác"]}
               rows={filteredEquipment.map((row) => [
                 <strong key="code">{row.code}</strong>,
                 row.legacyCode || "—",
                 <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.ownerGroupName}</small></div>,
-                row.equipmentType,
                 <span key="brand-model">{[row.brand, row.model].filter(Boolean).join(" / ") || "—"}</span>,
                 row.currentLocation || "—",
                 <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />,
