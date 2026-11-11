@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { SearchableSelect } from "@/components/searchable-select";
+import { LoanTabs } from "@/components/loan-tabs";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import {
   approveQuickLoanAction,
@@ -66,12 +67,9 @@ export default async function QuickLoansPage({ searchParams }: { searchParams?: 
 
   return (
     <div className={`loan-mobile-page quick-loans-page mobile-mode-${mobileMode}`}>
-      <div className="loan-mobile-switch" aria-label="Chọn kiểu mượn">
-        <a href="/machine-loans">Máy có mã</a>
-        <span className="is-active">CCDC lặt vặt</span>
-      </div>
+      <LoanTabs active="quick" />
       <PageHeader
-        title="Mượn nhanh"
+        title="Mượn – Trả CCDC lặt vặt"
         description="Luồng giống Mượn máy: tạo đề nghị → nhóm cho mượn duyệt (đồng thời bàn giao/đã nhận) → báo trả → nhóm cho mượn xác nhận nhận lại."
       />
 

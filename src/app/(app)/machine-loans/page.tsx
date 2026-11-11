@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { SearchableSelect } from "@/components/searchable-select";
+import { LoanTabs } from "@/components/loan-tabs";
 import { formatDate } from "@/lib/utils";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
@@ -81,12 +82,9 @@ export default async function MachineLoansPage({ searchParams }: { searchParams?
 
   return (
     <div className={`loan-mobile-page machine-loans-page mobile-mode-${mobileMode}`}>
-      <div className="loan-mobile-switch" aria-label="Chọn kiểu mượn">
-        <span className="is-active">Máy có mã</span>
-        <a href="/quick-loans">CCDC lặt vặt</a>
-      </div>
+      <LoanTabs active="machine" />
       <PageHeader
-        title="Mượn máy"
+        title="Mượn – Trả máy"
         description="Luồng rút gọn: tạo đề nghị → nhóm cho mượn duyệt (đồng thời bàn giao) → đang mượn → gửi trả → nhóm chủ máy xác nhận nhận lại."
       />
 
@@ -136,8 +134,8 @@ export default async function MachineLoansPage({ searchParams }: { searchParams?
                   <select name="condition" aria-label="Tình trạng khi nhận lại" defaultValue="good">
                     <option value="good">Tốt</option>
                     <option value="major_damage">Hư hỏng</option>
-                    <option value="awaiting_assessment">Chờ kiểm tra</option>
-                    <option value="irreparable">Thanh lý</option>
+                    <option value="awaiting_assessment">Chưa đánh giá</option>
+                    <option value="irreparable">Không thể phục hồi</option>
                   </select>
                   <Button size="sm">Nhận lại</Button>
                 </form>
@@ -204,8 +202,8 @@ export default async function MachineLoansPage({ searchParams }: { searchParams?
                       <select name="condition" aria-label="Tình trạng kỹ thuật" className="field-inline-md">
                         <option value="good">Tốt</option>
                         <option value="major_damage">Hư hỏng</option>
-                        <option value="awaiting_assessment">Chờ kiểm tra</option>
-                        <option value="irreparable">Thanh lý</option>
+                        <option value="awaiting_assessment">Chưa đánh giá</option>
+                        <option value="irreparable">Không thể phục hồi</option>
                       </select>
                       <input name="returnCondition" placeholder="Ghi chú khi nhận lại" aria-label="Ghi chú khi nhận lại" className="field-inline-lg" />
                       <Button size="sm">Nhận lại</Button>

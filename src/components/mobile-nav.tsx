@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { AuthContext, FlashMessage } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
+import { isActivePath } from "@/lib/nav-active";
 
 export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMessage | null }) {
   const [toast, setToast] = useState<FlashMessage | null>(flash || null);
@@ -75,7 +76,7 @@ export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMes
 
       <nav className="mobile-nav mobile-nav-v2" aria-label="Điều hướng điện thoại">
         {navItems.slice(0, 2).map(([href, label, Icon]) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
+          const active = isActivePath(pathname, href);
           return (
             <Link href={href} key={href} className={cn(active && "is-active")} aria-current={active ? "page" : undefined}>
               <span className="mobile-nav-icon"><Icon size={20} strokeWidth={2} /></span><span>{label}</span>
@@ -90,7 +91,7 @@ export function MobileNav({ auth, flash }: { auth: AuthContext; flash?: FlashMes
         ) : <span className="mobile-nav-spacer" aria-hidden="true" />}
 
         {navItems.slice(2).map(([href, label, Icon]) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
+          const active = isActivePath(pathname, href);
           return (
             <Link href={href} key={href} className={cn(active && "is-active")} aria-current={active ? "page" : undefined}>
               <span className="mobile-nav-icon"><Icon size={20} strokeWidth={2} /></span><span>{label}</span>

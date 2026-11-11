@@ -120,8 +120,8 @@ const originLabels = {
 const simpleConditionOptions = [
   ["good", "Tốt"],
   ["major_damage", "Hư hỏng"],
-  ["awaiting_assessment", "Chờ kiểm tra"],
-  ["irreparable", "Thanh lý"],
+  ["awaiting_assessment", "Chưa đánh giá"],
+  ["irreparable", "Không thể phục hồi"],
 ] as const;
 
 const auditFieldLabels: Record<string, string> = {
@@ -274,7 +274,7 @@ function QuantityToolForm({ permissions, isWorkshopAdmin, onCancel, onBack, onSa
           placeholder="Ví dụ: 1.250.000"
         />
       </FormField>
-      <FormField label="Tình trạng"><select name="condition" defaultValue="good"><option value="good">Tốt</option><option value="major_damage">Hư hỏng</option><option value="awaiting_assessment">Chờ kiểm tra</option><option value="irreparable">Thanh lý</option></select></FormField>
+      <FormField label="Tình trạng"><select name="condition" defaultValue="good"><option value="good">Tốt</option><option value="major_damage">Hư hỏng</option><option value="awaiting_assessment">Chưa đánh giá</option><option value="irreparable">Không thể phục hồi</option></select></FormField>
     </div><div className="form-grid"><FormField label="Ghi chú"><textarea name="notes" rows={3}/></FormField></div></section>
     {state.status === "error" ? <div className="form-message error">{state.message}</div> : null}
     <div className="asset-form-actions"><Button type="button" variant="secondary" onClick={onCancel}>Hủy</Button><Button type="submit" name="afterSave" value="add_next" variant="secondary" disabled={pending}>Lưu & thêm tiếp</Button><Button type="submit" name="afterSave" value="close" disabled={pending}>{pending ? "Đang lưu..." : "Lưu CCDC"}</Button></div>

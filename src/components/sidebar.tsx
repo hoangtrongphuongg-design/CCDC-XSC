@@ -16,13 +16,13 @@ import {
   Recycle,
   ShieldCheck,
   Wrench,
-  Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { AuthContext } from "@/lib/auth/session";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { canViewWholeWorkshop, getRoleSummary } from "@/lib/auth/roles";
+import { isActivePath } from "@/lib/nav-active";
 
 type NavItem = readonly [href: string, label: string, icon: LucideIcon];
 
@@ -41,8 +41,7 @@ const operationItems = [
 ] as const satisfies readonly NavItem[];
 
 const workflowItems = [
-  ["/machine-loans", "Mượn máy", Handshake],
-  ["/quick-loans", "Cho mượn nhanh", Zap],
+  ["/machine-loans", "Mượn – Trả", Handshake],
   ["/transfers", "Điều chuyển", ArrowLeftRight],
   ["/repairs", "Sửa chữa", Wrench],
   ["/disposals", "Thanh lý", Recycle],
@@ -72,7 +71,7 @@ export function Sidebar({ auth }: { auth: AuthContext }) {
   const visibleWorkflowItems = workflowItems.filter(([href]) => {
     if (href === "/transfers") return canTransfer;
     if (href === "/disposals") return canDispose;
-    if (["/machine-loans", "/quick-loans", "/repairs"].includes(href)) return canUseGroupWorkflows;
+    if (["/machine-loans", "/repairs"].includes(href)) return canUseGroupWorkflows;
     return false;
   });
 
@@ -81,7 +80,7 @@ export function Sidebar({ auth }: { auth: AuthContext }) {
       <p className="nav-section-label">{label}</p>
       <div className="nav-section-list">
         {items.map(([href, itemLabel, Icon]) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
+          const active = isActivePath(pathname, href);
           return (
             <Link href={href} key={href} className={cn("nav-link", active && "is-active")} aria-current={active ? "page" : undefined}>
               <span className="nav-icon"><Icon size={18} strokeWidth={1.9} aria-hidden="true" /></span>
