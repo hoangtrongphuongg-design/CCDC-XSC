@@ -8,6 +8,7 @@ import {
   Copy,
   Edit3,
   Eye,
+  FileSpreadsheet,
   Filter,
   History,
   MoreHorizontal,
@@ -720,6 +721,8 @@ export function EquipmentWorkspace({
   const typeOptions = useMemo(() => Array.from(new Set(equipmentRows.filter((row) => categoryFilter === "all" || row.categoryCode === categoryFilter).map((row) => row.equipmentType))).sort((a, b) => a.localeCompare(b, "vi")), [equipmentRows, categoryFilter]);
   const normalizedSearch = search.trim().toLocaleLowerCase("vi");
   const canAdd = !isReadOnlyViewer && (isWorkshopAdmin || actionablePermissions.length > 0);
+  // Xuất toàn bộ CCDC của nhóm đang chọn ở ô lọc nhóm ("all" = mọi nhóm trong phạm vi quyền).
+  const exportHref = `/my-equipment/export?group=${encodeURIComponent(groupFilter)}`;
 
   const scopeGroupIds = useMemo(() => new Set(groupFilter === "all" ? permissions.map((permission) => permission.groupId) : [groupFilter]), [groupFilter, permissions]);
   const inScope = (groupId: string | null | undefined) => Boolean(groupId && scopeGroupIds.has(groupId));
@@ -843,7 +846,7 @@ export function EquipmentWorkspace({
         <header className="mobile-equipment-header">
           <button type="button" aria-label="Quay lại" onClick={() => window.history.back()}><ArrowLeft size={20} /></button>
           <strong>Dụng cụ nhóm tôi</strong>
-          <div><button type="button" aria-label="Tìm kiếm" onClick={() => setMobileSearchOpen((value) => !value)}><Search size={19} /></button><button type="button" aria-label="Bộ lọc" onClick={() => setMobileFiltersOpen((value) => !value)}><Filter size={18} /></button></div>
+          <div><button type="button" aria-label="Tìm kiếm" onClick={() => setMobileSearchOpen((value) => !value)}><Search size={19} /></button><button type="button" aria-label="Bộ lọc" onClick={() => setMobileFiltersOpen((value) => !value)}><Filter size={18} /></button><a href={exportHref} download aria-label="Xuất Excel kiểm kê" title="Xuất Excel kiểm kê"><FileSpreadsheet size={18} /></a></div>
         </header>
         {mobileSearchOpen ? <div className="mobile-equipment-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Mã, mã hiện hữu, tên, model, serial..." autoFocus /></div> : null}
         {mobileFiltersOpen ? <div className="mobile-equipment-filters">
@@ -890,7 +893,11 @@ export function EquipmentWorkspace({
         </div>
 
         <section className="card table-card">
-          <div className="card-header"><div><h2 className="card-title">Danh sách CCDC</h2><p className="card-subtitle">Mỗi thiết bị có một mã hệ thống cố định trong toàn bộ vòng đời.</p></div></div>
+          <div className="card-header">
+            <div><h2 className="card-title">Danh sách CCDC</h2><p className="card-subtitle">Mỗi thiết bị có một mã hệ thống cố định trong toàn bộ vòng đời.</p></div>
+            {/* Tải file qua route handler: <a> thường (không next/link) để không prefetch. */}
+            <a className="btn btn-secondary btn-sm" href={exportHref} download title="Xuất toàn bộ CCDC của nhóm đang chọn (không phụ thuộc các ô lọc khác) để kiểm kê"><FileSpreadsheet size={15} aria-hidden="true" /> Xuất Excel kiểm kê</a>
+          </div>
           <div className="card-content equipment-list-table">
             <DataTable
               headers={["Mã", "Mã hiện hữu", "Tên CCDC", "Loại", "Hãng / Model", "Vị trí", "Tình trạng", "Trạng thái", "Cập nhật", "Thao tác"]}

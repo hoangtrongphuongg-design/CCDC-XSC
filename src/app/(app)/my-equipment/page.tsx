@@ -1,60 +1,22 @@
-import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { activityLogs, equipment, equipmentTypeCatalog, groups, machineLoans, repairs, transfers, users } from "@/lib/db/schema";
+import { activityLogs, equipmentTypeCatalog, groups, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { PageHeader } from "@/components/page-header";
 import {
   EquipmentWorkspace,
   type EquipmentAuditRow,
-  type EquipmentPermission,
   type IndividualEquipmentRow,
 } from "@/components/equipment/equipment-workspace";
-import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
-import { OPEN_MACHINE_LOAN_STATUSES, isHeldByBorrower } from "@/lib/loan-status";
+import { buildEquipmentPermissions, loadOperationalGroups, loadScopedEquipment } from "@/lib/equipment-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function MyEquipmentPage() {
   const auth = await requireUser();
 
-  const groupRows = (await db.select({
-    id: groups.id,
-    code: groups.code,
-    name: groups.name,
-    equipmentPrefix: groups.equipmentPrefix,
-    isSystem: groups.isSystem,
-  }).from(groups).where(eq(groups.isActive, true)).orderBy(asc(groups.name)))
-    .filter((group) => !group.isSystem && isOfficialOperationalGroupCode(group.code));
-
-  const permissionByGroup = new Map(auth.permissions.map((permission) => [permission.groupId, permission]));
-  const permissions: EquipmentPermission[] = auth.isWorkshopAdmin
-    ? groupRows.map((group) => ({
-        groupId: group.id,
-        groupCode: group.code,
-        groupName: group.name,
-        equipmentPrefix: group.equipmentPrefix,
-        level: "manager" as const,
-      }))
-    : auth.isReadOnlyViewer
-      ? groupRows.map((group) => ({
-          groupId: group.id,
-          groupCode: group.code,
-          groupName: group.name,
-          equipmentPrefix: group.equipmentPrefix,
-          level: "viewer" as const,
-        }))
-      : groupRows
-          .filter((group) => permissionByGroup.has(group.id))
-          .map((group) => {
-            const permission = permissionByGroup.get(group.id)!;
-            return {
-              groupId: group.id,
-              groupCode: group.code,
-              groupName: group.name,
-              equipmentPrefix: group.equipmentPrefix,
-              level: permission.level,
-            };
-          });
+  const groupRows = await loadOperationalGroups();
+  const permissions = buildEquipmentPermissions(auth, groupRows);
 
   const visibleGroupIds = permissions.map((permission) => permission.groupId);
 
@@ -67,87 +29,17 @@ export default async function MyEquipmentPage() {
     ? auth.primaryGroupId
     : "all";
 
-  const [relevantLoanRows, relevantTransferRows] = visibleGroupIds.length
-    ? await Promise.all([
-        db.select({
-          equipmentId: machineLoans.equipmentId,
-          ownerGroupId: machineLoans.ownerGroupId,
-          borrowerGroupId: machineLoans.borrowerGroupId,
-          status: machineLoans.status,
-          updatedAt: machineLoans.updatedAt,
-        }).from(machineLoans)
-          .where(and(
-            inArray(machineLoans.status, [...OPEN_MACHINE_LOAN_STATUSES]),
-            or(inArray(machineLoans.ownerGroupId, visibleGroupIds), inArray(machineLoans.borrowerGroupId, visibleGroupIds)),
-          ))
-          .orderBy(desc(machineLoans.updatedAt)),
-        db.select({
-          equipmentId: transfers.equipmentId,
-          sourceGroupId: transfers.sourceGroupId,
-          targetGroupId: transfers.targetGroupId,
-          status: transfers.status,
-          updatedAt: transfers.updatedAt,
-        }).from(transfers)
-          .where(or(inArray(transfers.sourceGroupId, visibleGroupIds), inArray(transfers.targetGroupId, visibleGroupIds)))
-          .orderBy(desc(transfers.updatedAt)),
-      ])
-    : [[], []];
-
-  const openTransferEquipmentIds = Array.from(new Set(
-    relevantTransferRows
-      .filter((row) => !["completed", "rejected", "cancelled"].includes(row.status))
-      .map((row) => row.equipmentId),
-  ));
-
-  // Máy nhóm mình đang giữ do đi mượn: suy ra từ phiếu mượn đang mở (nhóm mượn
-  // thực sự giữ máy), KHÔNG dựa vào equipment.current_group_id để máy đã trả
-  // (hoặc dữ liệu cũ lệch) không hiện mãi ở nhóm mượn.
-  const heldAsBorrowerEquipmentIds = relevantLoanRows
-    .filter((row) => isHeldByBorrower(row.status) && visibleGroupIds.includes(row.borrowerGroupId))
-    .map((row) => row.equipmentId);
-  const extraEquipmentIds = Array.from(new Set([...openTransferEquipmentIds, ...heldAsBorrowerEquipmentIds]));
-
-  const rawEquipmentRows = visibleGroupIds.length
-    ? await db.select().from(equipment)
-        .where(extraEquipmentIds.length
-          ? or(
-              inArray(equipment.ownerGroupId, visibleGroupIds),
-              inArray(equipment.id, extraEquipmentIds),
-            )
-          : inArray(equipment.ownerGroupId, visibleGroupIds))
-        .orderBy(asc(equipment.code))
-    : [];
+  // Máy của nhóm mình: thuộc nhóm, hoặc đang giữ do mượn (suy ra từ phiếu mượn đang mở, KHÔNG
+  // dựa vào equipment.current_group_id), hoặc có điều chuyển mở — xem lib/equipment-data.ts.
+  const {
+    rows: rawEquipmentRows,
+    loanByEquipment: activeLoanByEquipment,
+    transferByEquipment: activeTransferByEquipment,
+    repairByEquipment: activeRepairByEquipment,
+  } = await loadScopedEquipment(visibleGroupIds);
 
   const groupNameById = new Map(groupRows.map((group) => [group.id, group.name]));
   const equipmentIds = rawEquipmentRows.map((row) => row.id);
-
-  const repairRows = equipmentIds.length
-    ? await db.select({
-        equipmentId: repairs.equipmentId,
-        status: repairs.status,
-        updatedAt: repairs.updatedAt,
-      }).from(repairs)
-        .where(inArray(repairs.equipmentId, equipmentIds))
-        .orderBy(desc(repairs.updatedAt))
-    : [];
-
-  const activeLoanByEquipment = new Map<string, (typeof relevantLoanRows)[number]>();
-  relevantLoanRows.forEach((row) => {
-    if (["completed", "rejected", "cancelled"].includes(row.status) || activeLoanByEquipment.has(row.equipmentId)) return;
-    activeLoanByEquipment.set(row.equipmentId, row);
-  });
-
-  const activeTransferByEquipment = new Map<string, (typeof relevantTransferRows)[number]>();
-  relevantTransferRows.forEach((row) => {
-    if (["completed", "rejected", "cancelled"].includes(row.status) || activeTransferByEquipment.has(row.equipmentId)) return;
-    activeTransferByEquipment.set(row.equipmentId, row);
-  });
-
-  const activeRepairByEquipment = new Map<string, (typeof repairRows)[number]>();
-  repairRows.forEach((row) => {
-    if (["completed", "cancelled", "irreparable"].includes(row.status) || activeRepairByEquipment.has(row.equipmentId)) return;
-    activeRepairByEquipment.set(row.equipmentId, row);
-  });
 
   const equipmentRows: IndividualEquipmentRow[] = rawEquipmentRows.map((row) => {
     const loan = activeLoanByEquipment.get(row.id);

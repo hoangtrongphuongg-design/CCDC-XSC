@@ -13,6 +13,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // exceljs chỉ chạy ở server (route xuất Excel); không cho Next bundle nó.
+  serverExternalPackages: ["exceljs"],
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

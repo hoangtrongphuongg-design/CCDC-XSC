@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import { Boxes, CircleCheck, PackageOpen, Search, Wrench } from "lucide-react";
+import { Boxes, CircleCheck, FileSpreadsheet, PackageOpen, Search, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, toolCatalog } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
@@ -101,16 +101,27 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         title="Dụng cụ toàn xưởng"
         description="Trang tra cứu tập trung, chỉ xem. Việc thêm và cập nhật dụng cụ được thực hiện tại Dụng cụ nhóm tôi."
         actions={
-          <form className="workshop-equipment-search" action="/equipment" method="get" role="search">
-            <span className="workshop-search-icon" aria-hidden="true"><Search size={18} /></span>
-            <input
-              name="q"
-              defaultValue={searchText}
-              placeholder="Mã, tên máy, loại, nhóm, vị trí..."
-              aria-label="Tìm dụng cụ toàn xưởng"
-            />
-            <button type="submit">Tìm</button>
-          </form>
+          <>
+            <form className="workshop-equipment-search" action="/equipment" method="get" role="search">
+              <span className="workshop-search-icon" aria-hidden="true"><Search size={18} /></span>
+              <input
+                name="q"
+                defaultValue={searchText}
+                placeholder="Mã, tên máy, loại, nhóm, vị trí..."
+                aria-label="Tìm dụng cụ toàn xưởng"
+              />
+              <button type="submit">Tìm</button>
+            </form>
+            {/* Tải file qua route handler: dùng <a> thường, không dùng next/link để không prefetch. */}
+            <a
+              className="btn btn-secondary"
+              href={searchText ? `/equipment/export?q=${encodeURIComponent(searchText)}` : "/equipment/export"}
+              download
+              title={searchText ? "Xuất Excel danh sách đang tìm" : "Xuất Excel toàn bộ dụng cụ, phân theo nhóm"}
+            >
+              <FileSpreadsheet size={16} aria-hidden="true" /> Xuất Excel
+            </a>
+          </>
         }
       />
 
