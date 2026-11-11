@@ -2765,6 +2765,11 @@ body {
   .inventory-prompt-actions .btn { flex: 1; }
 }
 
+/* Đăng nhập: ghi nhớ thiết bị */
+.auth-remember { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.35; cursor: pointer; }
+.auth-remember input { flex: 0 0 auto; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--primary); }
+.auth-remember small { display: block; color: var(--text-muted); font-size: 12px; }
+
 /* Hồ sơ máy */
 .profile-page { display: grid; gap: 14px; }
 .profile-badges { display: flex; flex-wrap: wrap; gap: 8px; }

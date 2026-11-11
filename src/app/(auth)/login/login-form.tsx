@@ -15,6 +15,10 @@ export function LoginForm() {
     <form action={action} className="auth-form" noValidate>
       <FormField label="Số danh bộ" required><input name="employeeCode" autoComplete="username" inputMode="numeric" placeholder="Nhập số danh bộ" /></FormField>
       <FormField label="Mật khẩu" required><PasswordInput name="password" autoComplete="current-password" placeholder="Nhập mật khẩu" /></FormField>
+      <label className="auth-remember">
+        <input type="checkbox" name="remember" defaultChecked />
+        <span>Ghi nhớ đăng nhập trên thiết bị này <small>(30 ngày; bỏ chọn nếu dùng máy chung)</small></span>
+      </label>
       {state.error ? <p className="form-message error" role="alert">{state.error}</p> : null}
       <Button type="submit" size="lg" disabled={pending}><LogIn size={16} />{pending ? "Đang đăng nhập..." : "Đăng nhập"}</Button>
     </form>
