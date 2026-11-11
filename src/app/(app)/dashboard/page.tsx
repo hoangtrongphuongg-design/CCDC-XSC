@@ -215,9 +215,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
           <Link href="/profile" className="mobile-ops-avatar" aria-label="Hồ sơ cá nhân">{auth.fullName.trim().slice(0, 1).toUpperCase()}</Link>
         </header>
 
-        <form className="mobile-ops-search" action="/equipment" method="get" role="search">
+        <form className="mobile-ops-search" action="/search" method="get" role="search">
           <Search size={18} aria-hidden="true" />
-          <input name="q" placeholder="Tìm mã, tem nhôm hoặc tên CCDC..." aria-label="Tìm CCDC" />
+          <input name="q" placeholder="Tìm máy, tem nhôm, serial, mã phiếu..." aria-label="Tìm kiếm chung" />
         </form>
 
         {canOperate ? (

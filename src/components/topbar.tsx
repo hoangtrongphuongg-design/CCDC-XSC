@@ -3,6 +3,7 @@ import { Bell, CalendarDays, LogOut, ShieldCheck } from "lucide-react";
 import type { AuthContext } from "@/lib/auth/session";
 import { logoutAction } from "@/actions/auth";
 import { getRoleSummary } from "@/lib/auth/roles";
+import { GlobalSearchBox } from "@/components/global-search-box";
 import { EMPTY_TASK_COUNTS, formatBadge, type TaskSection } from "@/lib/my-tasks";
 
 function initials(name: string) {
@@ -35,6 +36,8 @@ export function Topbar({ auth, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthCon
           <span>{roleLabel} · {auth.permissions.length} phạm vi được phân quyền</span>
         </div>
       </div>
+
+      <GlobalSearchBox />
 
       <div className="topbar-actions">
         <div className="today-chip" title={today}>
