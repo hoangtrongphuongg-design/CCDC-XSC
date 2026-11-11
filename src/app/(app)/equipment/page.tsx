@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { conditionTone, equipmentStatusTone } from "@/lib/status-style";
 
 export const dynamic = "force-dynamic";
 
@@ -169,8 +170,8 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
               row.ownerGroup,
               groupMap.get(row.currentGroupId) || "—",
               row.currentLocation || "—",
-              <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={row.condition === "good" ? "success" : row.condition === "irreparable" ? "danger" : "warning"} />,
-              <StatusBadge key="status" label={EQUIPMENT_STATUS_LABELS[row.status]} tone={row.status === "in_use_owner" ? "success" : row.status === "disposal_warehouse" ? "danger" : "info"} />,
+              <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />,
+              <StatusBadge key="status" label={EQUIPMENT_STATUS_LABELS[row.status]} tone={equipmentStatusTone(row.status)} />,
             ])}
             empty={<EmptyState description={searchText ? `Không tìm thấy máy/CCDC phù hợp với “${searchText}”.` : "Chưa có máy/CCDC đã hoàn thành hồ sơ."} />}
           />

@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 117 pass
+npm test           # tsx --test tests/*.test.ts — 123 pass
 ```
 
 Không có ESLint script.
@@ -113,7 +113,8 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 
 - "Corporate Industrial Light UI", màu thương hiệu `#004A8F`. Không dùng theme tím/pastel cũ.
 - **Không cuộn ngang toàn trang.** Bảng desktop ép trong viewport, nội dung dài xuống dòng; mobile chuyển bảng → card. `tests/ui.test.ts` canh chừng quy tắc này qua `src/app/globals.css` / `ui-*.css`.
-- CSS: `src/app/globals.css` + `ui-current.css` + `ui-v3.css`. Chi tiết: `docs/BRAND_UI_STANDARD.md`, `docs/UI_DESIGN_STANDARD_V3.md`.
+- CSS: `src/app/globals.css` + `ui-current.css` (nạp sau, thắng khi trùng; `ui-v3.css` cũ đã xóa vì không còn import). Chi tiết: `docs/BRAND_UI_STANDARD.md`, `docs/UI_DESIGN_STANDARD_V3.md`.
+- **Chữ & màu dễ đọc** (`tests/readable-ui.test.ts` canh): phông **Be Vietnam Pro** nạp bằng `next/font/google` (`layout.tsx`, biến `--font-sans`); thân 15px (điện thoại 16px, ô nhập 16px để iOS không phóng to); **không khai báo `font-size` px nào dưới 12px** (tem in dùng `pt` nên ngoại lệ); màn cảm ứng (`pointer: coarse`) nút/ô nhập cao ≥ 44px. **Màu trạng thái chỉ do `lib/status-style.ts` quyết** (`equipmentStatusTone`, `conditionTone`, `workflowTone`): xanh lá = Sẵn sàng/Tốt/Hoàn thành; xanh dương = đang diễn ra (Đang mượn, Đã duyệt); cam = cần ai đó xử lý (Đang sửa, Chờ duyệt/xác nhận); đỏ = Hư hỏng, Không thể phục hồi, Có sự cố, Từ chối; xám = Chưa đánh giá, Ngừng, Kho thanh lý, Đã hủy. `StatusBadge` kèm ký hiệu ✓ ! ✕ ● ○ theo tông (không chỉ màu). Trang không được tự viết `tone={row.status === ...}`; thêm trạng thái mới thì thêm vào `status-style.ts` (test phủ đủ enum).
 - **Bảng (`DataTable`) chia cột theo nội dung**, không chia đều: `lib/table-columns.ts` (`columnKind(header)`, hàm thuần, so khớp tiêu đề không dấu) phân cột thành `fit` (mã, số, ngày — không xuống dòng), `status` (Trạng thái/Tình trạng — huy hiệu), `wide` (tên máy, nội dung, lý do — nhận phần rộng nhất, 22%), `text` (nhóm, loại, vị trí), `actions`; `DataTable` gắn `data-col`/`data-align`, CSS ở **cuối `ui-current.css`**. Chỉ bật `table-layout: auto` từ viewport **1366px** (đã đo: không tràn ở bề rộng bảng ≥ 940px); hẹp hơn giữ chia đều như cũ để không bao giờ cắt cột. **Thêm bảng/cột mới**: thêm tiêu đề vào danh sách trong `tests/table-columns.test.ts` (test quét mọi `headers={[...]}` trong `src` và fail nếu thiếu); cột không khớp mặc định là `text`. Tiêu đề bảng 12px (không in hoa), ô 13px; điện thoại vẫn chuyển bảng thành thẻ.
 - Sidebar (desktop) và MobileNav ẩn/hiện menu theo vai trò — **chỉ là UX**, backend luôn kiểm tra quyền độc lập. Menu có **một** mục "Mượn – Trả" (`/machine-loans`, sáng cả ở `/quick-loans` nhờ `isActivePath` trong `lib/nav-active.ts`); hai trang chia sẻ thanh tab `LoanTabs` (Máy có mã | CCDC lặt vặt).
 - Nhãn hiển thị không được trùng giữa **Trạng thái** (`EQUIPMENT_STATUS_LABELS`) và **Tình trạng** (`CONDITION_LABELS`: Tốt / Hư hỏng / Chưa đánh giá / Không thể phục hồi) — có test canh. Chỉ đổi chữ hiển thị, giá trị lưu trong DB giữ nguyên.

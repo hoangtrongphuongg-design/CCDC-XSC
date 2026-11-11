@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { conditionTone as conditionToneOf, equipmentStatusTone } from "@/lib/status-style";
 import { requireUser } from "@/lib/auth/guards";
 import { CONDITION_LABELS, EQUIPMENT_STATUS_LABELS } from "@/lib/constants";
 import { getEquipmentCategoryLabel } from "@/lib/equipment-categories";
@@ -34,8 +35,8 @@ export default async function MachineProfilePage({ params }: { params: Promise<{
 
   const name = (gid: string) => groupNames.get(gid) ?? "—";
   const inventoryPrompts = await loadInventoryPromptsForMachine(auth, machine.id, [machine.ownerGroupId]);
-  const statusTone = machine.status === "in_use_owner" ? "success" : machine.status === "disposal_warehouse" || machine.status === "inactive" ? "danger" : "info";
-  const conditionTone = machine.condition === "good" ? "success" : machine.condition === "irreparable" ? "danger" : "warning";
+  const statusTone = equipmentStatusTone(machine.status);
+  const conditionTone = conditionToneOf(machine.condition);
 
   return (
     <div className="profile-page">

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { workflowTone } from "@/lib/status-style";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import {
@@ -73,7 +74,7 @@ export default async function DisposalsPage() {
               if (row.status === "pending_ws" && auth.isWorkshopAdmin) actions.push(<form action={approveDisposalByWsAction} key="ws"><input type="hidden" name="disposalId" value={row.id} /><Button size="sm">Quản lý Xưởng duyệt</Button></form>);
               if (row.status === "wait_warehouse" && warehouse && hasGroupPermission(auth, warehouse.id, "operator")) actions.push(<form action={receiveDisposalWarehouseAction} key="warehouse"><input type="hidden" name="disposalId" value={row.id} /><Button size="sm">Nhập kho</Button></form>);
               const machine = equipmentMap.get(row.equipmentId);
-              return [<strong key="code">{row.code}</strong>, machine ? `${machine.code} — ${machine.name}` : row.equipmentId, groupMap.get(row.ownerGroupId) || "—", row.reason, <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={row.status === "completed" ? "success" : "warning"} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];
+              return [<strong key="code">{row.code}</strong>, machine ? `${machine.code} — ${machine.name}` : row.equipmentId, groupMap.get(row.ownerGroupId) || "—", row.reason, <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={workflowTone(row.status)} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];
             })} empty={<EmptyState description="Chưa có phiếu thanh lý." />} />
           </CardContent>
         </Card>
@@ -111,7 +112,7 @@ export default async function DisposalsPage() {
                   tool ? `${row.quantity} ${tool.unit}` : row.quantity,
                   groupMap.get(row.ownerGroupId) || "—",
                   row.reason,
-                  <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={row.status === "completed" ? "success" : "warning"} />,
+                  <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={workflowTone(row.status)} />,
                   <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>,
                 ];
               })}
