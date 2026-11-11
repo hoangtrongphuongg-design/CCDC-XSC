@@ -10,7 +10,8 @@ test("Dụng cụ nhóm tôi có tem nhôm (mã đã gắn), cấp phát ban đ�
   const action = await source("src/actions/equipment.ts");
   assert.match(action, /legacyCode/);
   assert.match(action, /new_purchase/);
-  assert.match(action, /equipment\.initial_allocation/);
+  // Việc tạo máy + nhật ký nằm ở hàm dùng chung với nhập Excel.
+  assert.match(await source("src/lib/equipment-create.ts"), /equipment\.initial_allocation/);
   assert.match(action, /equipment\.admin_correction/);
   assert.match(action, /correctionReason/);
 });

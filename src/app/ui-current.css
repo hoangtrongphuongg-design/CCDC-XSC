@@ -2487,3 +2487,63 @@ body {
 @media (max-width: 760px) {
   .my-task-row { grid-template-columns: 1fr; }
 }
+
+/* Nhập máy từ Excel (Admin) */
+.import-page { display: grid; gap: 14px; }
+.import-steps { margin: 0 0 8px; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; }
+.import-note { margin: 0; font-size: 12px; }
+.import-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.import-file {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  max-width: 100%;
+  padding: 0 14px;
+  border: 1px dashed var(--primary);
+  border-radius: 10px;
+  color: var(--primary);
+  background: var(--primary-softer);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  overflow: hidden;
+}
+.import-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.import-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.import-summary button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.import-summary button b { margin-left: 4px; }
+.import-summary button.is-active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+.import-summary button.is-error b { color: var(--danger); }
+.import-rows { display: grid; max-height: 560px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
+.import-row {
+  display: grid;
+  grid-template-columns: 74px 118px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 12px;
+  border-bottom: 1px solid #e7edf2;
+  border-left: 3px solid var(--success);
+  font-size: 12px;
+}
+.import-row:last-child { border-bottom: 0; }
+.import-row[data-state="skip"] { border-left-color: #d98a14; background: #fffaf0; }
+.import-row[data-state="error"] { border-left-color: var(--danger); background: var(--danger-soft); }
+.import-row-no { color: var(--text-muted); }
+.import-row-state { font-weight: 700; }
+.import-row-main { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.import-row-main small { color: var(--danger); font-size: 12px; }
+.import-row[data-state="skip"] .import-row-main small { color: #8a5a00; }
+@media (max-width: 760px) {
+  .import-row { grid-template-columns: 1fr; gap: 2px; }
+}

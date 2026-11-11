@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 64 pass
+npm test           # tsx --test tests/*.test.ts — 73 pass
 ```
 
 Không có ESLint script.
@@ -87,6 +87,14 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - Thư viện `exceljs` (chỉ server; `serverExternalPackages` trong `next.config.ts`). Chuỗi người dùng nhập luôn ghi dạng text, công thức duy nhất là cột "Chênh lệch" của sheet kiểm kê CCDC theo số lượng.
 - Phân tầng: `lib/equipment-data.ts` (truy vấn dùng chung với trang "Dụng cụ nhóm tôi": `loadScopedEquipment`, `loadWorkshopEquipment`, `loadTools`) → `lib/export/equipment-export.ts` (hàm thuần: cây nhóm → loại, ghi chú, tên sheet/file, ngày giờ VN) → `lib/export/equipment-workbook.ts` (dựng file). Test dữ liệu giả ở `tests/equipment-export.test.ts`.
 - `equipmentSearchValues()` phản chiếu các trường tìm kiếm của trang `/equipment` — đổi một nơi thì sửa nơi kia. "Nhóm đang giữ" trong file xuất suy ra từ phiếu mượn (không dùng `current_group_id`). Không xuất đơn giá.
+
+### Nhập máy từ Excel (`/import`, chỉ Admin hệ thống)
+
+- Trang `/import` (menu QUẢN TRỊ → "Nhập dữ liệu") + `GET /import/template` (file mẫu: tiêu đề dòng 1, ô chọn danh sách Nhóm quản lý / Nhóm thiết bị / Tình trạng, sheet Hướng dẫn + Danh mục). Hai bước trong một màn (`components/import/equipment-import-form.tsx` giữ file trong state): **Kiểm tra file** (`mode=check`, không ghi gì, trả bảng từng dòng hợp lệ / lỗi / bỏ qua trùng) → **Nhập vào hệ thống** (`mode=commit`, kiểm tra lại với dữ liệu mới nhất).
+- `actions/import.ts`: còn dòng **lỗi** thì không ghi gì; dòng trùng **Tem nhôm / Serial** (với DB hoặc dòng khác trong file, không phân biệt hoa thường; ô "-"/"N/A" coi như trống) bị **bỏ qua** và báo rõ; chỉ **tạo mới**, không cập nhật máy đã có; tối đa 1000 dòng, 2 MB, chỉ `.xlsx`. Toàn bộ trong **một transaction**, cấp mã liền bằng `nextAssetCodes` (`lib/workflows.ts`, một câu lệnh cho cả nhóm), ghi máy theo lô 200 dòng. `next.config.ts` nâng `serverActions.bodySizeLimit` lên 3 MB; trang đặt `maxDuration = 60`.
+- Phân tầng: `lib/import/equipment-import.ts` (hàm thuần: tiêu đề, kiểm tra dòng, trùng) → `lib/import/read-workbook.ts` (đọc exceljs, ô nào cũng ra chuỗi) → `lib/export/import-template.ts` → `actions/import.ts`. Việc dựng giá trị máy mới dùng chung với form "Thêm CCDC" qua `lib/equipment-create.ts` (`buildEquipmentInsertValues`, `insertEquipmentRecord`) — **không** đặt hàm dùng chung trong file `"use server"` vì mọi export ở đó thành Server Action.
+- Nhật ký: mỗi máy một dòng `equipment.import_create` (chỉ cho tab Lịch sử của máy, khai báo `mirror` nên ẩn khỏi `/activities`) + **một** dòng tổng hợp `equipment.import` hiện ở Lịch sử hoạt động.
+- Chưa hỗ trợ nhập CCDC theo số lượng và cập nhật máy đã có.
 
 ### Lịch sử hoạt động (`/activities`)
 

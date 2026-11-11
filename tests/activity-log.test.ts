@@ -48,6 +48,7 @@ test("nhãn tiếng Việt, mã lạ vẫn hiển thị và rơi vào sheet Khá
 
 test("bản sao theo máy luôn bị ẩn; sự kiện tài khoản/nhóm chỉ Admin thấy", () => {
   assert.deepEqual([...MIRROR_ACTIONS].sort(), [
+    "equipment.import_create",
     "equipment.loan_completed",
     "equipment.loan_rejected",
     "equipment.loan_requested",
