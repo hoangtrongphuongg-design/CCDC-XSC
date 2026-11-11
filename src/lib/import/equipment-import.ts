@@ -287,6 +287,23 @@ export function parseImportRows(
   return { rows, summary: summarize(rows) };
 }
 
+/**
+ * Đưa Loại máy / Vị trí của các dòng hợp lệ về đúng cách viết đã có. `canonicalType` và
+ * `canonicalLocation` là hàm dựa trên dữ liệu hiện có; trong cùng file, cách viết xuất hiện
+ * trước được dùng cho các dòng sau (nên "máy hàn que" và "Máy hàn que" trong file không tách đôi).
+ */
+export function applyCanonicalText(
+  rows: readonly ParsedImportRow[],
+  canon: { canonicalType: (categoryCode: string, value: string) => string; canonicalLocation: (value: string) => string },
+): void {
+  for (const row of rows) {
+    if (!row.record) continue;
+    row.record.equipmentType = canon.canonicalType(row.record.categoryCode, row.record.equipmentType) || row.record.name;
+    if (row.record.currentLocation) row.record.currentLocation = canon.canonicalLocation(row.record.currentLocation) || null;
+    row.preview.type = row.record.equipmentType;
+  }
+}
+
 export function summarize(rows: readonly ParsedImportRow[]): ImportSummary {
   return {
     total: rows.length,

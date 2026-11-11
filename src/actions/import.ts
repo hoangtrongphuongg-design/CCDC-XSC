@@ -10,9 +10,11 @@ import { db } from "@/lib/db";
 import { isUniqueViolation } from "@/lib/db/errors";
 import { equipment, equipmentTypeCatalog, groups } from "@/lib/db/schema";
 import { buildEquipmentInsertValues } from "@/lib/equipment-create";
+import { loadCanonicalizers } from "@/lib/canonical-data";
 import { vnDate } from "@/lib/export/equipment-export";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import {
+  applyCanonicalText,
   collectDuplicateKeys,
   findHeader,
   IMPORT_MAX_BYTES,
@@ -101,6 +103,7 @@ export async function importEquipmentAction(_previous: ImportState, formData: Fo
       existingLegacy: new Map(legacyHits.map((r) => [r.key, r.code])),
       existingSerial: new Map(serialHits.map((r) => [r.key, r.code])),
     });
+    applyCanonicalText(rows, await loadCanonicalizers());
     const preview = rows.map(toPreview);
 
     if (mode === "check") {

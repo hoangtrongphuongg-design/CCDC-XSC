@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 73 pass
+npm test           # tsx --test tests/*.test.ts — 79 pass
 ```
 
 Không có ESLint script.
@@ -63,6 +63,11 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - `lib/my-tasks.ts` (hàm thuần) quyết định phiếu nào đang chờ **chính người dùng**; `lib/my-tasks-data.ts` chỉ đọc các phiếu **đang mở** (`loadMyTasks(auth)`, bọc `react.cache` để layout và trang dùng chung một lần truy vấn, lỗi DB thì trả rỗng chứ không làm hỏng trang). `(app)/layout.tsx` tính số đếm → `AppShell` → huy hiệu ở Sidebar (Mượn – Trả, Điều chuyển, Sửa chữa, Thanh lý), MobileNav (Trang chủ = tổng, Mượn/Trả = mượn) và chuông `Topbar` (link `/dashboard#viec-cho-toi`). Thẻ "Việc chờ tôi xử lý" ở `/dashboard` (tối đa 8 việc, chờ lâu nhất lên đầu).
 - Quy tắc: bước cấp nhóm chỉ tính cho **thành viên nhóm** đủ bậc mà Server Action đòi (Admin/Quản lý Xưởng KHÔNG tự có việc của mọi nhóm, dù backend cho họ thao tác); bước cấp Xưởng (tiếp nhận sửa, duyệt điều chuyển/thanh lý) tính cho Quản lý Xưởng/Admin; Kho thanh lý tính cho operator+ nhóm `KHO_TL`; người tạo phiếu không tự thấy việc duyệt phiếu của mình; Người xem toàn xưởng không có việc nào; phiếu sửa "đang sửa" không tính (không phải việc chờ). Quá hạn trả tính cho nhóm đang mượn.
 - **Thêm trạng thái/bước duyệt mới** cho workflow thì thêm quy tắc vào `buildMyTasks` + test trong `tests/my-tasks.test.ts`, kẻo huy hiệu không hiện việc mới.
+
+### Chuẩn hóa Loại máy / Vị trí
+
+- Hai ô chữ tự do này được **đưa về đúng cách viết đã có** khi lưu (không phân biệt hoa/thường, gộp khoảng trắng; vẫn phân biệt dấu): `lib/canonical-text.ts` (hàm thuần: `createCanonicalizer`, `pickCanonicalSpellings`, `rankLabels`) + `lib/canonical-data.ts` (`loadCanonicalizers()`: Loại theo từng nhóm thiết bị = gợi ý có sẵn + `equipment_type_catalog`; Vị trí = cách viết đang dùng nhiều nhất trên máy). Áp ở `saveEquipmentRecordAction` và `importEquipmentAction` (`applyCanonicalText`, cả bảng xem trước). Loại/vị trí chưa có vẫn thêm được. Ô Vị trí ở form có `<datalist>` các vị trí đã dùng.
+- Dữ liệu cũ: khối **V1.6.13** trong `database/update.sql` (kèm câu SELECT xem trước, mặc định đang comment) gộp `equipment.equipment_type` (theo nhóm thiết bị) và `current_location` về cách viết phổ biến nhất, tắt (không xóa) bản na ná trong `equipment_type_catalog`. Admin tự chạy sau khi backup; quy tắc chọn cách viết chuẩn phải khớp `pickCanonicalSpellings`.
 
 ### Validation
 
