@@ -240,3 +240,12 @@ CREATE TABLE IF NOT EXISTS inventory_items (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS inventory_items_session_equipment_unique ON inventory_items(session_id, equipment_id);
 CREATE INDEX IF NOT EXISTS inventory_items_session_idx ON inventory_items(session_id);
+
+-- V1.7.1: Kiểm kê định kỳ hàng tháng (hệ thống tự mở ngày 1, tự đóng hết ngày 15). Idempotent.
+--  * created_by cho phép NULL: đợt do hệ thống tự mở; closed_by đã cho phép NULL (đợt tự đóng).
+--  * period "YYYY-MM": mỗi nhóm đúng một đợt định kỳ mỗi tháng (chạy lại không tạo trùng).
+--  * auto_closed: đợt do hệ thống tự đóng khi quá hạn.
+ALTER TABLE inventory_sessions ALTER COLUMN created_by DROP NOT NULL;
+ALTER TABLE inventory_sessions ADD COLUMN IF NOT EXISTS period varchar(7);
+ALTER TABLE inventory_sessions ADD COLUMN IF NOT EXISTS auto_closed boolean NOT NULL DEFAULT false;
+CREATE UNIQUE INDEX IF NOT EXISTS inventory_sessions_group_period_unique ON inventory_sessions(group_id, period) WHERE period IS NOT NULL;

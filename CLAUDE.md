@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 137 pass
+npm test           # tsx --test tests/*.test.ts — 158 pass
 ```
 
 Không có ESLint script.
@@ -64,6 +64,12 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - Quy tắc: bước cấp nhóm chỉ tính cho **thành viên nhóm** đủ bậc mà Server Action đòi (Admin/Quản lý Xưởng KHÔNG tự có việc của mọi nhóm, dù backend cho họ thao tác); bước cấp Xưởng (tiếp nhận sửa, duyệt điều chuyển/thanh lý) tính cho Quản lý Xưởng/Admin; Kho thanh lý tính cho operator+ nhóm `KHO_TL`; người tạo phiếu không tự thấy việc duyệt phiếu của mình; Người xem toàn xưởng không có việc nào; phiếu sửa "đang sửa" không tính (không phải việc chờ). Quá hạn trả tính cho nhóm đang mượn.
 - **Thêm trạng thái/bước duyệt mới** cho workflow thì thêm quy tắc vào `buildMyTasks` + test trong `tests/my-tasks.test.ts`, kẻo huy hiệu không hiện việc mới.
 
+### Dụng cụ nhóm tôi — CCDC theo số lượng + form nhập gọn
+
+- Dưới bảng máy có mã là thẻ **"CCDC quản lý theo số lượng"** (`tool_catalog`, `loadToolRows` trong `lib/equipment-data.ts`; cột Mã · Tên dụng cụ · Nhóm thiết bị · Quy cách · Nhóm quản lý · Tình trạng · Số lượng · Thao tác, không có cột Loại). Lọc theo ô nhóm + ô tìm + nhóm thiết bị (`lib/tool-filter.ts`); **ẩn** khi đang lọc riêng cho máy có mã (Tình trạng / Trạng thái / Loại / KPI / tab điện thoại). Điện thoại: danh sách thẻ "CCDC theo số lượng" dưới danh sách máy.
+- **Quyền** (`lib/tool-permissions.ts`, hàm thuần; backend tự kiểm lại): **sửa thông tin** (tên, quy cách, đơn vị, nhóm thiết bị, tình trạng, vị trí, ghi chú) từ Kỹ sư giám sát (operator) của nhóm — `updateQuantityToolAction`, chống ghi đè đồng thời bằng `updatedAt`, không đụng số lượng/giá; **hiệu chỉnh số lượng** từ Đốc công (manager) — `adjustToolQuantityAction`, **bắt buộc lý do ≥ 5 ký tự**, khóa dòng + `WHERE quantity_on_hand = số cũ`, không cho < 0. Hai hành động ghi `tool_catalog.update` / `tool_catalog.adjust_quantity` (kèm số cũ → số mới + lý do) hiện ở Lịch sử hoạt động. Số lượng vẫn tự cộng/trừ theo mượn nhanh và thanh lý; hiệu chỉnh chỉ để sửa sai/kiểm kê lệch. Admin/Quản lý Xưởng có quyền manager ở mọi nhóm; Người xem toàn xưởng không sửa.
+- **Form nhập gọn**: thêm máy có mã = 6 ô (Nhóm quản lý, Tên, Nhóm thiết bị, Tem nhôm, Tình trạng, Ghi chú; Hãng/Đơn giá/Ngày ghi nhận đưa sang form sửa hoặc tự lấy hôm nay); form sửa/nhân bản bỏ Năm đưa vào sử dụng, Ghi chú kỹ thuật, Ghi chú mua sắm (các ô này thành `<input type="hidden">` mang giá trị cũ nên **lưu không làm mất dữ liệu cũ**), Hình thức ghi nhận / Ngày ghi nhận chỉ hiện với Admin/Quản lý Xưởng, Đơn giá nằm trong khối Mua sắm (Admin, "Mua mới"); thêm CCDC theo số lượng = 8 ô (bỏ Đơn giá, Nhóm thiết bị mặc định "Khác"). `tests/tool-quantity.test.ts` canh các nhãn đã gỡ.
+
 ### Hồ sơ máy (`/equipment/[id]`)
 
 - Một trang gom mọi thứ về một máy: trạng thái / tình trạng / nhóm quản lý / nhóm đang giữ (suy ra từ phiếu mượn `on_loan`/`incident`, không dùng `current_group_id`) / vị trí, **phiếu đang mở** (mượn máy, điều chuyển, sửa chữa, thanh lý; link sang trang nghiệp vụ), thông tin kỹ thuật, nguồn gốc, **lịch sử**. Chỉ xem; thao tác vẫn ở "Dụng cụ nhóm tôi" (nút dẫn sang nếu máy trong phạm vi tài khoản). Route tĩnh `/equipment/export` luôn thắng `[id]`; id sai dạng UUID → 404 (`isUuid`).
@@ -78,10 +84,19 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - Nhật ký: `inventory.create` / `inventory.close` hiện ở Lịch sử hoạt động; **`inventory.check` (từng máy) khai báo `mirror`** — chỉ ở tab Lịch sử của máy, ẩn khỏi `/activities` để kiểm cả nhóm không làm ngập. Biên bản `GET /inventory/[id]/export` (`lib/export/inventory-workbook.ts`): tóm tắt đầu sheet, các mục Không thấy → Chưa kiểm → Thừa → Nơi khác → Có mặt.
 - Chưa có: kiểm kê CCDC theo số lượng (`tool_catalog`), tự cập nhật hồ sơ máy theo kết quả (đợt kiểm kê chỉ **ghi nhận**, không đổi trạng thái / vị trí máy).
 
+#### Kiểm kê định kỳ hàng tháng (tự động)
+
+- **Ngày 1 hằng tháng** hệ thống tự mở một đợt cho **mỗi nhóm nghiệp vụ chính thức có ≥ 1 máy** (bỏ nhóm trống và Kho thanh lý); Đốc công của nhóm kiểm trong tháng; **hết ngày 15** đợt tự đóng (`auto_closed = true`, `closed_by` NULL). Mỗi nhóm đúng MỘT đợt định kỳ mỗi tháng (`inventory_sessions.period` = `YYYY-MM`, UNIQUE `(group_id, period)` khi `period` không null); nhóm đang có đợt mở tay thì đợt đó được **nhận** làm đợt của tháng (không tạo đợt thứ hai).
+- Quy tắc thuần ở `lib/inventory-schedule.ts` (`periodOf`, `deadlineOf`, `plan({today, groups, sessions})` → các việc `close` / `adopt` / `create`; ngày theo giờ VN `vnDate`; **chạy bù** ngày 2–15 nếu lỡ ngày 1; idempotent). `lib/inventory-create.ts` (`createInventorySession`) là đường tạo đợt DÙNG CHUNG cho đợt mở tay và đợt tự động; `lib/inventory-schedule-data.ts` (`runMonthlyInventory`) thực thi, mỗi nhóm một transaction riêng.
+- **Cron**: `vercel.json` gọi `GET /api/cron/inventory` lúc `5 17 * * *` (17:05 UTC = 0h05 giờ VN, hợp gói Hobby 1 lần/ngày). Route kiểm `Authorization: Bearer $CRON_SECRET` (`lib/cron-auth.ts`, thiếu `CRON_SECRET` thì từ chối hết). Dự phòng: nút **"Chạy kiểm kê định kỳ ngay"** ở `/inventory` (Quản lý Xưởng/Admin, `runMonthlyInventoryAction`) gọi cùng hàm.
+- **Việc chờ tôi**: TaskSection mới `inventory` — Đốc công (manager) của nhóm có việc "Kiểm kê định kỳ — hạn 15/M" khi còn máy tại chỗ chưa kiểm và chưa quá hạn (cam, còn ≤ 2 ngày thì đỏ); hiện ở chuông, số đỏ cạnh menu Kiểm kê và nút Kiểm kê ở trang chủ. Admin/Quản lý Xưởng không tự có việc này (đúng quy tắc chung). Truy vấn riêng, lỗi (vd chưa chạy V1.7.1) không làm mất các việc khác.
+- `/inventory`: dòng "Hạn 15/M — còn N ngày", huy hiệu **"Tự đóng — còn N máy chưa kiểm"** cho đợt hệ thống đã đóng. Nhật ký: mỗi đợt tự mở/nhận ghi `inventory.schedule_create` (**mirror**, ẩn khỏi `/activities`) + **một** dòng tổng hợp `inventory.schedule_run` mỗi lần chạy (người thực hiện: Hệ thống).
+- **DB V1.7.1** (`database/update.sql` + `current_schema.sql` + `schema.ts`; phải chạy trong Neon TRƯỚC khi deploy): `created_by` cho phép NULL, thêm `period`, `auto_closed`, index duy nhất `(group_id, period)`.
+
 ### Tem QR dán máy (`/labels`)
 
-- Trang in tem decal **A4, lưới 3 cột × 8 hàng = 24 tem/tờ, mỗi tem 70 × 37 mm** (khổ phổ biến). Mỗi tem: mã QR (27 mm) + mã hệ thống + tem nhôm + tên + nhóm; quét → `/equipment/<id>` (hồ sơ máy; dùng UUID nên không đổi dù máy điều chuyển; chưa đăng nhập thì bị `requireUser` đưa về `/login`). Vào từ menu "In tem QR" (chọn nhóm quản lý; Admin/Quản lý Xưởng/Người xem toàn xưởng mọi nhóm, người dùng theo nhóm chỉ nhóm mình) hoặc nút "In tem QR" ở hồ sơ máy (`/labels?ids=<id>`, tối đa 100 id). Có ô "Bắt đầu từ ô số" cho tờ decal đã bóc dở, tối đa 240 tem (10 tờ) mỗi lần.
-- **Địa chỉ trong QR** mặc định lấy theo host của yêu cầu (`x-forwarded-host`/`host`) và có ô sửa (`?base=`, `normalizeBaseUrl` chỉ giữ gốc http(s), từ chối `javascript:`/có tài khoản). **Phải in từ bản chạy thật, không phải bản Preview**, vì tem dán lên máy dùng lâu.
+- Trang in tem decal **A4, lưới 3 cột × 8 hàng = 24 tem/tờ, mỗi tem 70 × 37 mm** (khổ phổ biến). Mỗi tem: mã QR (27 mm) + mã hệ thống + tem nhôm + tên + nhóm; quét → `/equipment/<id>` (hồ sơ máy; dùng UUID nên không đổi dù máy điều chuyển; chưa đăng nhập thì bị `requireUser` đưa về `/login`). **Chỉ Quản lý Xưởng và Admin** in tem (`canPrintLabels` trong `lib/labels.ts`; Người xem toàn xưởng và người dùng theo nhóm KHÔNG): trang `/labels` gọi `notFound()` với người khác, menu "In tem QR" và nút "In tem QR" ở hồ sơ máy (`/labels?ids=<id>`, tối đa 100 id) chỉ hiện cho họ; chọn được mọi nhóm nghiệp vụ. QR quét ra hồ sơ máy thì mọi tài khoản đăng nhập vẫn mở được. Có ô "Bắt đầu từ ô số" cho tờ decal đã bóc dở, tối đa 240 tem (10 tờ) mỗi lần.
+- **Địa chỉ trong QR**: có biến môi trường **`APP_BASE_URL`** (vd `https://ccdc-xsc.vercel.app`) thì LUÔN dùng nó làm địa chỉ mặc định (`resolveBaseUrl` trong `lib/labels.ts`) nên tem in lại ở đâu cũng ra đúng mã QR cũ; mở từ tên miền khác (bản Preview) thì trang hiện cảnh báo nhưng QR vẫn theo địa chỉ chính thức. Chưa khai báo `APP_BASE_URL` thì như trước: theo host của yêu cầu (`x-forwarded-host`/`host`). Vẫn có ô sửa (`?base=`, `normalizeBaseUrl` chỉ giữ gốc http(s), từ chối `javascript:`/có tài khoản). **Nên khai báo `APP_BASE_URL` trước khi in tem thật**, vì tem dán lên máy dùng lâu.
 - `lib/labels.ts` (hàm thuần, có test: địa chỉ, chia trang, ô bắt đầu) + `lib/labels-data.ts` (SVG QR bằng thư viện `qrcode`, sinh ở server, chỉ chứa UUID máy nên `dangerouslySetInnerHTML` an toàn). In: `@page labels { size: A4; margin: 0 }` đặt tên để không ảnh hưởng trang khác; `@media print` ẩn sidebar/topbar/nav, ô trống ẩn bằng `visibility`. Người dùng cần in A4 **100%** (không Fit to page), lề "Không có". Đổi khổ tem thì sửa hằng ở `lib/labels.ts` và CSS `.labels-page`/`.label-cell` (mm) cùng lúc — test canh `70mm`/`37.125mm`.
 
 ### Tìm kiếm chung (`/search`)
@@ -169,11 +184,13 @@ Lỗi vi phạm UNIQUE (race check-then-insert) nhận diện bằng `isUniqueVi
 |---|---|---|
 | `DATABASE_URL` | ✅ | chuỗi kết nối Neon |
 | `AUTH_SECRET` | ✅ (prod) | ≥ 32 ký tự ngẫu nhiên. Thiếu ở prod → app throw khi khởi động / build fail. Local có fallback dev. |
+| `APP_BASE_URL` | khuyến nghị | địa chỉ chính thức của web (vd `https://ccdc-xsc.vercel.app`, không có `/` cuối). Là địa chỉ gốc mặc định trong mã QR trên tem — khai báo để tem in lại luôn ra đúng QR cũ. Thiếu → theo host đang mở trang. |
+| `CRON_SECRET` | ✅ để kiểm kê định kỳ tự chạy | chuỗi ngẫu nhiên ≥ 16 ký tự. Vercel tự gửi `Authorization: Bearer <CRON_SECRET>` khi gọi cron; thiếu → `/api/cron/inventory` trả 401 (không bao giờ để mở). Thiếu thì chỉ còn nút "Chạy kiểm kê định kỳ ngay". |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` / `ADMIN_EMPLOYEE_CODE` / `ADMIN_FULL_NAME` | chỉ khi seed | dùng bởi `scripts/seed.ts` |
 
 ## Deploy
 
-GitHub → Vercel (`main`). `next.config.ts` set sẵn bộ security header cho mọi route. Lịch sử commit gốc chủ yếu là "Add files via upload" (upload qua web GitHub).
+GitHub → Vercel (`main`). `next.config.ts` set sẵn bộ security header cho mọi route. `vercel.json` khai báo cron kiểm kê định kỳ (xem mục Kiểm kê định kỳ); cron chỉ chạy ở bản Production. Lịch sử commit gốc chủ yếu là "Add files via upload" (upload qua web GitHub).
 
 ## Nợ kỹ thuật đã biết
 

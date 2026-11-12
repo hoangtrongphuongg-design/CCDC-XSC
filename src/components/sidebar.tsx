@@ -26,6 +26,7 @@ import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { canViewWholeWorkshop, getRoleSummary } from "@/lib/auth/roles";
 import { isActivePath } from "@/lib/nav-active";
+import { canPrintLabels } from "@/lib/labels";
 import { EMPTY_TASK_COUNTS, formatBadge, type TaskSection } from "@/lib/my-tasks";
 
 type NavItem = readonly [href: string, label: string, icon: LucideIcon];
@@ -43,8 +44,9 @@ const operationItems = [
   ["/equipment", "Dụng cụ toàn xưởng", Boxes],
   ["/my-equipment", "Dụng cụ nhóm tôi", ClipboardList],
   ["/inventory", "Kiểm kê", ClipboardCheck],
-  ["/labels", "In tem QR", QrCode],
 ] as const satisfies readonly NavItem[];
+
+const labelsItem = ["/labels", "In tem QR", QrCode] as const satisfies NavItem;
 
 const workflowItems = [
   ["/machine-loans", "Mượn – Trả", Handshake],
@@ -59,6 +61,7 @@ const TASK_SECTION_BY_HREF: Record<string, TaskSection> = {
   "/transfers": "transfers",
   "/repairs": "repairs",
   "/disposals": "disposals",
+  "/inventory": "inventory",
 };
 
 const reportsItem = ["/reports", "Báo cáo", BarChart3] as const satisfies NavItem;
@@ -81,7 +84,10 @@ export function Sidebar({ auth, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthCo
     ? [reportsItem, activitiesItem]
     : [activitiesItem];
 
-  const visibleOperationItems = operationItems.filter(([href]) => href !== "/my-equipment" || (!auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasAnyGroupPermission(auth))));
+  const visibleOperationItems: readonly NavItem[] = [
+    ...operationItems.filter(([href]) => href !== "/my-equipment" || (!auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasAnyGroupPermission(auth)))),
+    ...(canPrintLabels(auth) ? [labelsItem] : []),
+  ];
   const visibleWorkflowItems = workflowItems.filter(([href]) => {
     if (href === "/transfers") return canTransfer;
     if (href === "/disposals") return canDispose;

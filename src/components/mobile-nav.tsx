@@ -19,7 +19,7 @@ import {
 import type { AuthContext, FlashMessage } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 import { isActivePath } from "@/lib/nav-active";
-import { EMPTY_TASK_COUNTS, formatBadge, type TaskSection } from "@/lib/my-tasks";
+import { EMPTY_TASK_COUNTS, formatBadge, totalTaskCount, type TaskSection } from "@/lib/my-tasks";
 
 export function MobileNav({ auth, flash, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthContext; flash?: FlashMessage | null; taskCounts?: Record<TaskSection, number> }) {
   const [toast, setToast] = useState<FlashMessage | null>(flash || null);
@@ -35,7 +35,7 @@ export function MobileNav({ auth, flash, taskCounts = EMPTY_TASK_COUNTS }: { aut
     return () => window.clearTimeout(timer);
   }, [flash?.id]);
 
-  const totalPending = taskCounts.loans + taskCounts.transfers + taskCounts.repairs + taskCounts.disposals;
+  const totalPending = totalTaskCount(taskCounts);
   const pendingByHref: Record<string, number> = { "/dashboard": totalPending, "/machine-loans": taskCounts.loans };
 
   const navItems = [

@@ -240,7 +240,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
     excludeKeys: overdueTaskKeys(myTasks.map((task) => task.key)),
   });
   const shownAttention = attention.slice(0, ATTENTION_SHOWN);
-  const homeActions = buildHomeActions(auth, { pendingTasks: myTasks.length });
+  const homeActions = buildHomeActions(auth, { pendingTasks: myTasks.length, inventoryTasks: myTasks.filter((task) => task.section === "inventory").length });
   const links = kpiLinks(auth);
   const todayLabel = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
   const borrowedCountForMobile = machineBorrowedByMe + quickBorrowedByMe;

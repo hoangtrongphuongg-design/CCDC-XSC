@@ -1,12 +1,13 @@
 import { headers } from "next/headers";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { PrintButton } from "@/components/print-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
-import { canViewWholeWorkshop, requireUser } from "@/lib/auth/guards";
+import { requireUser } from "@/lib/auth/guards";
 import { loadOperationalGroups } from "@/lib/equipment-data";
-import { LABELS_PER_PAGE, MAX_LABELS, defaultBaseUrl, normalizeBaseUrl, paginateLabels, parseIds, parseStart } from "@/lib/labels";
+import { LABELS_PER_PAGE, MAX_LABELS, canPrintLabels, normalizeBaseUrl, paginateLabels, parseIds, parseStart, resolveBaseUrl } from "@/lib/labels";
 import { loadLabelsByGroup, loadLabelsByIds, type LabelItem } from "@/lib/labels-data";
 
 export const dynamic = "force-dynamic";
@@ -31,18 +32,21 @@ function Label({ item }: { item: LabelItem }) {
 
 export default async function LabelsPage({ searchParams }: { searchParams: Params }) {
   const auth = await requireUser();
+  // Chỉ Quản lý Xưởng / Admin in tem; người khác gõ thẳng đường dẫn thì như không có trang này.
+  if (!canPrintLabels(auth)) notFound();
   const params = await searchParams;
   const requestHeaders = await headers();
-  const fallbackBase = defaultBaseUrl(requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"), requestHeaders.get("x-forwarded-proto"));
-  const baseUrl = normalizeBaseUrl(one(params.base), fallbackBase);
+  const resolved = resolveBaseUrl({
+    configured: process.env.APP_BASE_URL,
+    host: requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"),
+    proto: requestHeaders.get("x-forwarded-proto"),
+  });
+  const baseUrl = normalizeBaseUrl(one(params.base), resolved.baseUrl);
   const start = parseStart(one(params.start));
   const ids = parseIds(one(params.ids));
 
-  // Chọn theo nhóm: chỉ các nhóm trong phạm vi tài khoản (vai trò toàn Xưởng: mọi nhóm).
-  const operationalGroups = await loadOperationalGroups();
-  const allowedGroups = canViewWholeWorkshop(auth)
-    ? operationalGroups
-    : operationalGroups.filter((group) => auth.permissions.some((p) => p.groupId === group.id));
+  // Quản lý Xưởng / Admin chọn được mọi nhóm nghiệp vụ.
+  const allowedGroups = await loadOperationalGroups();
   const groupId = allowedGroups.some((group) => group.id === one(params.group)) ? one(params.group) : "";
 
   const result = ids.length
@@ -61,6 +65,10 @@ export default async function LabelsPage({ searchParams }: { searchParams: Param
           description={`Tem decal A4 lưới 3 cột × 8 hàng (${LABELS_PER_PAGE} tem/tờ, mỗi tem 70 × 37 mm). Quét mã bằng điện thoại sẽ mở hồ sơ máy.`}
           actions={result?.items.length ? <PrintButton label={`In ${result.items.length} tem`} /> : null}
         />
+
+        {resolved.mismatch ? (
+          <p className="notice warning">Bạn đang mở trang từ một địa chỉ khác địa chỉ chính thức. Mã QR vẫn dùng địa chỉ chính thức <b>{resolved.baseUrl}</b>, nên tem in ở đây giống hệt tem in từ bản chính thức.</p>
+        ) : null}
 
         <Card>
           <CardContent>

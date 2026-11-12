@@ -410,13 +410,16 @@ CREATE TABLE IF NOT EXISTS inventory_sessions (
   group_id uuid NOT NULL REFERENCES groups(id),
   title varchar(180),
   status inventory_status NOT NULL DEFAULT 'open',
-  created_by uuid NOT NULL REFERENCES users(id),
+  created_by uuid REFERENCES users(id),
   closed_by uuid REFERENCES users(id),
   closed_at timestamptz,
+  period varchar(7),
+  auto_closed boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS inventory_sessions_group_status_idx ON inventory_sessions(group_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS inventory_sessions_group_period_unique ON inventory_sessions(group_id, period) WHERE period IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS inventory_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -22,6 +22,9 @@ import { createQuantityToolAction, saveEquipmentRecordAction, type EquipmentForm
 import { loadEquipmentHistoryAction } from "@/actions/equipment-history";
 import { DataTable } from "@/components/data-table";
 import { SafeText } from "@/components/safe-text";
+import { ToolAdjustDialog, ToolEditDialog } from "@/components/equipment/tool-dialogs";
+import { filterTools, type ToolRow } from "@/lib/tool-filter";
+import { canAdjustToolQuantity, canEditTool } from "@/lib/tool-permissions";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -33,6 +36,7 @@ import { rankLabels } from "@/lib/canonical-text";
 import {
   EQUIPMENT_CATEGORIES,
   EQUIPMENT_DISCIPLINE_LABELS,
+  getEquipmentCategoryLabel,
   type EquipmentDiscipline,
 } from "@/lib/equipment-categories";
 
@@ -156,6 +160,10 @@ const auditFieldLabels: Record<string, string> = {
   notes: "Ghi chú",
 };
 
+function formatQuantity(value: number) {
+  return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(value);
+}
+
 function permissionRank(level: EquipmentPermission["level"]) {
   return level === "manager" ? 2 : level === "operator" ? 1 : 0;
 }
@@ -239,8 +247,7 @@ function QuantityToolForm({ permissions, isWorkshopAdmin, onCancel, onBack, onSa
   const [state, action, pending] = useActionState(createQuantityToolAction, initialState);
   const actionableGroups = permissions.filter((permission) => permissionRank(permission.level) >= 1);
   const groups = isWorkshopAdmin ? permissions : actionableGroups;
-  const [categoryCode, setCategoryCode] = useState("CK_HAN_CAT");
-  const [purchasePrice, setPurchasePrice] = useState("");
+  const [categoryCode, setCategoryCode] = useState("KHAC");
   useEffect(() => { if (state.status === "success") { const timer = window.setTimeout(() => onSaved(state.afterSave || "close"), 500); return () => clearTimeout(timer); } }, [state.status, state.afterSave, onSaved]);
 
   return <form action={action} className="asset-form">
@@ -252,16 +259,6 @@ function QuantityToolForm({ permissions, isWorkshopAdmin, onCancel, onBack, onSa
       <FormField label="Quy cách"><input name="specification" placeholder="Ví dụ: 300 mm, Ø12, M20..." /></FormField>
       <FormField label="Đơn vị tính" required><input name="unit" defaultValue="Cái" required /></FormField>
       <FormField label="Số lượng" required><input name="quantity" type="number" min="0.01" step="0.01" required defaultValue="1" /></FormField>
-      <FormField label="Đơn giá (VNĐ)" hint="Tự hiển thị dấu chấm phân cách hàng nghìn.">
-        <input
-          name="purchasePrice"
-          type="text"
-          inputMode="numeric"
-          value={formatPurchasePriceInput(purchasePrice)}
-          onChange={(event) => setPurchasePrice(event.target.value.replace(/\D/g, "").slice(0, 16))}
-          placeholder="Ví dụ: 1.250.000"
-        />
-      </FormField>
       <FormField label="Tình trạng"><select name="condition" defaultValue="good"><option value="good">Tốt</option><option value="major_damage">Hư hỏng</option><option value="awaiting_assessment">Chưa đánh giá</option><option value="irreparable">Không thể phục hồi</option></select></FormField>
     </div><div className="form-grid"><FormField label="Ghi chú"><textarea name="notes" rows={3}/></FormField></div></section>
     {state.status === "error" ? <div className="form-message error">{state.message}</div> : null}
@@ -357,7 +354,6 @@ function AssetForm({
 
         <input type="hidden" name="recordId" value="" />
         <input type="hidden" name="originType" value="existing" />
-        <input type="hidden" name="purchasePrice" value={purchasePrice} />
 
         <section className="asset-form-section">
           <div className="asset-section-heading">
@@ -370,7 +366,7 @@ function AssetForm({
                 {(isWorkshopAdmin ? permissions : actionableGroups).map((group) => <option key={group.groupId} value={group.groupId}>{group.groupName}</option>)}
               </select>
             </FormField>
-            <FormField label="Tên CCDC" required hint="Ghi luôn model/thông số nhận diện vào tên nếu cần.">
+            <FormField label="Tên CCDC" required hint="Ghi luôn hãng / model / thông số nhận diện vào tên nếu cần.">
               <input name="name" required placeholder="Ví dụ: Máy hàn que HK300A 300A" />
             </FormField>
             <FormField label="Nhóm thiết bị" required>
@@ -383,11 +379,6 @@ function AssetForm({
               </select>
             </FormField>
             <FormField label="Tem nhôm / mã đã gán"><input name="legacyCode" placeholder="Ví dụ: MH-05" /></FormField>
-            <FormField label="Hãng"><input name="brand" placeholder="Ví dụ: Hồng Ký, Bosch, Makita..." /></FormField>
-            <FormField label="Đơn giá mua (VNĐ)" hint="Tự hiển thị dấu chấm phân cách hàng nghìn.">
-              <input type="text" inputMode="numeric" value={formatPurchasePriceInput(purchasePrice)} onChange={(event) => setPurchasePrice(event.target.value.replace(/\D/g, "").slice(0, 16))} placeholder="Ví dụ: 25.000.000" aria-label="Đơn giá mua" />
-            </FormField>
-            <FormField label="Ngày đưa vào sử dụng"><input name="recordedDate" type="date" defaultValue={defaultRecordedDate} /></FormField>
             <FormField label="Tình trạng">
               <select name="condition" value={condition} onChange={(event) => setCondition(event.target.value)}>
                 {simpleConditionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -422,6 +413,11 @@ function AssetForm({
       <input type="hidden" name="condition" value={condition} />
       <input type="hidden" name="status" value={status} />
       <input type="hidden" name="purchasePrice" value={purchasePrice} />
+      {/* Các ô đã gỡ khỏi form vẫn giữ nguyên giá trị cũ khi lưu (không bị xóa trắng). */}
+      <input type="hidden" name="commissionYear" defaultValue={record?.commissionYear || ""} />
+      <input type="hidden" name="technicalNote" defaultValue={record?.technicalNote || ""} />
+      <input type="hidden" name="purchaseNote" defaultValue={record?.purchaseNote || ""} />
+      {!isWorkshopAdmin ? <input type="hidden" name="recordedDate" value={defaultRecordedDate} /> : null}
 
       <section className="asset-form-section">
         <div className="asset-section-heading">
@@ -429,21 +425,25 @@ function AssetForm({
           <code className="asset-code-preview">{codePreview}</code>
         </div>
         <div className="form-grid two">
-          <FormField label="Hình thức ghi nhận" required>
-            <select value={originType} onChange={(event) => setOriginType(event.target.value as IndividualEquipmentRow["originType"])} disabled={!isWorkshopAdmin || isEditing}>
-              <option value="existing">CCDC hiện hữu</option>
-              {isWorkshopAdmin ? <option value="new_purchase">Mua mới / Cấp phát ban đầu</option> : null}
-              {isWorkshopAdmin ? <option value="other">Khác</option> : null}
-            </select>
-          </FormField>
+          {isWorkshopAdmin ? (
+            <FormField label="Hình thức ghi nhận" required>
+              <select value={originType} onChange={(event) => setOriginType(event.target.value as IndividualEquipmentRow["originType"])} disabled={isEditing}>
+                <option value="existing">CCDC hiện hữu</option>
+                <option value="new_purchase">Mua mới / Cấp phát ban đầu</option>
+                <option value="other">Khác</option>
+              </select>
+            </FormField>
+          ) : null}
           <FormField label="Nhóm quản lý" required hint={isEditing ? "Đổi nhóm thông thường phải thực hiện bằng Điều chuyển cố định." : isWorkshopAdmin ? "Quản lý Xưởng / Admin được chọn nhóm cấp phát ban đầu." : "Chỉ chọn được nhóm bạn có quyền quản lý."}>
             <select value={ownerGroupId} onChange={(event) => setOwnerGroupId(event.target.value)} disabled={isEditing}>
               {(isWorkshopAdmin ? permissions : actionableGroups).map((group) => <option key={group.groupId} value={group.groupId}>{group.groupName}</option>)}
             </select>
           </FormField>
-          <FormField label="Ngày ghi nhận" required>
-            <input name="recordedDate" type="date" defaultValue={defaultRecordedDate} />
-          </FormField>
+          {isWorkshopAdmin ? (
+            <FormField label="Ngày ghi nhận" required>
+              <input name="recordedDate" type="date" defaultValue={defaultRecordedDate} />
+            </FormField>
+          ) : null}
         </div>
       </section>
 
@@ -456,17 +456,6 @@ function AssetForm({
           <FormField label="Model"><input name="model" defaultValue={record?.model || ""} /></FormField>
           <FormField label="Serial"><input name="serial" defaultValue={defaultSerial} /></FormField>
           <FormField label="Năm sản xuất"><input name="manufactureYear" type="number" min="1900" max="2200" defaultValue={record?.manufactureYear || ""} /></FormField>
-          <FormField label="Năm đưa vào sử dụng"><input name="commissionYear" type="number" min="1900" max="2200" defaultValue={record?.commissionYear || ""} /></FormField>
-          <FormField label="Đơn giá mua (VNĐ)" hint="Giá mua của 01 máy/CCDC; để trống nếu chưa có thông tin.">
-            <input
-              type="text"
-              inputMode="numeric"
-              value={formatPurchasePriceInput(purchasePrice)}
-              onChange={(event) => setPurchasePrice(event.target.value.replace(/\D/g, "").slice(0, 16))}
-              placeholder="Ví dụ: 25.000.000"
-              aria-label="Đơn giá mua"
-            />
-          </FormField>
         </div>
       </section>
 
@@ -493,7 +482,6 @@ function AssetForm({
         <div className="asset-section-heading"><div><span>04</span><div><strong>Thông tin kỹ thuật</strong><small>Dùng trường tự do để phù hợp nhiều loại thiết bị khác nhau.</small></div></div></div>
         <div className="form-grid">
           <FormField label="Thông số kỹ thuật"><textarea name="technicalSpecs" rows={5} defaultValue={record?.technicalSpecs || ""} placeholder={'Ví dụ:\nĐiện áp: 380 V\nCông suất: 15 kW\nKhối lượng: 120 kg'} /></FormField>
-          <FormField label="Ghi chú kỹ thuật"><textarea name="technicalNote" rows={3} defaultValue={record?.technicalNote || ""} /></FormField>
         </div>
       </section>
 
@@ -526,7 +514,16 @@ function AssetForm({
             <FormField label="Số PO/HĐ"><input name="poContractNo" defaultValue={record?.poContractNo || ""} /></FormField>
             <FormField label="Nhà cung cấp"><input name="supplierName" defaultValue={record?.supplierName || ""} /></FormField>
             <FormField label="Bảo hành đến"><input name="warrantyUntil" type="date" defaultValue={record?.warrantyUntil || ""} /></FormField>
-            <FormField label="Ghi chú mua sắm"><textarea name="purchaseNote" rows={3} defaultValue={record?.purchaseNote || ""} /></FormField>
+            <FormField label="Đơn giá mua (VNĐ)" hint="Giá mua của 01 máy/CCDC; để trống nếu chưa có thông tin.">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatPurchasePriceInput(purchasePrice)}
+                onChange={(event) => setPurchasePrice(event.target.value.replace(/\D/g, "").slice(0, 16))}
+                placeholder="Ví dụ: 25.000.000"
+                aria-label="Đơn giá mua"
+              />
+            </FormField>
           </div>
         </section>
       ) : null}
@@ -673,6 +670,7 @@ function DetailModal({
 export function EquipmentWorkspace({
   permissions,
   equipmentRows,
+  toolRows = [],
   typeRows,
   isWorkshopAdmin,
   isReadOnlyViewer,
@@ -680,6 +678,8 @@ export function EquipmentWorkspace({
 }: {
   permissions: EquipmentPermission[];
   equipmentRows: IndividualEquipmentRow[];
+  /** CCDC quản lý theo số lượng trong phạm vi quyền. */
+  toolRows?: ToolRow[];
   typeRows: EquipmentTypeRow[];
   isWorkshopAdmin: boolean;
   isReadOnlyViewer: boolean;
@@ -702,6 +702,8 @@ export function EquipmentWorkspace({
   const [mobileTab, setMobileTab] = useState<"all" | "in_use_owner" | "on_loan" | "repairing">("all");
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [toolEditing, setToolEditing] = useState<ToolRow | null>(null);
+  const [toolAdjusting, setToolAdjusting] = useState<ToolRow | null>(null);
 
   const actionablePermissions = permissions.filter((permission) => permissionRank(permission.level) >= 1);
   const permissionByGroup = useMemo(() => new Map(permissions.map((permission) => [permission.groupId, permission])), [permissions]);
@@ -804,6 +806,14 @@ export function EquipmentWorkspace({
     return isTransferInScope(row);
   });
 
+  // Bảng CCDC theo số lượng: theo ô lọc nhóm + ô tìm + nhóm thiết bị; ẩn khi đang lọc riêng cho máy có mã
+  // (tình trạng / trạng thái / KPI / tab điện thoại / loại) vì các bộ lọc đó không áp dụng cho CCDC theo số lượng.
+  const machineOnlyFilterActive = conditionFilter !== "all" || statusFilter !== "all" || kpiFilter !== "all" || mobileTab !== "all" || typeFilter !== "all";
+  const visibleTools = machineOnlyFilterActive ? [] : filterTools(toolRows, { groupId: groupFilter, search, categoryCode: categoryFilter });
+  const toolPermissions = permissions.map((permission) => ({ groupId: permission.groupId, level: permission.level }));
+  const toolCanEdit = (tool: ToolRow) => !isReadOnlyViewer && canEditTool(toolPermissions, tool.groupId);
+  const toolCanAdjust = (tool: ToolRow) => !isReadOnlyViewer && canAdjustToolQuantity(toolPermissions, tool.groupId);
+
   function canEditRow(row: IndividualEquipmentRow) {
     if (isReadOnlyViewer) return false;
     if (isWorkshopAdmin) return true;
@@ -874,6 +884,26 @@ export function EquipmentWorkspace({
             <button type="button" className="mobile-equipment-more" onClick={(event) => { event.stopPropagation(); openDetail(row); }} aria-label={`Xem ${row.name}`}><MoreHorizontal size={18} /></button>
           </article>) : <EmptyState title="Chưa có dụng cụ" description="Không có dữ liệu phù hợp với bộ lọc hiện tại." />}
         </div>
+        {visibleTools.length ? (
+          <div className="mobile-tool-list">
+            <h2 className="mobile-tool-heading">CCDC theo số lượng</h2>
+            {visibleTools.map((tool) => (
+              <article className="mobile-tool-item" key={tool.id}>
+                <div className="mobile-tool-main">
+                  <strong>{tool.name}</strong>
+                  <span>{[tool.code, tool.specification, tool.groupName].filter(Boolean).join(" · ")}</span>
+                </div>
+                <div className="mobile-tool-qty"><strong>{formatQuantity(tool.quantity)}</strong><small>{tool.unit}</small></div>
+                {toolCanEdit(tool) || toolCanAdjust(tool) ? (
+                  <div className="mobile-tool-actions">
+                    {toolCanEdit(tool) ? <button type="button" onClick={() => setToolEditing(tool)}>Sửa</button> : null}
+                    {toolCanAdjust(tool) ? <button type="button" onClick={() => setToolAdjusting(tool)}>Hiệu chỉnh SL</button> : null}
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : null}
         {canAdd ? <button type="button" className="mobile-add-asset" onClick={openNew} aria-label="Thêm dụng cụ"><Plus size={24} /></button> : null}
       </div>
 
@@ -928,7 +958,37 @@ export function EquipmentWorkspace({
             />
           </div>
         </section>
+
+        {machineOnlyFilterActive ? null : (
+          <section className="card table-card tool-quantity-card">
+            <div className="card-header">
+              <div><h2 className="card-title">CCDC quản lý theo số lượng</h2><p className="card-subtitle">Dụng cụ nhỏ lẻ không có mã riêng từng cái, theo dõi bằng số lượng tồn. Mượn nhanh / thanh lý tự cộng trừ; sai số thì Đốc công hiệu chỉnh có ghi lý do.</p></div>
+            </div>
+            <div className="card-content equipment-list-table">
+              <DataTable
+                headers={["Mã", "Tên dụng cụ", "Nhóm thiết bị", "Quy cách", "Nhóm quản lý", "Tình trạng", "Số lượng", "Thao tác"]}
+                rows={visibleTools.map((tool) => [
+                  <strong key="code">{tool.code || "—"}</strong>,
+                  <div key="name" className="asset-name-cell"><strong><SafeText>{tool.name}</SafeText></strong>{tool.currentLocation ? <small>{tool.currentLocation}</small> : null}</div>,
+                  getEquipmentCategoryLabel(tool.categoryCode),
+                  tool.specification || "—",
+                  tool.groupName,
+                  <StatusBadge key="condition" label={CONDITION_LABELS[tool.condition as keyof typeof CONDITION_LABELS] ?? tool.condition} tone={conditionTone(tool.condition)} />,
+                  <strong key="qty">{formatQuantity(tool.quantity)} {tool.unit}</strong>,
+                  <div key="actions" className="row-actions equipment-row-actions">
+                    {toolCanEdit(tool) ? <Button type="button" size="sm" variant="ghost" onClick={() => setToolEditing(tool)}><Edit3 size={14} /> Sửa</Button> : null}
+                    {toolCanAdjust(tool) ? <Button type="button" size="sm" variant="ghost" onClick={() => setToolAdjusting(tool)}><ClipboardList size={14} /> Hiệu chỉnh SL</Button> : null}
+                  </div>,
+                ])}
+                empty={<EmptyState title="Chưa có CCDC theo số lượng" description={canAdd ? "Dùng nút Thêm dụng cụ → “Theo số lượng” để thêm mũi khoan, taro, đá mài..." : "Nhóm hiện chưa có CCDC theo số lượng."} />}
+              />
+            </div>
+          </section>
+        )}
       </div>
+
+      {toolEditing ? <ToolEditDialog key={toolEditing.id} tool={toolEditing} onClose={() => setToolEditing(null)} /> : null}
+      {toolAdjusting ? <ToolAdjustDialog key={toolAdjusting.id} tool={toolAdjusting} onClose={() => setToolAdjusting(null)} /> : null}
 
       {editorOpen ? <div className="asset-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}>
         <section className="asset-modal asset-editor-modal" role="dialog" aria-modal="true" aria-labelledby="asset-dialog-title">

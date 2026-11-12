@@ -7,7 +7,7 @@ import {
   EquipmentWorkspace,
   type IndividualEquipmentRow,
 } from "@/components/equipment/equipment-workspace";
-import { buildEquipmentPermissions, loadOperationalGroups, loadScopedEquipment } from "@/lib/equipment-data";
+import { buildEquipmentPermissions, loadOperationalGroups, loadScopedEquipment, loadToolRows } from "@/lib/equipment-data";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +87,8 @@ export default async function MyEquipmentPage() {
     };
   });
 
+  const toolRows = await loadToolRows(visibleGroupIds);
+
   const typeRows = await db.select({
     categoryCode: equipmentTypeCatalog.categoryCode,
     name: equipmentTypeCatalog.name,
@@ -103,6 +105,7 @@ export default async function MyEquipmentPage() {
       <EquipmentWorkspace
         permissions={permissions}
         equipmentRows={equipmentRows}
+        toolRows={toolRows}
         typeRows={typeRows}
         isWorkshopAdmin={auth.isWorkshopAdmin}
         isReadOnlyViewer={auth.isReadOnlyViewer}

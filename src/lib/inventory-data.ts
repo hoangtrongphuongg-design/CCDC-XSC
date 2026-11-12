@@ -16,6 +16,10 @@ export type InventoryListRow = {
   createdAt: Date;
   closedAt: Date | null;
   createdByName: string | null;
+  /** "YYYY-MM" nếu là đợt định kỳ hàng tháng. */
+  period: string | null;
+  /** Hệ thống tự đóng khi quá hạn. */
+  autoClosed: boolean;
   onsite: number;
   checkedOnsite: number;
   found: number;
@@ -38,6 +42,8 @@ export async function loadInventoryList(auth: AuthContext): Promise<InventoryLis
     createdAt: inventorySessions.createdAt,
     closedAt: inventorySessions.closedAt,
     createdByName: users.fullName,
+    period: inventorySessions.period,
+    autoClosed: inventorySessions.autoClosed,
   }).from(inventorySessions)
     .innerJoin(groups, eq(groups.id, inventorySessions.groupId))
     .leftJoin(users, eq(users.id, inventorySessions.createdBy))
@@ -77,6 +83,8 @@ export type InventoryDetail = {
     closedAt: Date | null;
     createdByName: string | null;
     closedByName: string | null;
+    period: string | null;
+    autoClosed: boolean;
   };
   items: InventoryDetailItem[];
   canManage: boolean;
@@ -97,6 +105,8 @@ export async function loadInventoryDetail(auth: AuthContext, id: string): Promis
     closedAt: inventorySessions.closedAt,
     createdBy: inventorySessions.createdBy,
     closedBy: inventorySessions.closedBy,
+    period: inventorySessions.period,
+    autoClosed: inventorySessions.autoClosed,
   }).from(inventorySessions).innerJoin(groups, eq(groups.id, inventorySessions.groupId)).where(eq(inventorySessions.id, id)).limit(1);
   if (!session || !canViewInventory(auth, session.groupId)) return null;
 
@@ -119,7 +129,7 @@ export async function loadInventoryDetail(auth: AuthContext, id: string): Promis
       .where(eq(inventoryItems.sessionId, id))
       .orderBy(asc(equipment.code)),
     db.select({ id: users.id, name: users.fullName }).from(users)
-      .where(inArray(users.id, [session.createdBy, ...(session.closedBy ? [session.closedBy] : [])])),
+      .where(inArray(users.id, [...(session.createdBy ? [session.createdBy] : []), ...(session.closedBy ? [session.closedBy] : [])])),
   ]);
   const userName = new Map(userRows.map((u) => [u.id, u.name]));
 
@@ -134,8 +144,10 @@ export async function loadInventoryDetail(auth: AuthContext, id: string): Promis
     session: {
       id: session.id, code: session.code, title: session.title, groupId: session.groupId, groupName: session.groupName,
       status: session.status, createdAt: session.createdAt, closedAt: session.closedAt,
-      createdByName: userName.get(session.createdBy) ?? null,
-      closedByName: session.closedBy ? userName.get(session.closedBy) ?? null : null,
+      createdByName: session.createdBy ? userName.get(session.createdBy) ?? null : "Hệ thống",
+      closedByName: session.closedBy ? userName.get(session.closedBy) ?? null : session.autoClosed ? "Hệ thống (tự đóng)" : null,
+      period: session.period,
+      autoClosed: session.autoClosed,
     },
     items: rows.map((r) => ({
       equipmentId: r.equipmentId, code: r.code, legacyCode: r.legacyCode, name: r.name, type: r.type,

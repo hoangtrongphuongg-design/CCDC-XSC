@@ -81,6 +81,10 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   "equipment.import": { label: "Nhập CCDC từ Excel", category: "ccdc" },
   "inventory.create": { label: "Mở đợt kiểm kê", category: "ccdc" },
   "inventory.close": { label: "Đóng đợt kiểm kê", category: "ccdc" },
+  // Kiểm kê định kỳ hàng tháng do hệ thống tự chạy: một dòng tổng hợp mỗi lần chạy hiện ở bảng tin;
+  // từng đợt tự tạo chỉ ghi theo nhóm (ẩn khỏi bảng tin để khỏi ngập).
+  "inventory.schedule_run": { label: "Kiểm kê định kỳ (hệ thống tự chạy)", category: "ccdc" },
+  "inventory.schedule_create": { label: "Tự mở đợt kiểm kê định kỳ (ghi theo đợt)", category: "ccdc", mirror: true },
   // Kết quả kiểm từng máy: chỉ cho tab Lịch sử của máy, ẩn khỏi bảng tin để khỏi ngập khi kiểm cả nhóm.
   "inventory.check": { label: "Kiểm kê máy (ghi theo máy)", category: "ccdc", mirror: true },
   // Bản ghi theo từng máy của đợt nhập Excel: chỉ cho tab Lịch sử của máy, ẩn khỏi bảng tin để khỏi ngập.
@@ -89,6 +93,8 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   "equipment.admin_correction": { label: "Admin hiệu chỉnh CCDC", category: "ccdc" },
   "equipment.condition.update": { label: "Cập nhật tình trạng CCDC", category: "ccdc" },
   "tool_catalog.create": { label: "Thêm CCDC theo số lượng", category: "ccdc" },
+  "tool_catalog.update": { label: "Sửa thông tin CCDC theo số lượng", category: "ccdc" },
+  "tool_catalog.adjust_quantity": { label: "Hiệu chỉnh số lượng CCDC", category: "ccdc" },
   // Tài khoản & nhóm (chỉ Admin hệ thống thấy)
   "user.approve": { label: "Duyệt tài khoản", category: "account" },
   "user.status.update": { label: "Đổi trạng thái tài khoản", category: "account" },

@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { equipment, equipmentTypeCatalog, groups, toolCatalog } from "@/lib/db/schema";
-import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
+import { hasGroupPermission, requireGroupPermission, requireUser } from "@/lib/auth/guards";
 import { isUniqueViolation } from "@/lib/db/errors";
 import { writeAudit } from "@/lib/audit";
 import { EQUIPMENT_CATEGORIES } from "@/lib/equipment-categories";
@@ -17,6 +17,7 @@ import { loadCanonicalizers } from "@/lib/canonical-data";
 import { cleanLabel } from "@/lib/canonical-text";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { GROUP_PERMISSION_LABELS } from "@/lib/auth/roles";
+import { validateQuantityAdjustment } from "@/lib/tool-permissions";
 
 export type EquipmentFormState = {
   status: "idle" | "success" | "error" | "confirm";
@@ -452,5 +453,135 @@ export async function createQuantityToolAction(
       return { status: "error", message: "Mã CCDC vừa sinh đã tồn tại. Vui lòng thử lại." };
     }
     return { status: "error", message: error instanceof Error ? error.message : "Không thể thêm CCDC." };
+  }
+}
+
+const toolConditionValues = ["good", "major_damage", "awaiting_assessment", "irreparable"] as const;
+
+/**
+ * Sửa THÔNG TIN CCDC theo số lượng (không đổi số lượng, không đổi giá): Kỹ sư giám sát (operator) trở lên của nhóm.
+ * Chống ghi đè đồng thời: form gửi kèm `updatedAt` lúc mở; khác bản đang lưu thì báo tải lại.
+ */
+export async function updateQuantityToolAction(
+  _previousState: EquipmentFormState,
+  formData: FormData,
+): Promise<EquipmentFormState> {
+  const toolId = String(formData.get("toolId") || "");
+  const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") || "");
+  const name = String(formData.get("name") || "").trim();
+  const categoryCode = String(formData.get("categoryCode") || "KHAC");
+  const specification = String(formData.get("specification") || "").trim();
+  const unit = String(formData.get("unit") || "").trim();
+  const condition = String(formData.get("condition") || "good");
+  const currentLocation = String(formData.get("currentLocation") || "").trim();
+  const notes = String(formData.get("notes") || "").trim();
+
+  if (!toolId || !expectedUpdatedAt) return { status: "error", message: "Thiếu thông tin CCDC cần sửa." };
+  if (name.length < 2 || name.length > 180) return { status: "error", message: "Tên CCDC cần từ 2 đến 180 ký tự." };
+  if (!unit || unit.length > 30) return { status: "error", message: "Đơn vị tính không hợp lệ." };
+  if (specification.length > 180) return { status: "error", message: "Quy cách tối đa 180 ký tự." };
+  if (currentLocation.length > 255) return { status: "error", message: "Vị trí tối đa 255 ký tự." };
+  if (!categoryCodes.includes(categoryCode as (typeof categoryCodes)[number])) return { status: "error", message: "Nhóm thiết bị không hợp lệ." };
+  if (!(toolConditionValues as readonly string[]).includes(condition)) return { status: "error", message: "Tình trạng CCDC không hợp lệ." };
+
+  try {
+    const [current] = await db.select().from(toolCatalog).where(eq(toolCatalog.id, toolId)).limit(1);
+    if (!current || !current.isActive || current.recordStatus !== "active") {
+      return { status: "error", message: "Không tìm thấy CCDC (có thể đã bị ngừng quản lý). Hãy tải lại trang." };
+    }
+    const auth = await requireGroupPermission(current.groupId, "operator");
+
+    await db.transaction(async (tx) => {
+      const [locked] = await tx.select().from(toolCatalog).where(eq(toolCatalog.id, toolId)).for("update");
+      if (!locked || locked.updatedAt.toISOString() !== expectedUpdatedAt) {
+        throw new Error("CCDC này vừa được người khác cập nhật. Hãy đóng hộp thoại, tải lại trang rồi sửa lại.");
+      }
+      const [updated] = await tx.update(toolCatalog).set({
+        name,
+        // CCDC theo số lượng: "loại" luôn bằng tên (giống lúc thêm mới).
+        equipmentType: name,
+        categoryCode,
+        specification: specification || null,
+        unit,
+        condition: condition as typeof toolCatalog.$inferInsert["condition"],
+        currentLocation: currentLocation || null,
+        notes: notes || null,
+        updatedBy: auth.userId,
+        updatedAt: new Date(),
+      }).where(and(eq(toolCatalog.id, toolId), eq(toolCatalog.updatedAt, locked.updatedAt))).returning();
+      if (!updated) throw new Error("CCDC này vừa được người khác cập nhật. Hãy tải lại trang rồi sửa lại.");
+      await writeAudit(tx as never, {
+        actorUserId: auth.userId,
+        actorGroupId: current.groupId,
+        actorRole: getActorRoleLabel(auth, current.groupId),
+        action: "tool_catalog.update",
+        entityType: "tool_catalog",
+        entityId: toolId,
+        description: `Sửa thông tin CCDC theo số lượng ${current.code ?? ""} ${name}`.replace(/\s+/g, " "),
+        beforeData: locked,
+        afterData: updated,
+      });
+    });
+    await setFlashMessage("success", "Đã cập nhật CCDC", `${current.code ?? ""} · ${name}`.trim());
+    refreshEquipmentConsumers();
+    return { status: "success", message: "Đã lưu thay đổi.", afterSave: "close" };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "Không thể cập nhật CCDC." };
+  }
+}
+
+/**
+ * Hiệu chỉnh SỐ LƯỢNG tồn trực tiếp (kiểm kê thấy lệch, nhập sai): Đốc công (manager) trở lên, BẮT BUỘC ghi lý do.
+ * Số mượn/trả/thanh lý vẫn đi theo phiếu; chỗ này chỉ để sửa sai. Khóa dòng + điều kiện theo số cũ để không đè phiếu đang chạy.
+ */
+export async function adjustToolQuantityAction(
+  _previousState: EquipmentFormState,
+  formData: FormData,
+): Promise<EquipmentFormState> {
+  const toolId = String(formData.get("toolId") || "");
+  const oldQty = Number(String(formData.get("oldQuantity") || "").replace(/,/g, "."));
+  const newQty = Number(String(formData.get("newQuantity") || "").replace(/,/g, "."));
+  const reasonRaw = String(formData.get("reason") || "");
+
+  if (!toolId) return { status: "error", message: "Thiếu thông tin CCDC cần hiệu chỉnh." };
+  const check = validateQuantityAdjustment({ oldQty, newQty, reason: reasonRaw });
+  if (!check.ok) return { status: "error", message: check.message };
+
+  try {
+    const [current] = await db.select().from(toolCatalog).where(eq(toolCatalog.id, toolId)).limit(1);
+    if (!current || !current.isActive || current.recordStatus !== "active") {
+      return { status: "error", message: "Không tìm thấy CCDC (có thể đã bị ngừng quản lý). Hãy tải lại trang." };
+    }
+    const auth = await requireGroupPermission(current.groupId, "manager");
+    const newValue = String(Math.round(newQty * 100) / 100);
+
+    await db.transaction(async (tx) => {
+      const [locked] = await tx.select().from(toolCatalog).where(eq(toolCatalog.id, toolId)).for("update");
+      if (!locked || Math.round(Number(locked.quantityOnHand) * 100) !== Math.round(oldQty * 100)) {
+        throw new Error("Số lượng vừa thay đổi (có phiếu mượn/trả/thanh lý khác). Hãy tải lại trang rồi hiệu chỉnh lại.");
+      }
+      const [updated] = await tx.update(toolCatalog).set({
+        quantityOnHand: newValue,
+        updatedBy: auth.userId,
+        updatedAt: new Date(),
+      }).where(and(eq(toolCatalog.id, toolId), eq(toolCatalog.quantityOnHand, locked.quantityOnHand))).returning();
+      if (!updated) throw new Error("Số lượng vừa thay đổi. Hãy tải lại trang rồi hiệu chỉnh lại.");
+      await writeAudit(tx as never, {
+        actorUserId: auth.userId,
+        actorGroupId: current.groupId,
+        actorRole: getActorRoleLabel(auth, current.groupId),
+        action: "tool_catalog.adjust_quantity",
+        entityType: "tool_catalog",
+        entityId: toolId,
+        description: `Hiệu chỉnh số lượng ${current.code ?? current.name}: ${Number(locked.quantityOnHand)} → ${Number(newValue)} ${current.unit}. Lý do: ${check.reason}`,
+        beforeData: { quantityOnHand: locked.quantityOnHand },
+        afterData: { quantityOnHand: updated.quantityOnHand, reason: check.reason },
+      });
+    });
+    await setFlashMessage("success", "Đã hiệu chỉnh số lượng", `${current.code ?? current.name} · ${Number(oldQty)} → ${Number(newValue)} ${current.unit}`);
+    refreshEquipmentConsumers();
+    return { status: "success", message: "Đã hiệu chỉnh số lượng.", afterSave: "close" };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "Không thể hiệu chỉnh số lượng." };
   }
 }

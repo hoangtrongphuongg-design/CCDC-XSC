@@ -6,6 +6,7 @@ import {
   countBySection,
   formatBadge,
   isGroupMember,
+  totalTaskCount,
   type MyTaskInput,
   type TaskSubject,
 } from "../src/lib/my-tasks";
@@ -148,11 +149,32 @@ test("đếm theo mục menu, sắp việc chờ lâu nhất lên đầu, huy hi
     disposals: [{ ...base, id: "d1", status: "pending_group", ownerGroupId: A, proposedBy: OTHER, updatedAt: new Date("2026-11-04T00:00:00Z") }],
   }));
   assert.deepEqual(tasks.map((t) => t.section), ["transfers", "repairs", "disposals", "loans"]);
-  assert.deepEqual(countBySection(tasks), { loans: 1, transfers: 1, repairs: 1, disposals: 1 });
+  assert.deepEqual(countBySection(tasks), { loans: 1, transfers: 1, repairs: 1, disposals: 1, inventory: 0 });
   assert.equal(new Set(tasks.map((t) => t.key)).size, tasks.length, "key không trùng");
   assert.equal(formatBadge(7), "7");
   assert.equal(formatBadge(99), "99");
   assert.equal(formatBadge(100), "99+");
+});
+
+test("kiểm kê định kỳ: chỉ Đốc công (manager) của nhóm có việc, khi còn máy chưa kiểm và chưa quá hạn", () => {
+  const inventories = [{ id: "kk1", code: "KK-2026-0007", groupId: A, period: "2026-11", pending: 5, updatedAt: AT }];
+  const mine = buildMyTasks(subject({ perms: [[A, "manager"]] }), input({ inventories }));
+  assert.deepEqual(mine.map((t) => [t.section, t.key, t.href]), [["inventory", "inventory:kk1", "/inventory/kk1"]]);
+  assert.match(mine[0].action, /hạn 15[/]11/);
+  assert.match(mine[0].label, /còn 5 máy chưa kiểm/);
+  assert.equal(mine[0].tone, "orange", "còn 3 ngày thì cam, chưa đỏ");
+  assert.equal(buildMyTasks(subject({ perms: [[A, "manager"]] }), input({ inventories, today: "2026-11-13" }))[0].tone, "red", "còn ≤ 2 ngày thì đỏ");
+  assert.deepEqual(buildMyTasks(subject({ perms: [[A, "operator"]] }), input({ inventories })), [], "Kỹ sư giám sát không có việc kiểm kê định kỳ");
+  assert.deepEqual(buildMyTasks(subject({ perms: [[A, "viewer"]] }), input({ inventories })), [], "Công nhân kỹ thuật không");
+  assert.deepEqual(buildMyTasks(subject({ perms: [[B, "manager"]] }), input({ inventories })), [], "Đốc công nhóm khác không");
+  assert.deepEqual(buildMyTasks(subject({ isAdmin: true }), input({ inventories })), [], "Admin không tự có việc của mọi nhóm");
+  assert.deepEqual(buildMyTasks(subject({ isWsManager: true }), input({ inventories })), [], "Quản lý Xưởng cũng không");
+  assert.deepEqual(buildMyTasks(subject({ isReadOnlyViewer: true, perms: [[A, "manager"]] }), input({ inventories })), [], "Người xem toàn xưởng không");
+  assert.deepEqual(buildMyTasks(subject({ perms: [[A, "manager"]] }), input({ inventories: [{ ...inventories[0], pending: 0 }] })), [], "kiểm xong thì hết việc");
+  assert.deepEqual(buildMyTasks(subject({ perms: [[A, "manager"]] }), input({ inventories, today: "2026-11-16" })), [], "quá hạn (chờ hệ thống đóng) thì không còn là việc");
+  const counts = countBySection(mine);
+  assert.equal(counts.inventory, 1);
+  assert.equal(totalTaskCount(counts), 1);
 });
 
 async function source(relativePath: string) {

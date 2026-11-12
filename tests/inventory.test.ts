@@ -103,7 +103,7 @@ test("filterChecklist: theo tab và từ khóa không dấu", () => {
 
 test("biên bản Excel: tóm tắt ở đầu, các mục theo thứ tự cần chú ý", async () => {
   const detail: InventoryDetail = {
-    session: { id: "s", code: "KK-2026-0001", title: "Cuối quý 4", groupId: A, groupName: "Nhóm A", status: "closed", createdAt: new Date("2026-11-01T01:00:00Z"), closedAt: new Date("2026-11-02T01:00:00Z"), createdByName: "Lan", closedByName: "Minh" },
+    session: { id: "s", code: "KK-2026-0001", title: "Cuối quý 4", groupId: A, groupName: "Nhóm A", status: "closed", createdAt: new Date("2026-11-01T01:00:00Z"), closedAt: new Date("2026-11-02T01:00:00Z"), createdByName: "Lan", closedByName: "Minh", period: null, autoClosed: false },
     items: [
       { ...item({ equipmentId: "1", code: "A-1", name: "Máy có mặt", result: "found" }), note: null, checkedByName: "Hùng", checkedAt: new Date("2026-11-01T02:00:00Z") },
       { ...item({ equipmentId: "2", code: "A-2", name: "Máy không thấy", result: "missing" }), note: "Hỏi tổ trưởng", checkedByName: "Hùng", checkedAt: new Date("2026-11-01T03:00:00Z") },
@@ -159,7 +159,8 @@ test("thao tác kiểm kê: đúng quyền, khóa khi đã đóng, tối ưu cho
   assert.match(action, /eq\(inventorySessions\.status, "open"\)/, "đóng đợt giữ mẫu UPDATE ... WHERE status");
   assert.match(action, /addIfMissing: false/, "danh sách trong đợt không tự thêm máy lạ");
   assert.match(action, /addIfMissing: true/, "hồ sơ máy (quét QR) được thêm máy thừa");
-  assert.match(action, /nextWorkflowCode\(tx, "KK"\)/);
+  assert.match(action, /createInventorySession\(/, "mở đợt đi qua hàm dùng chung với đợt tự động");
+  assert.match(await source("src/lib/inventory-create.ts"), /nextWorkflowCode\(tx, "KK"\)/);
   const data = await source("src/lib/inventory-data.ts");
   assert.match(data, /catch \(error\)[\s\S]*return \[\]/, "thiếu bảng kiểm kê thì hồ sơ máy vẫn hiện");
   assert.match(await source("src/app/(app)/equipment/[id]/page.tsx"), /loadInventoryPromptsForMachine\(/);

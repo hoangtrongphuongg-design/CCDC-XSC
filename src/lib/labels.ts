@@ -37,6 +37,23 @@ export function defaultBaseUrl(host: string | null | undefined, forwardedProto: 
   return normalizeBaseUrl(`${proto}://${cleanHost}`, "https://localhost");
 }
 
+/** Chỉ Quản lý Xưởng và Admin in tem QR (Người xem toàn xưởng không, kể cả khi mang cờ Admin). */
+export function canPrintLabels(subject: { isAdmin: boolean; isWsManager: boolean; isReadOnlyViewer: boolean }): boolean {
+  return (subject.isAdmin || subject.isWsManager) && !subject.isReadOnlyViewer;
+}
+
+/**
+ * Địa chỉ gốc mặc định của mã QR. Có cấu hình `APP_BASE_URL` (địa chỉ chính thức) thì LUÔN dùng nó, để tem in lại
+ * ở đâu cũng ra đúng mã QR cũ; chưa cấu hình thì dùng tên miền đang mở trang như trước. `mismatch` = đang mở trang
+ * từ tên miền khác địa chỉ chính thức (vd bản xem thử) — trang hiện cảnh báo.
+ */
+export function resolveBaseUrl(input: { configured: string | null | undefined; host: string | null | undefined; proto: string | null | undefined }): { baseUrl: string; fromConfig: boolean; mismatch: boolean } {
+  const requested = defaultBaseUrl(input.host, input.proto);
+  const configured = normalizeBaseUrl(input.configured, "");
+  if (!configured) return { baseUrl: requested, fromConfig: false, mismatch: false };
+  return { baseUrl: configured, fromConfig: true, mismatch: configured !== requested };
+}
+
 export function machineUrl(baseUrl: string, equipmentId: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/equipment/${equipmentId}`;
 }

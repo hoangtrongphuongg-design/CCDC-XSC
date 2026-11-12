@@ -4,7 +4,7 @@ import type { AuthContext } from "@/lib/auth/session";
 import { logoutAction } from "@/actions/auth";
 import { getRoleSummary } from "@/lib/auth/roles";
 import { GlobalSearchBox } from "@/components/global-search-box";
-import { EMPTY_TASK_COUNTS, formatBadge, type TaskSection } from "@/lib/my-tasks";
+import { EMPTY_TASK_COUNTS, formatBadge, totalTaskCount, type TaskSection } from "@/lib/my-tasks";
 
 function initials(name: string) {
   return name
@@ -24,7 +24,7 @@ export function Topbar({ auth, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthCon
     timeZone: "Asia/Ho_Chi_Minh",
   }).format(new Date());
   const roleLabel = getRoleSummary(auth);
-  const pending = taskCounts.loans + taskCounts.transfers + taskCounts.repairs + taskCounts.disposals;
+  const pending = totalTaskCount(taskCounts);
   const bellLabel = pending > 0 ? `${pending} việc chờ bạn xử lý` : "Không có việc chờ bạn xử lý";
 
   return (

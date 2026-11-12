@@ -66,7 +66,7 @@ async function source(relativePath: string) {
 
 test("trang chủ: lời chào + nút hành động + việc chờ tôi ở đầu, ô số liệu bấm được, biểu đồ gập lại", async () => {
   const page = await source("src/app/(app)/dashboard/page.tsx");
-  assert.match(page, /buildHomeActions\(auth, \{ pendingTasks: myTasks\.length \}\)/);
+  assert.match(page, /buildHomeActions\(auth, \{ pendingTasks: myTasks\.length, inventoryTasks: /);
   assert.match(page, /kpiLinks\(auth\)/);
   assert.match(page, /className="home-hero"/);
   assert.match(page, /<details className="home-more"/);

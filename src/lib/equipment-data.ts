@@ -10,6 +10,7 @@ import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { OPEN_MACHINE_LOAN_STATUSES, isHeldByBorrower } from "@/lib/loan-status";
 import { CLOSED_REPAIR_STATUSES, CLOSED_TRANSFER_STATUSES } from "@/lib/workflow-status";
 import type { ExportTool } from "@/lib/export/equipment-export";
+import type { ToolRow } from "@/lib/tool-filter";
 
 export type OperationalGroup = {
   id: string;
@@ -195,4 +196,31 @@ export async function loadTools(groupIds?: string[]): Promise<ExportTool[]> {
     .where(groupIds ? and(active, inArray(toolCatalog.groupId, groupIds)) : active)
     .orderBy(asc(groups.name), asc(toolCatalog.code), asc(toolCatalog.name));
   return rows.map((row) => ({ ...row, quantity: Number(row.quantity) }));
+}
+
+/** CCDC theo số lượng cho bảng "Dụng cụ nhóm tôi" (có id, tình trạng, vị trí, ghi chú, phiên bản để sửa). */
+export async function loadToolRows(groupIds?: string[]): Promise<ToolRow[]> {
+  if (groupIds && !groupIds.length) return [];
+  const active = and(eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active"));
+  const rows = await db.select({
+    id: toolCatalog.id,
+    code: toolCatalog.code,
+    name: toolCatalog.name,
+    specification: toolCatalog.specification,
+    unit: toolCatalog.unit,
+    quantity: toolCatalog.quantityOnHand,
+    categoryCode: toolCatalog.categoryCode,
+    equipmentType: toolCatalog.equipmentType,
+    condition: toolCatalog.condition,
+    currentLocation: toolCatalog.currentLocation,
+    notes: toolCatalog.notes,
+    updatedAt: toolCatalog.updatedAt,
+    groupId: toolCatalog.groupId,
+    groupCode: groups.code,
+    groupName: groups.name,
+  }).from(toolCatalog)
+    .innerJoin(groups, eq(toolCatalog.groupId, groups.id))
+    .where(groupIds ? and(active, inArray(toolCatalog.groupId, groupIds)) : active)
+    .orderBy(asc(groups.name), asc(toolCatalog.code), asc(toolCatalog.name));
+  return rows.map((row) => ({ ...row, quantity: Number(row.quantity), updatedAt: row.updatedAt.toISOString() }));
 }
