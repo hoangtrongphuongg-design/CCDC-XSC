@@ -23,6 +23,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { formatDateTime } from "@/lib/utils";
+import { vnDate } from "@/lib/export/equipment-export";
+import { DUE_SOON_DAYS, attentionText, buildAttention, overdueTaskKeys } from "@/lib/attention";
+import { dmy } from "@/lib/reports";
 import { WORKFLOW_LABELS } from "@/lib/constants";
 import { loadMyTasks } from "@/lib/my-tasks-data";
 import { buildHomeActions, greetingFor, kpiLinks, shortName, type HomeActionIcon } from "@/lib/home-actions";
@@ -53,6 +56,8 @@ export const dynamic = "force-dynamic";
 /** Số việc hiện sẵn trên thẻ "Việc chờ tôi xử lý"; còn lại bấm vào từng trang nghiệp vụ. */
 const MY_TASKS_SHOWN = 8;
 const MOBILE_TASKS_SHOWN = 5;
+const ATTENTION_SHOWN = 8;
+const MOBILE_ATTENTION_SHOWN = 4;
 
 const ACTION_ICONS: Record<HomeActionIcon, LucideIcon> = {
   loan: Handshake,
@@ -95,7 +100,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const showMobileRelated = one(params.related) === "1";
   const fullWorkshopScope = canViewWholeWorkshop(auth);
   const allowedGroupIds = new Set(auth.permissions.map((permission) => permission.groupId));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = vnDate();
 
   const myTasks = await loadMyTasks(auth);
   const shownTasks = myTasks.slice(0, MY_TASKS_SHOWN);
@@ -226,6 +231,15 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   const filteredTransfers = [...filteredIds].filter((id) => transferEquipmentIds.has(id)).length;
 
   const scopeLabel = fullWorkshopScope ? "toàn XSC" : auth.permissions.length === 1 ? auth.permissions[0].groupName : "các nhóm được phân quyền";
+  const attention = buildAttention({
+    loans: loanRows.map((row) => { const machine = equipmentMap.get(row.equipmentId); return { id: row.id, code: row.code, label: machine ? `${machine.name} (${machine.code})` : "Máy/CCDC", status: row.status, ownerGroupId: row.ownerGroupId, borrowerGroupId: row.borrowerGroupId, expectedReturnDate: row.expectedReturnDate }; }),
+    quickLoans: quickLoanRows.map((row) => ({ id: row.id, code: row.code, label: `${row.itemName} × ${Number(row.quantityBorrowed)} ${row.unit}`, status: row.status, sourceGroupId: row.sourceGroupId, borrowerGroupId: row.borrowerGroupId, expectedReturnAt: row.expectedReturnAt })),
+    groupNames: groupMap,
+    today,
+    scope: { whole: fullWorkshopScope, groupIds: allowedGroupIds },
+    excludeKeys: overdueTaskKeys(myTasks.map((task) => task.key)),
+  });
+  const shownAttention = attention.slice(0, ATTENTION_SHOWN);
   const homeActions = buildHomeActions(auth, { pendingTasks: myTasks.length });
   const links = kpiLinks(auth);
   const todayLabel = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
@@ -263,6 +277,22 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
           ))}
           {myTasks.length > MOBILE_TASKS_SHOWN ? <p className="mobile-ops-empty">Còn {myTasks.length - MOBILE_TASKS_SHOWN} việc nữa — mở mục Mượn – Trả, Điều chuyển… trong menu (có số đỏ).</p> : null}
         </section>
+
+        {attention.length ? (
+          <section className="mobile-ops-block mobile-attention" id="mobile-attention" aria-label="Chú ý hôm nay">
+            <div className="mobile-ops-block-title">
+              <div><strong>Chú ý hôm nay</strong><small>Phiếu quá hạn hoặc sắp đến hạn trả</small></div>
+              <span>{attention.length}</span>
+            </div>
+            {attention.slice(0, MOBILE_ATTENTION_SHOWN).map((row) => (
+              <Link href={row.href} key={row.key} className="mobile-task-card" data-tone={row.state === "overdue" ? "red" : "orange"}>
+                <div><strong>{attentionText(row)}</strong><span>{row.label}</span><small>{row.borrowerGroup} mượn của {row.ownerGroup}</small></div>
+                <ChevronRight size={18} aria-hidden="true" />
+              </Link>
+            ))}
+            {attention.length > MOBILE_ATTENTION_SHOWN ? <p className="mobile-ops-empty">Còn {attention.length - MOBILE_ATTENTION_SHOWN} phiếu nữa — mở mục Mượn – Trả.</p> : null}
+          </section>
+        ) : null}
 
         <div className="mobile-ops-primary mobile-ops-primary-v2" id="mobile-actions">
           {homeActions.map((action) => {
@@ -398,6 +428,36 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
               </>
             ) : (
               <EmptyState title="Không có việc nào đang chờ bạn" description="Phiếu cần bạn duyệt hoặc xác nhận sẽ hiện ở đây và trên chuông thông báo." />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="home-attention" aria-label="Chú ý hôm nay">
+        <Card>
+          <CardHeader>
+            <div><CardTitle>Chú ý hôm nay</CardTitle><p className="card-subtitle">Phiếu mượn đã quá hạn hoặc sắp đến hạn trả (trong {DUE_SOON_DAYS} ngày), trong phạm vi {scopeLabel}.</p></div>
+            <span className={attention.length ? "my-tasks-count" : "my-tasks-count is-zero"}>{attention.length}</span>
+          </CardHeader>
+          <CardContent>
+            {shownAttention.length ? (
+              <>
+                <div className="my-task-list">
+                  {shownAttention.map((row) => (
+                    <div className="my-task-row" data-tone={row.state === "overdue" ? "red" : "orange"} key={row.key}>
+                      <div className="my-task-main">
+                        <strong>{attentionText(row)} · hạn {dmy(row.dueDate)}</strong>
+                        <span>{row.label}</span>
+                        <small>{row.kind} {row.code} · {row.borrowerGroup} mượn của {row.ownerGroup}</small>
+                      </div>
+                      {auth.isReadOnlyViewer ? null : <Link href={row.href} className="btn btn-secondary btn-sm">Xử lý <ChevronRight size={14} /></Link>}
+                    </div>
+                  ))}
+                </div>
+                {attention.length > shownAttention.length ? <p className="my-tasks-more">Còn {attention.length - shownAttention.length} phiếu nữa — {fullWorkshopScope ? "xem đủ ở Báo cáo → Phiếu quá hạn trả" : "mở mục Mượn – Trả"}.</p> : null}
+              </>
+            ) : (
+              <p className="home-attention-clear"><CheckCircle2 size={18} aria-hidden="true" /> Không có phiếu nào quá hạn hoặc sắp đến hạn trả.</p>
             )}
           </CardContent>
         </Card>

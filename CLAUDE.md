@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 128 pass
+npm test           # tsx --test tests/*.test.ts — 135 pass
 ```
 
 Không có ESLint script.
@@ -105,6 +105,7 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 
 - Thứ tự "việc trước, số liệu sau": **lời chào + nút hành động lớn** (`home-hero`) → **Việc chờ tôi** (`#viec-cho-toi`) → **6 ô số liệu bấm được** → hoạt động gần đây → `<details class="home-more">` **gập lại** chứa tìm kiếm phân tích + biểu đồ trạng thái / phân bố nhóm (tự mở khi đang có bộ lọc `?q=`/`?group=`/`?status=`).
 - `lib/home-actions.ts` (hàm thuần, có test): `buildHomeActions(auth, { pendingTasks })` chọn tối đa 4 nút theo vai trò — Công nhân kỹ thuật: Mượn, Trả, Kiểm kê, Tìm; Kỹ sư giám sát: Mượn, Trả, Báo hỏng, Tìm; Đốc công: Việc chờ xử lý (kèm số), Mượn, Báo hỏng, Kiểm kê; Quản lý Xưởng: Việc chờ, Quá hạn & báo cáo, Kiểm kê, Tìm (Admin thay Tìm bằng Nhập máy từ Excel); Người xem toàn xưởng: Tìm, Dụng cụ toàn xưởng, Báo cáo. `kpiLinks(auth)` cho đường dẫn từng ô số (null = chỉ hiện số, vd Điều chuyển với người không phải Đốc công). `greetingFor` (giờ VN) và `shortName`.
+- **Chú ý hôm nay** (`lib/attention.ts`, hàm thuần, có test; thẻ `home-attention` giữa "Việc chờ tôi" và ô số liệu, trên điện thoại khối `mobile-attention` chỉ hiện khi có phiếu): phiếu mượn máy (`on_loan`/`incident`) và mượn nhanh (`borrowed`) **đã quá hạn** hoặc **đến hạn trong `DUE_SOON_DAYS` = 2 ngày**, theo ngày VN (`vnDate`, không dùng UTC); chỉ phiếu liên quan nhóm của người dùng (bên cho mượn hoặc bên mượn; vai trò toàn Xưởng thấy hết); quá hạn trước (trễ nhiều nhất lên đầu) rồi sắp đến hạn; phiếu quá hạn đã nằm ở "Việc chờ tôi" bị loại (`overdueTaskKeys`) để khỏi lặp. Dùng lại các phiếu đang mở mà trang chủ đã tải, không thêm truy vấn. Khác `/reports` (cả Xưởng, 180 ngày…): đây là cảnh báo theo phạm vi nhóm của tôi.
 - Điện thoại (thanh trên bị ẩn; mọi khối desktop bị ẩn bởi `.dashboard-page > :not(.mobile-ops-home)`): thẻ **Việc chờ tôi** (5 việc đầu) + cùng bộ nút hành động; các khối xem phiếu nhúng cũ (`?loans=1`, `?returns=1`, `?repairs=1`) đã bỏ vì nút giờ dẫn thẳng tới trang nghiệp vụ; khối "Việc cần xử lý" (duyệt nhanh bằng nút) và "Đang liên quan" giữ nguyên.
 
 ### Validation
