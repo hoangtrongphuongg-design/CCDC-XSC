@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SafeText } from "@/components/safe-text";
 import { alignOf, columnKind } from "@/lib/table-columns";
 
 /**
@@ -17,7 +18,7 @@ export function DataTable({ headers, rows, empty }: { headers: string[]; rows: R
           <tbody>
             {rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
-                {row.map((cell, colIndex) => <td key={colIndex} data-label={headers[colIndex]} data-col={columns[colIndex]?.kind} data-align={columns[colIndex]?.align}>{cell}</td>)}
+                {row.map((cell, colIndex) => <td key={colIndex} data-label={headers[colIndex]} data-col={columns[colIndex]?.kind} data-align={columns[colIndex]?.align}>{typeof cell === "string" ? <SafeText>{cell}</SafeText> : cell}</td>)}
               </tr>
             ))}
           </tbody>

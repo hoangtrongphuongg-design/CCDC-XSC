@@ -22,6 +22,23 @@ const FIT_EXACT = new Set(["stt", "ma", "phieu", "tem nhom", "serial", "sl", "ch
 const FIT_PREFIX = ["ma ", "sl ", "so ", "tre ", "nam "];
 const STATUS_PREFIX = ["trang thai", "tinh trang"];
 
+export type TextPart = { text: string; nowrap: boolean };
+
+const MAX_NOWRAP_TOKEN = 24;
+const HYPHEN_INSIDE = /[\p{L}\p{N}]-[\p{L}\p{N}]/u;
+
+/**
+ * Tách chuỗi thành các phần; "từ" có gạch nối giữa chữ/số ("ZX7-315", "CBL-0001", "PM-2026-0007") là MỘT từ độc lập
+ * nên đánh dấu nowrap để trình duyệt không xuống dòng ngay sau dấu gạch. Từ quá dài (> 24 ký tự) không nowrap để
+ * không làm cột phình. Dấu " - " có khoảng trắng hai bên (ngăn cách cụm) vẫn là chỗ xuống dòng bình thường.
+ */
+export function splitTokens(text: string): TextPart[] {
+  return text.split(/(\s+)/).filter((part) => part !== "").map((part) => ({
+    text: part,
+    nowrap: !/^\s+$/.test(part) && part.length <= MAX_NOWRAP_TOKEN && HYPHEN_INSIDE.test(part),
+  }));
+}
+
 export function columnKind(header: string): ColumnKind {
   const key = foldText(header);
   if (key.includes("thao tac")) return "actions";

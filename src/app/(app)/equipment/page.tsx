@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
+import { SafeText } from "@/components/safe-text";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { conditionTone, equipmentStatusTone } from "@/lib/status-style";
@@ -166,7 +167,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
             rows={filteredRows.map((row) => [
               <Link key="code" href={`/equipment/${row.id}`}><strong>{row.code}</strong></Link>,
               row.legacyCode || "—",
-              <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.model || "Chưa có model"}</small></div>,
+              <div key="name" className="asset-name-cell"><strong><SafeText>{row.name}</SafeText></strong><small>{row.model || "Chưa có model"}</small></div>,
               row.ownerGroup,
               groupMap.get(row.currentGroupId) || "—",
               row.currentLocation || "—",

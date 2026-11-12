@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { alignOf, columnKind, type ColumnKind } from "../src/lib/table-columns";
+import { alignOf, columnKind, splitTokens, type ColumnKind } from "../src/lib/table-columns";
 
 /** Mọi tiêu đề đang dùng ở các trang (DataTable) và loại cột mong đợi. */
 const EXPECTED: Array<[string, ColumnKind]> = [
@@ -87,4 +87,40 @@ test("DataTable gắn data-col / data-align; CSS chia cột theo nội dung và 
   const globals = await source("src/app/globals.css");
   assert.doesNotMatch(globals, /\.asset-name-cell strong \{ max-width: 260px; \}/, "tên máy dài không bị giới hạn 260px");
   assert.match(globals, /overflow-x:\s*hidden/, "vẫn không cuộn ngang");
+});
+
+test("không bẻ chữ giữa từ: ô và tiêu đề bảng dùng break-word (không dùng anywhere)", async () => {
+  const globals = await source("src/app/globals.css");
+  const ui = await source("src/app/ui-current.css");
+  const rule = (css: string, selector: string) => {
+    const index = css.indexOf(selector);
+    assert.ok(index >= 0, `thiếu quy tắc ${selector}`);
+    return css.slice(index, css.indexOf("}", index));
+  };
+  for (const [css, selector] of [
+    [globals, "th {"],
+    [globals, ".asset-name-cell strong {"],
+    [globals, ".asset-name-cell small {"],
+    [ui, ".equipment-list-table td {"],
+    [ui, ".quick-loan-item-cell strong, .quick-loan-item-cell small {"],
+    [ui, ".table-wrap [data-col=\"wide\"] {"],
+    [ui, ".table-wrap [data-col=\"text\"] {"],
+  ] as const) {
+    const body = rule(css, selector);
+    assert.doesNotMatch(body, /overflow-wrap:\s*anywhere/, `${selector} không được dùng anywhere`);
+  }
+  assert.match(rule(ui, ".table-wrap [data-col=\"text\"] {"), /overflow-wrap:\s*break-word/);
+  assert.match(ui, /\.table-wrap:has\(table\[data-sizing="auto"\]\) \{ overflow-x: auto; \}/, "lưới an toàn cuộn riêng của bảng");
+  assert.match(ui, /\.nobreak \{ white-space: nowrap; \}/);
+});
+
+test("splitTokens: mã/model có gạch nối là một từ không xuống dòng; chữ thường và cụm ' - ' vẫn xuống dòng được", () => {
+  const nowraps = (text: string) => splitTokens(text).filter((p) => p.nowrap).map((p) => p.text);
+  assert.deepEqual(nowraps("Máy hàn Jasic ZX7-315 bản mới"), ["ZX7-315"]);
+  assert.deepEqual(nowraps("PM-2026-0007 · CBL-0001"), ["PM-2026-0007", "CBL-0001"]);
+  assert.deepEqual(nowraps("Bảo trì điện - Nhóm NBS"), [], "dấu ' - ' có khoảng trắng hai bên là chỗ ngắt cụm");
+  assert.deepEqual(nowraps("Workshop Xưởng A"), []);
+  assert.deepEqual(nowraps("a-".repeat(20) + "b"), [], "từ quá dài không nowrap để khỏi làm phình cột");
+  assert.equal(splitTokens("A  B").map((p) => p.text).join(""), "A  B", "giữ nguyên chuỗi gốc");
+  assert.deepEqual(splitTokens(""), []);
 });
