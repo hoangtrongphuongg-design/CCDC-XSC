@@ -31,7 +31,15 @@ const isWorkshopLevel = (s: InventorySubject) => (s.isAdmin || s.isWsManager) &&
 const levelAt = (s: InventorySubject, groupId: string): number =>
   s.permissions.filter((p) => p.groupId === groupId).reduce((best, p) => Math.max(best, RANK[p.level]), -1);
 
-/** Mở / đóng đợt kiểm kê: Đốc công (manager) của nhóm, hoặc Quản lý Xưởng / Admin. */
+/**
+ * Mở đợt kiểm kê TAY: chỉ Quản lý Xưởng / Admin. Đợt hằng tháng đã tự mở ngày 1 nên Đốc công không cần tự mở
+ * (Người xem toàn xưởng luôn không, kể cả khi mang cờ Admin).
+ */
+export function canOpenInventory(s: InventorySubject): boolean {
+  return isWorkshopLevel(s);
+}
+
+/** Đóng đợt kiểm kê: Đốc công (manager) của nhóm, hoặc Quản lý Xưởng / Admin. */
 export function canManageInventory(s: InventorySubject, groupId: string): boolean {
   if (s.isReadOnlyViewer) return false;
   return isWorkshopLevel(s) || levelAt(s, groupId) >= RANK.manager;
