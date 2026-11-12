@@ -646,7 +646,8 @@ th {
   font-weight: 750;
   letter-spacing: .01em;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 th:first-child { border-radius: 11px 0 0 0; }
 th:last-child { border-radius: 0 11px 0 0; }
@@ -1071,8 +1072,8 @@ tbody tr:hover { background: #f9fbff; }
 .equipment-summary-strip strong { color: var(--text); font-variant-numeric: tabular-nums; }
 .equipment-summary-strip i { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px var(--success-soft); }
 .asset-name-cell strong, .asset-name-cell small { display: block; }
-.asset-name-cell strong { overflow-wrap: anywhere; }
-.asset-name-cell small { margin-top: 3px; color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.asset-name-cell strong { overflow-wrap: break-word; }
+.asset-name-cell small { margin-top: 3px; color: var(--text-muted); font-size: 12px; overflow-wrap: break-word; }
 
 .asset-modal-backdrop {
   position: fixed;

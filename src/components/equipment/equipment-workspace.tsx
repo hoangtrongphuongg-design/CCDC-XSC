@@ -21,6 +21,7 @@ import {
 import { createQuantityToolAction, saveEquipmentRecordAction, type EquipmentFormState } from "@/actions/equipment";
 import { loadEquipmentHistoryAction } from "@/actions/equipment-history";
 import { DataTable } from "@/components/data-table";
+import { SafeText } from "@/components/safe-text";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -911,7 +912,7 @@ export function EquipmentWorkspace({
               rows={filteredEquipment.map((row) => [
                 <strong key="code">{row.code}</strong>,
                 row.legacyCode || "—",
-                <div key="name" className="asset-name-cell"><strong>{row.name}</strong><small>{row.ownerGroupName}</small></div>,
+                <div key="name" className="asset-name-cell"><strong><SafeText>{row.name}</SafeText></strong><small>{row.ownerGroupName}</small></div>,
                 <span key="brand-model">{[row.brand, row.model].filter(Boolean).join(" / ") || "—"}</span>,
                 row.currentLocation || "—",
                 <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />,

@@ -1317,7 +1317,7 @@ body {
 .equipment-kpi-grid span { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
 .equipment-kpi-grid strong { color: var(--text); font-size: 22px; line-height: 1; letter-spacing: -.025em; }
 /* Độ rộng cột của bảng này do quy tắc chung (data-col) quyết định, xem cuối file. */
-.equipment-list-table td { min-width: 0; overflow-wrap: anywhere; }
+.equipment-list-table td { min-width: 0; overflow-wrap: break-word; word-break: normal; }
 .equipment-updated-at { display: inline-block; max-width: 100%; font-size: 12px; line-height: 1.35; white-space: normal; overflow-wrap: normal; }
 .equipment-row-actions { flex-wrap: wrap; justify-content: center; gap: 3px 5px; }
 .equipment-row-actions .btn { min-height: 34px; padding: 4px 8px; white-space: nowrap; font-size: 12px; }
@@ -1649,7 +1649,7 @@ body {
   padding-left: 8px;
   padding-right: 8px;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: normal;
 }
 .user-account-table .table-wrap th:nth-child(1),
@@ -1673,7 +1673,7 @@ body {
 .user-account-table .permission-list-cell span,
 .user-account-table .permission-list-cell small {
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .user-account-table .status-badge {
   max-width: 100%;
@@ -1838,7 +1838,7 @@ body {
 .quick-loan-free-fields { gap: 10px; }
 .quick-loan-note { margin: -2px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
 .quick-loan-item-cell { display: grid; gap: 3px; min-width: 0; }
-.quick-loan-item-cell strong, .quick-loan-item-cell small { overflow-wrap: anywhere; }
+.quick-loan-item-cell strong, .quick-loan-item-cell small { overflow-wrap: break-word; }
 .quick-loan-item-cell strong { font-size: 12px; }
 .quick-loan-item-cell small { color: var(--text-muted); font-size: 12px; }
 .catalog-chip { justify-self: start; display: inline-flex; align-items: center; min-height: 20px; padding: 2px 7px; border-radius: 999px; font-size: 12px; font-weight: 750; }
@@ -2778,15 +2778,20 @@ body {
 
 /* Bảng chia cột theo nội dung (DataTable gắn data-col từ lib/table-columns.ts).
    Trước đây table-layout: fixed chia đều nên cột Tên bị bó, cột mã/trạng thái thừa chỗ. */
-/* Từ 1366px: đủ rộng để chia theo nội dung mà không tràn; hẹp hơn giữ chia đều như cũ. */
-@media (min-width: 1366px) {
+/* Từ 1181px chia cột theo nội dung (cột không hẹp hơn từ dài nhất, chữ không bị bẻ giữa từ); hẹp hơn nữa giữ chia đều như cũ.
+   Bảng quá nhiều cột so với khung thì tự hiện thanh cuộn ngang của riêng bảng (lưới an toàn bên dưới). */
+@media (min-width: 1181px) {
   .table-wrap table[data-sizing="auto"] { table-layout: auto; }
   .table-wrap [data-col="fit"] { width: 1%; white-space: nowrap; }
   .table-wrap th[data-col="fit"] { white-space: normal; }
   .table-wrap [data-col="status"] { min-width: 11ch; }
   .table-wrap [data-col="actions"] { width: 1%; min-width: 150px; }
-  .table-wrap [data-col="wide"] { width: 22%; min-width: 16ch; overflow-wrap: anywhere; }
-  .table-wrap [data-col="text"] { min-width: 9ch; overflow-wrap: anywhere; }
+  /* break-word (KHÔNG dùng anywhere): cột không bao giờ hẹp hơn từ dài nhất của nó, nên chữ chỉ xuống dòng ở dấu cách,
+     không bị bẻ giữa từ ("Worksho/p"). */
+  .table-wrap [data-col="wide"] { width: 22%; min-width: 16ch; overflow-wrap: break-word; word-break: normal; }
+  .table-wrap [data-col="text"] { min-width: 9ch; overflow-wrap: break-word; word-break: normal; }
+  /* Lưới an toàn: thanh cuộn chỉ hiện khi bảng thật sự thiếu chỗ (hiếm), thay vì cắt cột hoặc bẻ chữ. */
+  .table-wrap:has(table[data-sizing="auto"]) { overflow-x: auto; }
   /* Huy hiệu trong bảng được xuống dòng khi thiếu chỗ thay vì ép cột rộng. */
   .table-wrap td .status-badge { white-space: normal; text-align: center; line-height: 1.25; }
 }
@@ -2797,6 +2802,9 @@ body {
   /* Hai thẻ cạnh nhau không kéo thẻ ngắn cao theo thẻ dài (tránh khoảng trống thừa). */
   .content-grid.equal { align-items: start; }
 }
+
+/* Từ có gạch nối (mã, model) giữ liền một khối, không xuống dòng ở dấu gạch (SafeText). */
+.nobreak { white-space: nowrap; }
 
 /* Dễ đọc, dễ bấm (PR A): thân chữ 15px (điện thoại 16px, đồng thời ô nhập 16px để iOS không tự phóng to khi gõ);
    màn cảm ứng: nút / ô nhập / tab cao tối thiểu 44px. Sàn cỡ chữ 12px được test canh (tests/readable-ui.test.ts). */

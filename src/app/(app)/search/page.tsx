@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
+import { SafeText } from "@/components/safe-text";
 import { EmptyState } from "@/components/empty-state";
 import { requireUser } from "@/lib/auth/guards";
 import { MIN_QUERY_LENGTH, cleanQuery } from "@/lib/global-search";
@@ -52,7 +53,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                     rows={machines.rows.map((m) => [
                       <Link key="code" href={`/equipment/${m.id}`}><b>{m.code}</b></Link>,
                       m.legacyCode || "—",
-                      <span key="name">{m.name}{m.serial ? <small className="search-serial"> · Serial {m.serial}</small> : null}</span>,
+                      <span key="name"><SafeText>{m.name}</SafeText>{m.serial ? <small className="search-serial"> · Serial {m.serial}</small> : null}</span>,
                       m.type,
                       m.ownerGroup,
                       <span key="status">{m.statusLabel} · {m.conditionLabel}{m.heldBy ? <small className="search-serial"> · đang ở {m.heldBy}</small> : null}</span>,
