@@ -15,6 +15,7 @@ import {
   INVENTORY_RESULT_LABELS,
   canCheckInventory,
   canManageInventory,
+  canOpenInventory,
   classifyExpected,
   summarizeInventory,
   type InventoryResult,
@@ -39,7 +40,7 @@ export async function createInventoryAction(formData: FormData) {
   const groupId = String(formData.get("groupId") || "");
   const title = String(formData.get("title") || "").replace(/\s+/g, " ").trim().slice(0, 180);
   if (!isUuid(groupId)) throw new Error("Hãy chọn nhóm cần kiểm kê.");
-  if (!canManageInventory(auth, groupId)) throw new Error("Chỉ Đốc công của nhóm hoặc Quản lý Xưởng được mở đợt kiểm kê.");
+  if (!canOpenInventory(auth)) throw new Error("Chỉ Quản lý Xưởng hoặc Admin được mở đợt kiểm kê tay. Đợt định kỳ tự mở ngày 1 hằng tháng.");
 
   const created = await createInventorySession({ groupId, title: title || null, createdBy: auth.userId, period: null });
 

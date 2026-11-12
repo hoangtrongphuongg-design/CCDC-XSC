@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { requireUser } from "@/lib/auth/guards";
 import { loadOperationalGroups } from "@/lib/equipment-data";
-import { canManageInventory } from "@/lib/inventory";
+import { canOpenInventory } from "@/lib/inventory";
 import { loadInventoryList } from "@/lib/inventory-data";
 import { INVENTORY_DEADLINE_DAY, daysUntilDeadline, periodOf } from "@/lib/inventory-schedule";
 import { vnDate } from "@/lib/export/equipment-export";
@@ -19,7 +19,8 @@ export const dynamic = "force-dynamic";
 export default async function InventoryListPage() {
   const auth = await requireUser();
   const [sessions, operationalGroups] = await Promise.all([loadInventoryList(auth), loadOperationalGroups()]);
-  const manageable = operationalGroups.filter((group) => canManageInventory(auth, group.id));
+  const canOpen = canOpenInventory(auth);
+  const manageable = canOpen ? operationalGroups : [];
   const openGroupIds = new Set(sessions.filter((s) => s.status === "open").map((s) => s.groupId));
   const today = vnDate();
   const canRunSchedule = auth.isWorkshopAdmin && !auth.isReadOnlyViewer;
@@ -28,7 +29,7 @@ export default async function InventoryListPage() {
     <div className="inventory-page">
       <PageHeader
         title="Kiểm kê CCDC"
-        description="Mở đợt kiểm kê cho nhóm, rồi kiểm từng máy ngay trên điện thoại: quét QR trên máy bằng camera hoặc bấm trong danh sách. Xuất biên bản Excel khi đóng đợt."
+        description="Kiểm từng máy của nhóm ngay trên điện thoại: quét QR trên máy bằng camera hoặc bấm trong danh sách. Xuất biên bản Excel khi đóng đợt."
       />
 
       <div className="notice inventory-schedule-note">
@@ -94,7 +95,7 @@ export default async function InventoryListPage() {
                 );
               })}
             </div>
-          ) : <EmptyState title="Chưa có đợt kiểm kê" description={manageable.length ? "Mở đợt đầu tiên ở khung phía trên." : "Đốc công nhóm hoặc Quản lý Xưởng sẽ mở đợt kiểm kê."} />}
+          ) : <EmptyState title="Chưa có đợt kiểm kê" description={manageable.length ? "Mở đợt đầu tiên ở khung phía trên." : "Đợt kiểm kê tự mở ngày 1 hằng tháng cho mỗi nhóm có máy; Quản lý Xưởng cũng có thể mở thêm bằng tay."} />}
         </CardContent>
       </Card>
     </div>

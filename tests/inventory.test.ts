@@ -6,6 +6,7 @@ import { buildInventoryWorkbook } from "../src/lib/export/inventory-workbook";
 import {
   canCheckInventory,
   canManageInventory,
+  canOpenInventory,
   canViewInventory,
   classifyExpected,
   filterChecklist,
@@ -24,7 +25,16 @@ function subject(over: Partial<InventorySubject> & { perms?: Array<[string, "vie
   return { isAdmin: false, isWsManager: false, isReadOnlyViewer: false, permissions: perms.map(([groupId, level]) => ({ groupId, level })), ...rest };
 }
 
-test("quyền kiểm kê: Đốc công mở/đóng, mọi thành viên nhóm kiểm, vai trò toàn Xưởng xem; Người xem không ghi", () => {
+test("mở đợt tay chỉ Quản lý Xưởng/Admin; Đốc công, Kỹ sư, Công nhân và Người xem thì không", () => {
+  assert.equal(canOpenInventory(subject({ isWsManager: true })), true);
+  assert.equal(canOpenInventory(subject({ isAdmin: true })), true);
+  assert.equal(canOpenInventory(subject({ perms: [[A, "manager"]] })), false, "Đốc công không tự mở: đợt đã tự mở ngày 1");
+  assert.equal(canOpenInventory(subject({ perms: [[A, "operator"]] })), false);
+  assert.equal(canOpenInventory(subject({ perms: [[A, "viewer"]] })), false);
+  assert.equal(canOpenInventory(subject({ isReadOnlyViewer: true, isAdmin: true })), false);
+});
+
+test("quyền kiểm kê: Đốc công đóng, mọi thành viên nhóm kiểm, vai trò toàn Xưởng xem; Người xem không ghi", () => {
   assert.equal(canManageInventory(subject({ perms: [[A, "manager"]] }), A), true);
   assert.equal(canManageInventory(subject({ perms: [[A, "operator"]] }), A), false, "Kỹ sư giám sát chưa được mở/đóng");
   assert.equal(canManageInventory(subject({ perms: [[A, "manager"]] }), B), false, "nhóm khác");
@@ -152,7 +162,7 @@ test("schema, update.sql và current_schema.sql khớp nhau cho hai bảng kiể
 
 test("thao tác kiểm kê: đúng quyền, khóa khi đã đóng, tối ưu cho điện thoại, hồ sơ máy không vỡ khi thiếu bảng", async () => {
   const action = await source("src/actions/inventory.ts");
-  assert.match(action, /canManageInventory\(auth, groupId\)/, "mở đợt cần Đốc công trở lên");
+  assert.match(action, /canOpenInventory\(auth\)/, "mở đợt tay chỉ Quản lý Xưởng/Admin");
   assert.match(action, /canManageInventory\(auth, session\.groupId\)/, "đóng đợt cần Đốc công trở lên");
   assert.match(action, /canCheckInventory\(auth, session\.groupId\)/);
   assert.match(action, /\.for\("update"\)/, "khóa dòng đợt khi ghi kết quả");
