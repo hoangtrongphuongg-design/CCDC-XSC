@@ -14,6 +14,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const accountStatusEnum = pgEnum("account_status", ["pending", "active", "rejected", "blocked"]);
 export const permissionLevelEnum = pgEnum("permission_level", ["viewer", "operator", "manager"]);
@@ -505,13 +506,22 @@ export const inventorySessions = pgTable(
     groupId: uuid("group_id").notNull().references(() => groups.id),
     title: varchar("title", { length: 180 }),
     status: inventoryStatusEnum("status").notNull().default("open"),
-    createdBy: uuid("created_by").notNull().references(() => users.id),
+    /** NULL = đợt do hệ thống tự mở (kiểm kê định kỳ). */
+    createdBy: uuid("created_by").references(() => users.id),
     closedBy: uuid("closed_by").references(() => users.id),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    /** "YYYY-MM" cho đợt định kỳ hàng tháng; NULL cho đợt mở tay. Mỗi nhóm đúng một đợt mỗi kỳ. */
+    period: varchar("period", { length: 7 }),
+    /** Đợt do hệ thống tự đóng khi quá hạn (hết ngày 15). */
+    autoClosed: boolean("auto_closed").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("inventory_sessions_code_unique").on(t.code), index("inventory_sessions_group_status_idx").on(t.groupId, t.status)],
+  (t) => [
+    uniqueIndex("inventory_sessions_code_unique").on(t.code),
+    index("inventory_sessions_group_status_idx").on(t.groupId, t.status),
+    uniqueIndex("inventory_sessions_group_period_unique").on(t.groupId, t.period).where(sql`${t.period} is not null`),
+  ],
 );
 
 /**

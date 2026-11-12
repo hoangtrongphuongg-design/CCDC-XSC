@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ClipboardCheck } from "lucide-react";
-import { createInventoryAction } from "@/actions/inventory";
+import { createInventoryAction, runMonthlyInventoryAction } from "@/actions/inventory";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { requireUser } from "@/lib/auth/guards";
 import { loadOperationalGroups } from "@/lib/equipment-data";
 import { canManageInventory } from "@/lib/inventory";
 import { loadInventoryList } from "@/lib/inventory-data";
+import { INVENTORY_DEADLINE_DAY, daysUntilDeadline, periodOf } from "@/lib/inventory-schedule";
+import { vnDate } from "@/lib/export/equipment-export";
 import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,8 @@ export default async function InventoryListPage() {
   const [sessions, operationalGroups] = await Promise.all([loadInventoryList(auth), loadOperationalGroups()]);
   const manageable = operationalGroups.filter((group) => canManageInventory(auth, group.id));
   const openGroupIds = new Set(sessions.filter((s) => s.status === "open").map((s) => s.groupId));
+  const today = vnDate();
+  const canRunSchedule = auth.isWorkshopAdmin && !auth.isReadOnlyViewer;
 
   return (
     <div className="inventory-page">
@@ -26,6 +30,16 @@ export default async function InventoryListPage() {
         title="Kiểm kê CCDC"
         description="Mở đợt kiểm kê cho nhóm, rồi kiểm từng máy ngay trên điện thoại: quét QR trên máy bằng camera hoặc bấm trong danh sách. Xuất biên bản Excel khi đóng đợt."
       />
+
+      <div className="notice inventory-schedule-note">
+        <b>Kiểm kê định kỳ:</b> ngày 1 hằng tháng hệ thống tự mở đợt cho mỗi nhóm có máy; Đốc công nhóm kiểm trong tháng, hết ngày {INVENTORY_DEADLINE_DAY} đợt tự đóng.
+        {canRunSchedule ? (
+          <form action={runMonthlyInventoryAction} className="inventory-run-now">
+            <Button type="submit" variant="secondary" size="sm">Chạy kiểm kê định kỳ ngay</Button>
+            <small className="muted">Dùng khi hệ thống chưa tự mở (vd lỡ ngày 1). Chạy lại không tạo trùng.</small>
+          </form>
+        ) : null}
+      </div>
 
       {manageable.length ? (
         <Card>
@@ -65,10 +79,16 @@ export default async function InventoryListPage() {
                       <span className="inventory-state">{s.status === "open" ? "Đang mở" : "Đã đóng"}</span>
                     </div>
                     <span>{s.groupName}{s.title ? ` · ${s.title}` : ""}</span>
+                    {s.status === "open" && s.period ? (
+                      <small className="inventory-due">
+                        {periodOf(today) === s.period ? `Hạn ${INVENTORY_DEADLINE_DAY}/${Number(s.period.slice(5))} — ${daysUntilDeadline(s.period, today) <= 0 ? "hôm nay là hạn chót" : `còn ${daysUntilDeadline(s.period, today)} ngày`}` : "Quá hạn, chờ hệ thống tự đóng"}
+                      </small>
+                    ) : null}
+                    {s.autoClosed ? <small className="inventory-auto-closed">Tự đóng — còn {Math.max(s.onsite - s.checkedOnsite, 0)} máy chưa kiểm</small> : null}
                     <div className="inventory-bar" aria-label={`Đã kiểm ${percent}%`}><i style={{ width: `${percent}%` }} /></div>
                     <small>
                       {s.checkedOnsite}/{s.onsite} máy đã kiểm · {s.found} có mặt · <b className={s.missing ? "inventory-missing" : ""}>{s.missing} không thấy</b>
-                      {" · "}mở {formatDate(s.createdAt)}{s.createdByName ? ` bởi ${s.createdByName}` : ""}
+                      {" · "}mở {formatDate(s.createdAt)}{s.createdByName ? ` bởi ${s.createdByName}` : s.period ? " bởi Hệ thống" : ""}
                     </small>
                   </Link>
                 );

@@ -21,9 +21,9 @@ import {
 } from "@/lib/inventory";
 import { BORROWER_HOLDING_STATUSES } from "@/lib/loan-status";
 import { isUuid } from "@/lib/machine-profile";
-import { nextWorkflowCode } from "@/lib/workflows";
+import { createInventorySession } from "@/lib/inventory-create";
+import { runMonthlyInventory } from "@/lib/inventory-schedule-data";
 
-const INSERT_CHUNK = 400;
 const MAX_NOTE = 200;
 
 function refresh(sessionId?: string, equipmentId?: string) {
@@ -41,63 +41,32 @@ export async function createInventoryAction(formData: FormData) {
   if (!isUuid(groupId)) throw new Error("Hãy chọn nhóm cần kiểm kê.");
   if (!canManageInventory(auth, groupId)) throw new Error("Chỉ Đốc công của nhóm hoặc Quản lý Xưởng được mở đợt kiểm kê.");
 
-  const [group] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
-  if (!group || group.isSystem || !group.isActive || !isOfficialOperationalGroupCode(group.code)) throw new Error("Nhóm quản lý không hợp lệ.");
+  const created = await createInventorySession({ groupId, title: title || null, createdBy: auth.userId, period: null });
 
-  const [existing] = await db.select({ code: inventorySessions.code }).from(inventorySessions)
-    .where(and(eq(inventorySessions.groupId, groupId), eq(inventorySessions.status, "open"))).limit(1);
-  if (existing) throw new Error(`Nhóm đang có đợt kiểm kê ${existing.code} chưa đóng. Hãy đóng đợt đó trước khi mở đợt mới.`);
+  refresh(created.sessionId);
+  await setFlashMessage("success", "Đã mở đợt kiểm kê", `${created.machineCount} máy cần kiểm.`);
+  redirect(`/inventory/${created.sessionId}`);
+}
 
-  const [ownedRows, holdingLoans, groupRows] = await Promise.all([
-    db.select({ id: equipment.id, ownerGroupId: equipment.ownerGroupId, status: equipment.status }).from(equipment)
-      .where(and(eq(equipment.ownerGroupId, groupId), eq(equipment.recordStatus, "active"))).orderBy(asc(equipment.code)),
-    db.select({ equipmentId: machineLoans.equipmentId, ownerGroupId: machineLoans.ownerGroupId, borrowerGroupId: machineLoans.borrowerGroupId })
-      .from(machineLoans)
-      .where(and(inArray(machineLoans.status, [...BORROWER_HOLDING_STATUSES]), or(eq(machineLoans.ownerGroupId, groupId), eq(machineLoans.borrowerGroupId, groupId)))),
-    db.select({ id: groups.id, name: groups.name }).from(groups),
-  ]);
-  const heldBy = new Map(holdingLoans.map((loan) => [loan.equipmentId, loan.borrowerGroupId]));
-  const ownedIds = new Set(ownedRows.map((row) => row.id));
-  const borrowedInIds = holdingLoans.filter((loan) => loan.borrowerGroupId === groupId && !ownedIds.has(loan.equipmentId)).map((loan) => loan.equipmentId);
-  const borrowedInRows = borrowedInIds.length
-    ? await db.select({ id: equipment.id, ownerGroupId: equipment.ownerGroupId, status: equipment.status }).from(equipment)
-      .where(and(inArray(equipment.id, borrowedInIds), eq(equipment.recordStatus, "active")))
-    : [];
-
-  const machines = [...ownedRows, ...borrowedInRows];
-  if (!machines.length) throw new Error("Nhóm chưa có máy nào hoàn thành hồ sơ để kiểm kê.");
-  if (machines.length > INVENTORY_MAX_ITEMS) throw new Error(`Nhóm có ${machines.length} máy, vượt giới hạn ${INVENTORY_MAX_ITEMS} máy mỗi đợt.`);
-  const groupName = new Map(groupRows.map((row) => [row.id, row.name]));
-  const nameOf = (id: string) => groupName.get(id) ?? "—";
-
-  let sessionId = "";
-  try {
-    await db.transaction(async (tx) => {
-      const code = await nextWorkflowCode(tx, "KK");
-      const [session] = await tx.insert(inventorySessions).values({ code, groupId, title: title || null, createdBy: auth.userId }).returning({ id: inventorySessions.id });
-      sessionId = session.id;
-      const values = machines.map((machine) => {
-        const { offsite, note } = classifyExpected({ groupId, ownerGroupId: machine.ownerGroupId, heldByGroupId: heldBy.get(machine.id) ?? null, status: machine.status }, nameOf);
-        return { sessionId: session.id, equipmentId: machine.id, offsite, expectedNote: note };
-      });
-      for (let start = 0; start < values.length; start += INSERT_CHUNK) await tx.insert(inventoryItems).values(values.slice(start, start + INSERT_CHUNK));
-      await writeAudit(tx, {
-        actorUserId: auth.userId,
-        actorGroupId: groupId,
-        action: "inventory.create",
-        entityType: "inventory_session",
-        entityId: session.id,
-        description: `Mở đợt kiểm kê ${code} cho ${group.name} (${machines.length} máy)${title ? `: ${title}` : ""}`,
-      });
-    });
-  } catch (error) {
-    if (isUniqueViolation(error)) throw new Error("Nhóm vừa có người mở đợt kiểm kê khác. Hãy tải lại trang.");
-    throw error;
-  }
-
-  refresh(sessionId);
-  await setFlashMessage("success", "Đã mở đợt kiểm kê", `${machines.length} máy cần kiểm.`);
-  redirect(`/inventory/${sessionId}`);
+/**
+ * Chạy ngay kiểm kê định kỳ của tháng (cùng hàm với cron hằng ngày; dự phòng khi cron chưa cấu hình / lỡ ngày 1).
+ * Chỉ Quản lý Xưởng / Admin. Idempotent: chạy lại không tạo trùng.
+ */
+export async function runMonthlyInventoryAction() {
+  const auth = await requireUser();
+  if (auth.isReadOnlyViewer || !auth.isWorkshopAdmin) throw new Error("Chỉ Quản lý Xưởng hoặc Admin được chạy kiểm kê định kỳ.");
+  const summary = await runMonthlyInventory();
+  revalidatePath("/inventory");
+  revalidatePath("/dashboard");
+  revalidatePath("/activities");
+  const nothing = !summary.created && !summary.adopted && !summary.closed;
+  await setFlashMessage(
+    summary.errors.length ? "error" : "success",
+    nothing ? "Không có gì cần làm" : "Đã chạy kiểm kê định kỳ",
+    nothing
+      ? `Kỳ ${summary.period}: các nhóm có máy đều đã có đợt, hoặc đã quá ngày 15.`
+      : `Mở ${summary.created} đợt, nhận ${summary.adopted} đợt đang mở, đóng ${summary.closed} đợt quá hạn.${summary.errors.length ? ` Lỗi: ${summary.errors.join("; ")}` : ""}`,
+  );
 }
 
 type CheckOutcome = { ok: true } | { ok: false; message: string };

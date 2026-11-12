@@ -7,12 +7,14 @@ import {
   LABEL_COLUMNS,
   LABEL_ROWS,
   MAX_IDS,
+  canPrintLabels,
   defaultBaseUrl,
   machineUrl,
   normalizeBaseUrl,
   paginateLabels,
   parseIds,
   parseStart,
+  resolveBaseUrl,
 } from "../src/lib/labels";
 
 const ID1 = "3f2b1c0e-8a4d-4c6e-9b1a-0d2e5f7a9c11";
@@ -81,17 +83,43 @@ async function source(relativePath: string) {
   return readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 }
 
-test("trang in tem: giới hạn theo phạm vi nhóm, in khổ A4 riêng, ẩn khung ứng dụng khi in, có lối vào từ menu và hồ sơ máy", async () => {
+test("canPrintLabels: chỉ Quản lý Xưởng và Admin, Người xem toàn xưởng không (kể cả mang cờ Admin)", () => {
+  const none = { isAdmin: false, isWsManager: false, isReadOnlyViewer: false };
+  assert.equal(canPrintLabels({ ...none, isWsManager: true }), true);
+  assert.equal(canPrintLabels({ ...none, isAdmin: true }), true);
+  assert.equal(canPrintLabels(none), false, "Đốc công / Kỹ sư / Công nhân (người dùng theo nhóm)");
+  assert.equal(canPrintLabels({ ...none, isReadOnlyViewer: true }), false);
+  assert.equal(canPrintLabels({ isAdmin: true, isWsManager: false, isReadOnlyViewer: true }), false);
+});
+
+test("resolveBaseUrl: có APP_BASE_URL thì luôn dùng (QR in lại giống hệt), thiếu thì theo tên miền đang mở", () => {
+  const fromHost = resolveBaseUrl({ configured: "", host: "preview-abc.vercel.app", proto: "https" });
+  assert.deepEqual(fromHost, { baseUrl: "https://preview-abc.vercel.app", fromConfig: false, mismatch: false });
+  const same = resolveBaseUrl({ configured: "https://ccdc-xsc.vercel.app/", host: "ccdc-xsc.vercel.app", proto: "https" });
+  assert.deepEqual(same, { baseUrl: "https://ccdc-xsc.vercel.app", fromConfig: true, mismatch: false });
+  const preview = resolveBaseUrl({ configured: "https://ccdc-xsc.vercel.app", host: "preview-abc.vercel.app", proto: "https" });
+  assert.equal(preview.baseUrl, "https://ccdc-xsc.vercel.app", "mở từ bản xem thử vẫn ra địa chỉ chính thức");
+  assert.equal(preview.mismatch, true);
+  const bad = resolveBaseUrl({ configured: "javascript:alert(1)", host: "x.vn", proto: "https" });
+  assert.equal(bad.fromConfig, false, "cấu hình sai dạng thì bỏ qua");
+});
+
+test("trang in tem: chỉ Quản lý Xưởng/Admin, dùng địa chỉ gốc cấu hình, in khổ A4 riêng, ẩn khung ứng dụng khi in, lối vào có điều kiện", async () => {
   const page = await source("src/app/(app)/labels/page.tsx");
   assert.match(page, /requireUser\(\)/);
-  assert.match(page, /canViewWholeWorkshop\(auth\)/);
-  assert.match(page, /allowedGroups\.some\(\(group\) => group\.id === one\(params\.group\)\)/, "chỉ chọn được nhóm trong phạm vi");
+  assert.match(page, /if \(!canPrintLabels\(auth\)\) notFound\(\);/, "người không đủ quyền gõ thẳng /labels thì 404");
+  assert.doesNotMatch(page, /canViewWholeWorkshop/);
+  assert.match(page, /process\.env\.APP_BASE_URL/);
   assert.match(page, /normalizeBaseUrl\(one\(params\.base\)/);
   const css = await source("src/app/ui-current.css");
   assert.match(css, /@page labels \{ size: A4 portrait; margin: 0; \}/);
   assert.match(css, /grid-template-columns: repeat\(3, 70mm\)/);
   assert.match(css, /grid-template-rows: repeat\(8, 37\.125mm\)/);
   assert.match(css, /@media print \{[\s\S]*\.sidebar, \.topbar/);
-  assert.match(await source("src/components/sidebar.tsx"), /"\/labels", "In tem QR"/);
-  assert.match(await source("src/app/(app)/equipment/[id]/page.tsx"), /\/labels\?ids=\$\{machine\.id\}/);
+  const sidebar = await source("src/components/sidebar.tsx");
+  assert.match(sidebar, /"\/labels", "In tem QR"/);
+  assert.match(sidebar, /canPrintLabels\(auth\) \? \[labelsItem\]/, "menu chỉ hiện cho người in được tem");
+  const profile = await source("src/app/(app)/equipment/[id]/page.tsx");
+  assert.match(profile, /\/labels\?ids=\$\{machine\.id\}/);
+  assert.match(profile, /canPrintLabels\(auth\) \? <Link/, "nút In tem QR ở hồ sơ máy chỉ hiện cho người in được tem");
 });

@@ -2930,3 +2930,40 @@ body {
 /* Chú ý hôm nay */
 .home-attention { margin-bottom: 14px; }
 .home-attention-clear { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--success); font-weight: 650; }
+
+/* CCDC theo số lượng ở "Dụng cụ nhóm tôi" (bảng desktop + danh sách điện thoại) */
+.tool-quantity-card { margin-top: 16px; }
+.mobile-tool-list { border-top: 8px solid #f1f5f9; background: #fff; }
+.mobile-tool-heading { margin: 0; padding: 12px 13px 6px; color: #172033; font-size: 15px; font-weight: 700; }
+.mobile-tool-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 10px 13px;
+  border-bottom: 1px solid #e8edf2;
+}
+.mobile-tool-main { min-width: 0; }
+.mobile-tool-main strong { display: block; color: #172033; font-size: 15px; overflow-wrap: break-word; }
+.mobile-tool-main span { display: block; margin-top: 2px; color: #6b7786; font-size: 13px; overflow-wrap: break-word; }
+.mobile-tool-qty { display: grid; justify-items: end; }
+.mobile-tool-qty strong { font-size: 18px; color: var(--primary); }
+.mobile-tool-qty small { color: #6b7786; font-size: 12px; }
+.mobile-tool-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.mobile-tool-actions button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--primary);
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Kiểm kê định kỳ hàng tháng */
+.inventory-schedule-note { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; color: var(--text); border-color: #dbe5ed; background: #f1f6fa; font-size: 14px; }
+.inventory-run-now { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0; }
+.inventory-run-now small { font-size: 12px; }
+.inventory-card .inventory-due { color: var(--primary); font-weight: 600; }
+.inventory-card .inventory-auto-closed { color: var(--danger); font-weight: 600; }

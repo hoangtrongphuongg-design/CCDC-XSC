@@ -27,12 +27,17 @@ const hasLevel = (s: HomeSubject, level: "operator" | "manager") =>
 export const HOME_ACTION_LIMIT = 4;
 
 /** Các nút hành động lớn ở đầu trang chủ, tối đa HOME_ACTION_LIMIT, theo vai trò. */
-export function buildHomeActions(subject: HomeSubject, ctx: { pendingTasks: number }): HomeAction[] {
+export function buildHomeActions(subject: HomeSubject, ctx: { pendingTasks: number; inventoryTasks?: number }): HomeAction[] {
   const search: HomeAction = { key: "search", icon: "search", label: "Tìm máy", hint: "Mã, tem nhôm, serial, mã phiếu", href: "/search" };
   const loan: HomeAction = { key: "loan", icon: "loan", label: "Mượn CCDC", hint: "Tạo đề nghị mượn", href: "/machine-loans?mode=create#new-loan" };
   const giveBack: HomeAction = { key: "return", icon: "return", label: "Trả CCDC", hint: "Chọn máy đang mượn để trả", href: "/machine-loans?mode=return#mobile-active-loans" };
   const repair: HomeAction = { key: "repair", icon: "repair", label: "Báo hỏng", hint: "Báo máy hư để sửa chữa", href: "/repairs?mode=create#new-repair" };
-  const inventory: HomeAction = { key: "inventory", icon: "inventory", label: "Kiểm kê", hint: "Kiểm CCDC của nhóm tại chỗ", href: "/inventory" };
+  const inventoryDue = ctx.inventoryTasks ?? 0;
+  const inventory: HomeAction = {
+    key: "inventory", icon: "inventory", label: "Kiểm kê",
+    hint: inventoryDue ? "Đang có đợt kiểm kê định kỳ cần làm" : "Kiểm CCDC của nhóm tại chỗ",
+    href: "/inventory", badge: inventoryDue || undefined,
+  };
   const approve: HomeAction = {
     key: "approve", icon: "approve", label: "Việc chờ xử lý",
     hint: ctx.pendingTasks ? `${ctx.pendingTasks} việc đang chờ bạn` : "Không có việc đang chờ",

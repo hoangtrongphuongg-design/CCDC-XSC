@@ -15,6 +15,7 @@ import { loadInventoryPromptsForMachine } from "@/lib/inventory-data";
 import { markInventoryFromProfileAction } from "@/actions/inventory";
 import { INVENTORY_RESULT_LABELS } from "@/lib/inventory";
 import { ORIGIN_LABELS } from "@/lib/machine-profile";
+import { canPrintLabels } from "@/lib/labels";
 import { dmy, formatVnd } from "@/lib/reports";
 import { formatDateTime } from "@/lib/utils";
 
@@ -46,7 +47,7 @@ export default async function MachineProfilePage({ params }: { params: Promise<{
         actions={
           <>
             <Link className="btn btn-secondary" href={`/equipment?q=${encodeURIComponent(machine.code)}`}><ArrowLeft size={16} /> Dụng cụ toàn xưởng</Link>
-            <Link className="btn btn-secondary" href={`/labels?ids=${machine.id}`}><QrCode size={16} /> In tem QR</Link>
+            {canPrintLabels(auth) ? <Link className="btn btn-secondary" href={`/labels?ids=${machine.id}`}><QrCode size={16} /> In tem QR</Link> : null}
             {inMyScope ? <Link className="btn btn-primary" href="/my-equipment"><ClipboardList size={16} /> Dụng cụ nhóm tôi</Link> : null}
           </>
         }

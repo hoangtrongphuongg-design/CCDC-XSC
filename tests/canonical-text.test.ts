@@ -83,5 +83,6 @@ test("form lưu máy và nhập Excel đều chuẩn hóa; ô Vị trí có gợ
   assert.match(sql, /V1\.6\.13/);
   assert.match(sql, /-- SELECT r\.category_code/, "có câu SELECT xem trước");
   assert.match(sql, /UPDATE equipment e\s+SET equipment_type/);
-  assert.doesNotMatch(sql.slice(sql.indexOf("V1.6.13")), /DELETE FROM|DROP /i, "không xóa dữ liệu");
+  const v1613 = sql.slice(sql.indexOf("V1.6.13"), sql.indexOf("V1.7.0") > 0 ? sql.indexOf("V1.7.0") : undefined);
+  assert.doesNotMatch(v1613, /DELETE FROM|DROP /i, "không xóa dữ liệu");
 });
