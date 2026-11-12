@@ -2918,3 +2918,7 @@ body {
 .mobile-tasks .mobile-ops-block-title strong, .mobile-tasks .mobile-ops-block-title small { display: block; }
 .mobile-tasks .mobile-ops-block-title small { color: var(--text-muted); font-size: 12px; }
 .mobile-ops-primary-v2 .mobile-action-card strong, .mobile-ops-primary-v2 .mobile-action-card small { overflow: visible; text-overflow: clip; white-space: normal; }
+
+/* Chú ý hôm nay */
+.home-attention { margin-bottom: 14px; }
+.home-attention-clear { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--success); font-weight: 650; }
