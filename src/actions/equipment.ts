@@ -18,6 +18,7 @@ import { cleanLabel } from "@/lib/canonical-text";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { GROUP_PERMISSION_LABELS } from "@/lib/auth/roles";
 import { validateQuantityAdjustment } from "@/lib/tool-permissions";
+import { statusForCondition } from "@/lib/equipment-status-rule";
 import { canChangeIdentity, changedIdentityFields, legacyConflictMessage, normalizeLegacyCode } from "@/lib/equipment-identity";
 
 export type EquipmentFormState = {
@@ -282,6 +283,15 @@ export async function saveEquipmentRecordAction(
           await assertEquipmentHasNoOtherOpenWorkflow(tx, before.id);
           nextManualStatus = data.status as (typeof MANUAL_EQUIPMENT_STATUSES)[number];
         }
+        // Sẵn sàng chỉ khi tình trạng Tốt: máy đang/sắp Sẵn sàng mà tình trạng không Tốt → Chờ kiểm tra (kể cả khi
+        // người dùng không đụng ô trạng thái). Trạng thái do quy trình điều khiển giữ nguyên.
+        if (manual.includes(locked.status)) {
+          const enforced = statusForCondition(nextManualStatus ?? locked.status, data.condition);
+          if (enforced !== locked.status && enforced !== nextManualStatus) {
+            await assertEquipmentHasNoOtherOpenWorkflow(tx, before.id);
+            nextManualStatus = enforced as (typeof MANUAL_EQUIPMENT_STATUSES)[number];
+          }
+        }
 
         const [updated] = await tx.update(equipment).set({
           code: nextCode,
@@ -389,7 +399,10 @@ export async function updateEquipmentConditionAction(formData: FormData) {
   const auth = await requireUser();
   if (!hasGroupPermission(auth, item.ownerGroupId, "operator")) throw new Error("Bạn không có quyền cập nhật CCDC này.");
   await db.transaction(async (tx) => {
-    await tx.update(equipment).set({ condition, updatedBy: auth.userId, version: item.version + 1, updatedAt: new Date() }).where(eq(equipment.id, equipmentId));
+    // Đổi sang tình trạng không Tốt khi máy đang Sẵn sàng → Chờ kiểm tra (đọc lại trạng thái sau khi khóa dòng).
+    const locked = await lockEquipment(tx, equipmentId);
+    const nextStatus = statusForCondition(locked.status, condition) as typeof item.status;
+    await tx.update(equipment).set({ condition, ...(nextStatus !== locked.status ? { status: nextStatus } : {}), updatedBy: auth.userId, version: item.version + 1, updatedAt: new Date() }).where(eq(equipment.id, equipmentId));
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
       actorGroupId: item.ownerGroupId,

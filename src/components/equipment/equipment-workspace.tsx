@@ -23,6 +23,7 @@ import { loadEquipmentHistoryAction } from "@/actions/equipment-history";
 import { DataTable } from "@/components/data-table";
 import { SafeText } from "@/components/safe-text";
 import { equipmentStatusDisplay } from "@/lib/repair-display";
+import { isReadyCondition } from "@/lib/equipment-status-rule";
 import { ToolAdjustDialog, ToolEditDialog } from "@/components/equipment/tool-dialogs";
 import { filterTools, type ToolRow } from "@/lib/tool-filter";
 import { canAdjustToolQuantity, canEditTool } from "@/lib/tool-permissions";
@@ -389,7 +390,7 @@ function AssetForm({
               </select>
             </FormField>
             <FormField label="Tem nhôm / mã đã gán"><input name="legacyCode" placeholder="Ví dụ: MH-05" /></FormField>
-            <FormField label="Tình trạng">
+            <FormField label="Tình trạng" hint={isReadyCondition(condition) ? undefined : "Máy chưa ở tình trạng Tốt sẽ ở trạng thái Chờ kiểm tra, chưa cho mượn."}>
               <select name="condition" value={condition} onChange={(event) => setCondition(event.target.value)}>
                 {simpleConditionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
@@ -500,16 +501,16 @@ function AssetForm({
         <div className="asset-section-heading"><div><span>05</span><div><strong>Hiện trạng</strong><small>Tình trạng kỹ thuật và trạng thái nghiệp vụ là hai thông tin riêng.</small></div></div></div>
         <div className="form-grid two">
           <FormField label="Tình trạng kỹ thuật" required>
-            <select value={condition} onChange={(event) => setCondition(event.target.value)}>
+            <select value={condition} onChange={(event) => { const next = event.target.value; setCondition(next); if (!isReadyCondition(next) && status === "in_use_owner") setStatus("wait_inspection"); }}>
               {simpleConditionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               {record && !simpleConditionOptions.some(([value]) => value === record.condition) ? <option value={record.condition}>{CONDITION_LABELS[record.condition]}</option> : null}
             </select>
           </FormField>
-          <FormField label="Trạng thái nghiệp vụ" required hint={statusIsManual ? "Chỉ đổi tay được giữa Sẵn sàng, Chờ kiểm tra và Ngừng sử dụng. Mượn, sửa, điều chuyển, thanh lý do quy trình tự điều khiển." : "Trạng thái này do quy trình mượn/sửa/điều chuyển/thanh lý điều khiển nên không sửa tay được."}>
+          <FormField label="Trạng thái nghiệp vụ" required hint={statusIsManual ? (isReadyCondition(condition) ? "Chỉ đổi tay được giữa Sẵn sàng, Chờ kiểm tra và Ngừng sử dụng. Mượn, sửa, điều chuyển, thanh lý do quy trình tự điều khiển." : "Máy chưa ở tình trạng Tốt không thể Sẵn sàng: chọn Chờ kiểm tra hoặc Ngừng sử dụng. Sửa xong và nhóm nhận lại thì máy tự về Sẵn sàng.") : "Trạng thái này do quy trình mượn/sửa/điều chuyển/thanh lý điều khiển nên không sửa tay được."}>
             <select value={status} onChange={(event) => setStatus(event.target.value)} disabled={!statusIsManual}>
               {Object.entries(EQUIPMENT_STATUS_LABELS)
                 .filter(([value]) => (statusIsManual ? MANUAL_STATUS_KEYS.includes(value) : value === status))
-                .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                .map(([value, label]) => <option key={value} value={value} disabled={value === "in_use_owner" && !isReadyCondition(condition)}>{label}</option>)}
             </select>
           </FormField>
           <FormField label="Vị trí"><input name="currentLocation" defaultValue={record?.currentLocation || ""} list="equipment-locations" placeholder="Kho Workshop, Tủ số 2..." /><datalist id="equipment-locations">{locationOptions.map((location) => <option key={location} value={location} />)}</datalist></FormField>
