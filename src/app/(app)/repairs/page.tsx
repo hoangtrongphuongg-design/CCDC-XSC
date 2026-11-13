@@ -1,5 +1,5 @@
 import { asc, desc, eq, inArray } from "drizzle-orm";
-import { CheckCircle2, Clock3, Plus, ShieldAlert, Wrench } from "lucide-react";
+import { CheckCircle2, Clock3, FileSpreadsheet, Plus, ShieldAlert, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, repairs } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
@@ -44,7 +44,18 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Sea
 
   return (
     <div className={`repair-mobile-page mobile-mode-${mobileMode}`}>
-      <PageHeader title="Sửa chữa" description="Báo hư, tiếp nhận, thực hiện sửa và xác nhận hoàn thành theo từng mã máy." />
+      <PageHeader
+        title="Sửa chữa"
+        description="Báo hư, tiếp nhận, thực hiện sửa và xác nhận hoàn thành theo từng mã máy."
+        actions={auth.isWorkshopAdmin && !auth.isReadOnlyViewer ? (
+          // Form GET tới route tải file: trình duyệt tải về, trang giữ nguyên. Để trống ngày = toàn bộ phiếu.
+          <form className="repair-export-bar" action="/repairs/export" method="get">
+            <label>Báo hỏng từ ngày<input type="date" name="from" /></label>
+            <label>Đến ngày<input type="date" name="to" /></label>
+            <Button type="submit" variant="secondary"><FileSpreadsheet size={16} aria-hidden="true" /> Xuất Excel phiếu sửa</Button>
+          </form>
+        ) : null}
+      />
       <section className="stat-grid">
         <StatCard title="Chờ tiếp nhận" value={pending} icon={Clock3} tone="warning" />
         <StatCard title="Sửa nội bộ" value={repairing} icon={Wrench} tone="primary" />
