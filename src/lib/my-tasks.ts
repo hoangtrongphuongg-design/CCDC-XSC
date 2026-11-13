@@ -151,17 +151,18 @@ export function buildMyTasks(subject: TaskSubject, input: MyTaskInput): MyTask[]
       add({ ...base, kind: "repair-accept", action: "Tiếp nhận sửa chữa", detail, tone: "orange" });
     } else if (row.status === "wait_owner_confirm" && isGroupMember(subject, row.ownerGroupId, "manager")) {
       add({ ...base, kind: "repair-confirm", action: "Nhận lại máy đã sửa", detail, tone: "orange" });
+    } else if (row.status === "wait_owner_receive" && isGroupMember(subject, row.ownerGroupId, "manager")) {
+      add({ ...base, kind: "repair-receive-irreparable", action: "Nhận lại máy không thể phục hồi", detail, tone: "red" });
     }
   }
 
   for (const row of input.disposals) {
     const base = { id: row.id, label: `${row.label} · ${row.code}`, since: row.updatedAt, href: "/disposals", section: "disposals" as const };
     const detail = `Nhóm quản lý: ${name(row.ownerGroupId)}`;
-    if (row.status === "pending_group" && isGroupMember(subject, row.ownerGroupId, "manager") && row.proposedBy !== subject.userId) {
-      add({ ...base, kind: "disposal-group", action: "Xác nhận đề xuất thanh lý", detail, tone: "red" });
-    } else if (row.status === "pending_ws" && isWsLevel(subject)) {
+    // pending_group: phiếu cũ từ trước khi bỏ bước "Nhóm xác nhận" — Quản lý Xưởng vẫn duyệt được.
+    if ((row.status === "pending_ws" || row.status === "pending_group") && isWsLevel(subject)) {
       add({ ...base, kind: "disposal-ws", action: "Duyệt thanh lý", detail, tone: "red" });
-    } else if (row.status === "wait_warehouse" && isGroupMember(subject, input.warehouseGroupId, "operator")) {
+    } else if (row.status === "wait_warehouse" && isWsLevel(subject)) {
       add({ ...base, kind: "disposal-warehouse", action: "Xác nhận nhập Kho thanh lý", detail, tone: "red" });
     }
   }

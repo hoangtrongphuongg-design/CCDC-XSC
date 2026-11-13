@@ -47,7 +47,7 @@ const statusMeta = {
 } as const;
 
 const openLoanStatuses = ["pending_owner", "approved", "wait_handover", "on_loan", "return_requested", "incident"] as const;
-const openRepairStatuses = ["pending_acceptance", "repairing", "wait_owner_confirm"] as const;
+const openRepairStatuses = ["pending_acceptance", "repairing", "wait_owner_confirm", "wait_owner_receive"] as const;
 const openQuickLoanStatuses = ["pending_approval", "pending_receipt", "borrowed", "return_reported"] as const;
 const openTransferStatuses = ["pending_source", "pending_target", "pending_ws", "wait_handover"] as const;
 

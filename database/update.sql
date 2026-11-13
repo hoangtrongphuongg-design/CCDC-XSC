@@ -249,3 +249,7 @@ ALTER TABLE inventory_sessions ALTER COLUMN created_by DROP NOT NULL;
 ALTER TABLE inventory_sessions ADD COLUMN IF NOT EXISTS period varchar(7);
 ALTER TABLE inventory_sessions ADD COLUMN IF NOT EXISTS auto_closed boolean NOT NULL DEFAULT false;
 CREATE UNIQUE INDEX IF NOT EXISTS inventory_sessions_group_period_unique ON inventory_sessions(group_id, period) WHERE period IS NOT NULL;
+
+-- V1.7.2: Luồng thanh lý mới. Máy sửa không được → "Chờ nhóm nhận lại (không sửa được)" → Đốc công nhóm nhận lại.
+-- Chỉ thêm giá trị enum (idempotent). Chạy TRƯỚC khi deploy code.
+ALTER TYPE repair_status ADD VALUE IF NOT EXISTS 'wait_owner_receive';

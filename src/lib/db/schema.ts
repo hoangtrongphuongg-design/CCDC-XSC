@@ -72,6 +72,7 @@ export const repairStatusEnum = pgEnum("repair_status", [
   "pending_acceptance",
   "repairing",
   "wait_owner_confirm",
+  "wait_owner_receive",
   "completed",
   "irreparable",
   "cancelled",

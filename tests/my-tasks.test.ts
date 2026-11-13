@@ -112,19 +112,26 @@ test("sửa chữa: Quản lý Xưởng tiếp nhận, nhóm chủ nhận lại;
   assert.deepEqual(run("wait_owner_confirm", subject({ isWsManager: true })), [], "Quản lý Xưởng không phải nhóm chủ");
 });
 
-test("thanh lý: nhóm xác nhận, Quản lý Xưởng duyệt, Kho thanh lý nhập kho", () => {
+test("thanh lý: Quản lý Xưởng duyệt và xác nhận nhập kho; không còn bước nhóm xác nhận", () => {
   const row = { ...base, code: "TL-1", ownerGroupId: A, proposedBy: OTHER };
   const run = (status: string, s: TaskSubject, extra: Partial<typeof row> = {}) =>
     keys(buildMyTasks(s, input({ disposals: [{ ...row, status, ...extra }] })));
-  assert.deepEqual(run("pending_group", subject({ perms: [[A, "manager"]] })), ["disposal-group"]);
-  assert.deepEqual(run("pending_group", subject({ perms: [[A, "manager"]] }), { proposedBy: ME }), [], "người đề xuất không tự xác nhận");
-  assert.deepEqual(run("pending_group", subject({ perms: [[A, "operator"]] })), []);
   assert.deepEqual(run("pending_ws", subject({ isWsManager: true })), ["disposal-ws"]);
-  assert.deepEqual(run("pending_ws", subject({ perms: [[A, "manager"]] })), []);
-  assert.deepEqual(run("wait_warehouse", subject({ perms: [[KHO, "operator"]] })), ["disposal-warehouse"]);
-  assert.deepEqual(run("wait_warehouse", subject({ perms: [[KHO, "viewer"]] })), []);
+  assert.deepEqual(run("pending_ws", subject({ isAdmin: true })), ["disposal-ws"]);
+  assert.deepEqual(run("pending_ws", subject({ perms: [[A, "manager"]] })), [], "Đốc công nhóm không còn bước xác nhận");
+  assert.deepEqual(run("pending_group", subject({ perms: [[A, "manager"]] })), [], "phiếu cũ pending_group: nhóm không có việc");
+  assert.deepEqual(run("pending_group", subject({ isWsManager: true })), ["disposal-ws"], "phiếu cũ pending_group: Quản lý Xưởng vẫn duyệt được");
+  assert.deepEqual(run("wait_warehouse", subject({ isWsManager: true })), ["disposal-warehouse"]);
+  assert.deepEqual(run("wait_warehouse", subject({ perms: [[KHO, "operator"]] })), [], "nhập kho do Quản lý Xưởng/Admin xác nhận");
   assert.deepEqual(run("wait_warehouse", subject({ perms: [[A, "manager"]] })), []);
-  assert.deepEqual(buildMyTasks(subject({ perms: [[KHO, "operator"]] }), input({ warehouseGroupId: null, disposals: [{ ...row, status: "wait_warehouse" }] })), []);
+});
+
+test("máy sửa không được: Đốc công nhóm chủ nhận lại; Quản lý Xưởng không phải nhóm chủ thì không có việc", () => {
+  const row = { ...base, code: "SC-2", ownerGroupId: A, status: "wait_owner_receive" };
+  const run = (s: TaskSubject) => keys(buildMyTasks(s, input({ repairs: [row] })));
+  assert.deepEqual(run(subject({ perms: [[A, "manager"]] })), ["repair-receive-irreparable"]);
+  assert.deepEqual(run(subject({ perms: [[A, "operator"]] })), []);
+  assert.deepEqual(run(subject({ isWsManager: true })), []);
 });
 
 test("Admin / Quản lý Xưởng không tự có việc của mọi nhóm; Người xem toàn xưởng không có việc nào", () => {
@@ -146,7 +153,7 @@ test("đếm theo mục menu, sắp việc chờ lâu nhất lên đầu, huy hi
     loans: [{ ...base, id: "l1", status: "pending_owner", ownerGroupId: A, borrowerGroupId: B, requestedBy: OTHER, expectedReturnDate: "2026-12-01", updatedAt: new Date("2026-11-05T00:00:00Z") }],
     transfers: [{ ...base, id: "t1", status: "pending_ws", sourceGroupId: A, targetGroupId: B, proposedBy: OTHER, handedOver: false, updatedAt: new Date("2026-11-02T00:00:00Z") }],
     repairs: [{ ...base, id: "r1", status: "pending_acceptance", ownerGroupId: A, updatedAt: new Date("2026-11-03T00:00:00Z") }],
-    disposals: [{ ...base, id: "d1", status: "pending_group", ownerGroupId: A, proposedBy: OTHER, updatedAt: new Date("2026-11-04T00:00:00Z") }],
+    disposals: [{ ...base, id: "d1", status: "pending_ws", ownerGroupId: A, proposedBy: OTHER, updatedAt: new Date("2026-11-04T00:00:00Z") }],
   }));
   assert.deepEqual(tasks.map((t) => t.section), ["transfers", "repairs", "disposals", "loans"]);
   assert.deepEqual(countBySection(tasks), { loans: 1, transfers: 1, repairs: 1, disposals: 1, inventory: 0 });

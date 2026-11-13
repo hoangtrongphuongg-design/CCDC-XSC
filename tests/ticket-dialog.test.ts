@@ -95,7 +95,7 @@ test("bảng Đã hoàn thành không có cột Thao tác; bảng Chờ xử lý
 
 test("nút gửi trong cửa sổ giữ màu xanh (Button primary), chỉ nút nổi ngoài trang màu đỏ; lỗi trả về dạng dữ liệu", async () => {
   const dialog = await source("src/components/ticket-dialog.tsx");
-  assert.match(dialog, /<Button type="submit" disabled=\{pending\}>/);
+  assert.match(dialog, /<Button type="submit" disabled=\{pending \|\| submitDisabled\}>/);
   assert.doesNotMatch(dialog, /variant="danger"/);
   assert.match(dialog, /className="ticket-fab"/);
   assert.match(dialog, /event\.preventDefault\(\)/, "không dùng form action để khỏi bị xóa ô khi lỗi");
@@ -119,4 +119,13 @@ test("thống kê thu gọn ở các trang Điều chuyển / Sửa chữa / Tha
   for (const path of ["machine-loans", "quick-loans", "transfers", "repairs", "disposals"]) {
     assert.match(await source(`src/actions/${path}.ts`), /setFlashMessage\("success", "Đã tạo phiếu thành công"/, path);
   }
+});
+
+test("trang Thanh lý: nút đỏ luôn hiện theo quyền tạo phiếu (không ẩn khi chưa có máy đủ điều kiện); cửa sổ giải thích và khóa nút gửi", async () => {
+  const page = await source("src/app/(app)/disposals/page.tsx");
+  assert.doesNotMatch(page, /disposableEquipment\.length > 0 &&|disposableTools\.length > 0 &&/, "nút không phụ thuộc số máy đủ điều kiện");
+  assert.match(page, /const canCreate = !auth\.isReadOnlyViewer && \(auth\.isWorkshopAdmin \|\|/);
+  assert.match(page, /submitDisabled=\{disposableEquipment\.length === 0\}/);
+  assert.match(page, /submitDisabled=\{disposableTools\.length === 0\}/);
+  assert.match(await source("src/components/ticket-dialog.tsx"), /disabled=\{pending \|\| submitDisabled\}/);
 });

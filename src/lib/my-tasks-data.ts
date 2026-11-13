@@ -47,7 +47,7 @@ async function compute(subject: TaskSubject): Promise<MyTask[]> {
       id: repairs.id, code: repairs.code, status: repairs.status, updatedAt: repairs.updatedAt,
       ownerGroupId: equipment.ownerGroupId, equipmentCode: equipment.code, equipmentName: equipment.name,
     }).from(repairs).innerJoin(equipment, eq(equipment.id, repairs.equipmentId))
-      .where(inArray(repairs.status, ["pending_acceptance", "wait_owner_confirm"])),
+      .where(inArray(repairs.status, ["pending_acceptance", "wait_owner_confirm", "wait_owner_receive"])),
     db.select({
       id: disposals.id, code: disposals.code, status: disposals.status, updatedAt: disposals.updatedAt,
       ownerGroupId: disposals.ownerGroupId, proposedBy: disposals.proposedBy, equipmentCode: equipment.code, equipmentName: equipment.name,
