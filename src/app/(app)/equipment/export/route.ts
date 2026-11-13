@@ -36,9 +36,9 @@ export async function GET(request: Request) {
       transfer: workshop.transferByEquipment.get(row.id),
       repair: workshop.repairByEquipment.get(row.id),
     }))
-    .filter((row) => matchesEquipmentFilters({ ownerGroupId: row.ownerGroupId, status: row.status, condition: row.condition, categoryCode: row.categoryCode }, filters))
+    .filter((row) => matchesEquipmentFilters({ ownerGroupId: row.ownerGroupId, condition: row.condition, categoryCode: row.categoryCode }, filters))
     .filter((row) => matchesSearch(equipmentSearchValues(row), query));
-  // CCDC theo số lượng không có trạng thái / tình trạng: lọc hai mục đó thì không xuất bảng này.
+  // CCDC theo số lượng không có tình trạng: đang lọc tình trạng thì không xuất bảng này.
   const filteredTools = filtersHideTools(filters)
     ? []
     : tools.filter((tool) => matchesToolFilters(tool, filters)).filter((tool) => matchesSearch(toolSearchValues(tool), query));
