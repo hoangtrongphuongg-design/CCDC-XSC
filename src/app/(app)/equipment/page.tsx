@@ -224,12 +224,10 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         </form>
       </section>
 
-      {hasActiveFilters(filters) ? (
-        <div className="equipment-filter-chips" aria-label="Bộ lọc đang áp dụng">
-          <span>Hiển thị <b>{filteredRows.length}</b> / {listRows.length} máy</span>
-          {describeFilters(filters, { groupName: (id) => groupMap.get(id) ?? "—" }).map((chip) => (
-            <Link key={chip.key} className="filter-chip" href={buildFilterHref("/equipment", filters, { omit: chip.key })} aria-label={`Bỏ lọc ${chip.text}`}>{chip.text} <span aria-hidden="true">✕</span></Link>
-          ))}
+      {/* Chỉ từ khóa mới cần chip (không có ô nhập nào hiển thị nó); Nhóm / Tình trạng / Nhóm thiết bị đã hiện ngay trong ô lọc. */}
+      {filters.q ? (
+        <div className="equipment-filter-chips" aria-label="Từ khóa đang tìm">
+          <Link className="filter-chip" href={buildFilterHref("/equipment", filters, { omit: "q" })} aria-label={`Bỏ từ khóa ${filters.q}`}>Từ khóa “{filters.q}” <span aria-hidden="true">✕</span></Link>
         </div>
       ) : null}
 
@@ -237,6 +235,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         active={tab}
         counts={{ machines: filteredByTab.machines.length, tools: filteredToolRows.length, disposal: filteredByTab.disposal.length, lost: filteredByTab.lost.length }}
         hrefFor={(next) => pageHref({ tab: next })}
+        summary={hasActiveFilters(filters) && !showTools ? <>Hiển thị <b>{filteredRows.length}</b> / {listRows.length} máy</> : null}
       />
 
       {!showTools ? (
@@ -264,14 +263,6 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
               )}
             </section>
           ) : null}
-
-          {/* Tóm tắt theo Tình trạng: các số bấm được (lọc Tình trạng). */}
-          <nav className="loan-chips" aria-label="Tóm tắt theo tình trạng">
-            <Link className={`loan-chip${!filters.condition ? " is-active" : ""}`} href={buildFilterHref("/equipment", filters, { omit: "condition" })}>Tất cả <b>{baseRows.length}</b></Link>
-            {CONDITION_FILTER_OPTIONS.map(([value, label]) => (
-              <Link key={value} className={`loan-chip${filters.condition === value ? " is-active" : ""}${value !== "good" && (conditionCounts[value] ?? 0) > 0 ? " is-alert" : ""}`} href={buildFilterHref("/equipment", filters, { override: { condition: value } })}>{label} <b>{conditionCounts[value] ?? 0}</b></Link>
-            ))}
-          </nav>
 
           <Card className="table-card">
             <CardHeader><CardTitle>{EQUIPMENT_TAB_LABELS[listTab].title}</CardTitle></CardHeader>
