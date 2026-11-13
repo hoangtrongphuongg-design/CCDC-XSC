@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { equipmentStatusDisplay } from "@/lib/repair-display";
-import { Boxes, CircleCheck, FileSpreadsheet, PackageOpen, Search, Wrench } from "lucide-react";
+import { Boxes, CircleCheck, FileSpreadsheet, PackageOpen, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, repairs, toolCatalog } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
@@ -121,17 +121,6 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
       <PageHeader
         title="Dụng cụ toàn xưởng"
         description="Trang tra cứu tập trung, chỉ xem. Việc thêm và cập nhật dụng cụ được thực hiện tại Dụng cụ nhóm tôi."
-        actions={
-          // Tải file qua route handler: dùng <a> thường, không dùng next/link để không prefetch. Xuất đúng phần đang lọc.
-          <a
-            className="btn btn-secondary"
-            href={buildFilterHref("/equipment/export", filters)}
-            download
-            title={hasActiveFilters(filters) ? "Xuất Excel đúng phần đang lọc / tìm" : "Xuất Excel toàn bộ dụng cụ, phân theo nhóm"}
-          >
-            <FileSpreadsheet size={16} aria-hidden="true" /> Xuất Excel{hasActiveFilters(filters) ? " (đang lọc)" : ""}
-          </a>
-        }
       />
 
       <section className="stat-grid">
@@ -149,13 +138,10 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         </a>
       </section>
 
-      <details className="equipment-filter-panel" open={hasActiveFilters(filters)}>
-        <summary>Tìm và lọc{hasActiveFilters(filters) ? ` (đang lọc)` : ""}</summary>
-        <form className="equipment-filter-bar" action="/equipment" method="get" role="search">
-          <label className="equipment-filter-search">
-            <span><Search size={14} aria-hidden="true" /> Tìm</span>
-            <input name="q" defaultValue={filters.q} placeholder="Mã hệ thống, tem nhôm, tên máy, loại, nhóm, vị trí..." aria-label="Tìm dụng cụ toàn xưởng" />
-          </label>
+      <section className="equipment-filter-panel" aria-labelledby="equipment-filter-title">
+        <h2 className="equipment-filter-title" id="equipment-filter-title">Bộ lọc{hasActiveFilters(filters) ? " (đang lọc)" : ""}</h2>
+        <form className="equipment-filter-bar" action="/equipment" method="get">
+          {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
           <label>
             <span>Nhóm quản lý</span>
             <select name="group" defaultValue={filters.group}>
@@ -192,9 +178,18 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
           <div className="equipment-filter-actions">
             <button type="submit" className="btn btn-primary">Lọc</button>
             {hasActiveFilters(filters) ? <Link className="btn btn-secondary" href="/equipment">Xóa bộ lọc</Link> : null}
+            {/* Tải file qua route handler: dùng <a> thường, không dùng next/link để không prefetch. Xuất đúng phần đang lọc. */}
+            <a
+              className="btn btn-secondary"
+              href={buildFilterHref("/equipment/export", filters)}
+              download
+              title={hasActiveFilters(filters) ? "Xuất Excel đúng phần đang lọc" : "Xuất Excel toàn bộ dụng cụ, phân theo nhóm"}
+            >
+              <FileSpreadsheet size={16} aria-hidden="true" /> Xuất Excel{hasActiveFilters(filters) ? " (đang lọc)" : ""}
+            </a>
           </div>
         </form>
-      </details>
+      </section>
 
       {hasActiveFilters(filters) ? (
         <div className="equipment-filter-chips" aria-label="Bộ lọc đang áp dụng">

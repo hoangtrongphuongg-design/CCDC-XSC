@@ -81,6 +81,15 @@ test("trang và file Excel dùng chung bộ lọc; bảng CCDC theo số lượn
   assert.match(page, /matchesEquipmentFilters\(row, filters\)/);
   assert.match(page, /hideTools \? \[\] : toolRows\.filter\(\(tool\) => matchesToolFilters\(tool, filters\)\)/);
   assert.match(page, /action="\/equipment" method="get"/);
+  assert.match(page, /<section className="equipment-filter-panel"/, "khung lọc bung sẵn");
+  assert.doesNotMatch(page, /equipment-global-search/, "ô tìm kiếm đã có ở thanh trên nên trang không lặp lại");
+  const filterForm = page.slice(page.indexOf('<form className="equipment-filter-bar"'), page.indexOf("</form>", page.indexOf('<form className="equipment-filter-bar"')));
+  assert.doesNotMatch(filterForm, /<input name="q"/, "khung lọc không còn ô tìm chữ");
+  assert.match(filterForm, /Xuất Excel/, "nút Xuất Excel nằm trong khung lọc");
+  const header = page.slice(page.indexOf("<PageHeader"), page.indexOf("/>", page.indexOf("<PageHeader")));
+  assert.doesNotMatch(header, /Xuất Excel/, "đầu trang không còn nút Xuất Excel");
+  assert.doesNotMatch(page, /<details className="equipment-filter-panel"/, "không còn gập");
+  assert.match(await source("src/app/ui-current.css"), /\.equipment-filter-panel \{[^}]*border: 2px solid #F08C1A/, "viền cam");
   assert.match(page, /className=\{`stat-card-link/);
   assert.match(page, /buildFilterHref\("\/equipment\/export", filters\)/, "nút Xuất Excel đi theo bộ lọc");
   const route = await source("src/app/(app)/equipment/export/route.ts");
