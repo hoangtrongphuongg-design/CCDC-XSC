@@ -333,6 +333,13 @@ function AssetForm({
     setCondition("good");
   }, [originType, mode]);
 
+  // Máy đã có mã: Tên / Nhóm thiết bị / Loại là danh tính, người thường không đổi được (backend cũng chặn).
+  const identityLocked = isEditing && !isWorkshopAdmin;
+  const identityNote = isEditing && record
+    ? isWorkshopAdmin
+      ? "Danh tính máy gắn với mã hệ thống. Đổi ở đây cần ghi “Lý do hiệu chỉnh” ở cuối form và được ghi vào lịch sử."
+      : `Cố định theo mã ${record.code}. Muốn đổi chủng loại hãy tạo mã mới; nhập sai thì nhờ Quản lý Xưởng hiệu chỉnh.`
+    : undefined;
   const defaultLegacyCode = isClone ? "" : record?.legacyCode || "";
   const defaultSerial = isClone ? "" : record?.serial || "";
   const defaultRecordedDate = record?.recordedDate || todayIso();
@@ -450,7 +457,7 @@ function AssetForm({
       <section className="asset-form-section">
         <div className="asset-section-heading"><div><span>02</span><div><strong>Thông tin nhận dạng</strong><small>Mã hệ thống được cấp tự động; tem nhôm là mã đã gắn trên máy, dùng để đối chiếu máy ngoài thực tế.</small></div></div></div>
         <div className="form-grid two">
-          <FormField label="Tên CCDC" required><input name="name" defaultValue={record?.name || ""} placeholder="Ví dụ: Máy hàn MIG Panasonic" /></FormField>
+          <FormField label="Tên CCDC" required hint={identityNote}><input name="name" defaultValue={record?.name || ""} readOnly={identityLocked} aria-readonly={identityLocked} className={identityLocked ? "is-locked" : undefined} placeholder="Ví dụ: Máy hàn MIG Panasonic" /></FormField>
           <FormField label="Tem nhôm / mã đã gán"><input name="legacyCode" defaultValue={defaultLegacyCode} placeholder="Ví dụ: MH-05" /></FormField>
           <FormField label="Hãng"><input name="brand" defaultValue={record?.brand || ""} placeholder="Bosch, Makita, Enerpac..." /></FormField>
           <FormField label="Model"><input name="model" defaultValue={record?.model || ""} /></FormField>
@@ -462,8 +469,9 @@ function AssetForm({
       <section className="asset-form-section">
         <div className="asset-section-heading"><div><span>03</span><div><strong>Phân loại CCDC</strong><small>Chọn nhóm thiết bị và loại dụng cụ. Có thể nhập loại mới nếu chưa có trong gợi ý.</small></div></div></div>
         <div className="form-grid two">
-          <FormField label="Nhóm thiết bị" required>
-            <select name="categoryCode" value={categoryCode} onChange={(event) => setCategoryCode(event.target.value)}>
+          <FormField label="Nhóm thiết bị" required hint={identityNote}>
+            {identityLocked ? <input type="hidden" name="categoryCode" value={categoryCode} /> : null}
+            <select name={identityLocked ? undefined : "categoryCode"} value={categoryCode} onChange={(event) => setCategoryCode(event.target.value)} disabled={identityLocked}>
               {disciplineOrder.map((discipline) => (
                 <optgroup key={discipline} label={EQUIPMENT_DISCIPLINE_LABELS[discipline]}>
                   {EQUIPMENT_CATEGORIES.filter((category) => category.discipline === discipline).map((category) => <option key={category.code} value={category.code}>{category.name}</option>)}
@@ -471,8 +479,8 @@ function AssetForm({
               ))}
             </select>
           </FormField>
-          <FormField label="Loại dụng cụ" required hint="Nếu gõ loại mới, hệ thống sẽ ghi nhận để dùng cho các lần nhập sau.">
-            <input name="equipmentType" defaultValue={record?.equipmentType || ""} list={`equipment-types-${categoryCode}`} placeholder="Ví dụ: Máy hàn MIG/MAG" />
+          <FormField label="Loại dụng cụ" required hint={identityLocked ? undefined : "Nếu gõ loại mới, hệ thống sẽ ghi nhận để dùng cho các lần nhập sau."}>
+            <input name="equipmentType" defaultValue={record?.equipmentType || ""} readOnly={identityLocked} aria-readonly={identityLocked} className={identityLocked ? "is-locked" : undefined} list={identityLocked ? undefined : `equipment-types-${categoryCode}`} placeholder="Ví dụ: Máy hàn MIG/MAG" />
             <datalist id={`equipment-types-${categoryCode}`}>{dynamicTypeSuggestions.map((type) => <option key={type} value={type} />)}</datalist>
           </FormField>
         </div>
@@ -987,7 +995,7 @@ export function EquipmentWorkspace({
         )}
       </div>
 
-      {toolEditing ? <ToolEditDialog key={toolEditing.id} tool={toolEditing} onClose={() => setToolEditing(null)} /> : null}
+      {toolEditing ? <ToolEditDialog key={toolEditing.id} tool={toolEditing} canChangeIdentity={isWorkshopAdmin && !isReadOnlyViewer} onClose={() => setToolEditing(null)} /> : null}
       {toolAdjusting ? <ToolAdjustDialog key={toolAdjusting.id} tool={toolAdjusting} onClose={() => setToolAdjusting(null)} /> : null}
 
       {editorOpen ? <div className="asset-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}>
