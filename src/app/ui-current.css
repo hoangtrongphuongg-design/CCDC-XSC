@@ -3154,9 +3154,6 @@ body {
 .inventory-tools-tag { color: var(--primary); font-weight: 700; }
 
 /* Dụng cụ toàn xưởng: tab, một cột Trạng thái, phân trang */
-.equipment-tabs { margin: 0 0 12px; grid-template-columns: repeat(4, minmax(0, auto)); }
-@media (max-width: 760px) { .equipment-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.equipment-tabs b { margin-left: 6px; font-variant-numeric: tabular-nums; }
 .status-stack { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; }
 .pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 4px 2px; font-size: 13px; color: var(--text-secondary, #475569); }
 .pager-pages { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -3172,3 +3169,17 @@ body {
 .inventory-tool-drift { display: block; margin-top: 4px; color: #b54708; font-size: 12px; font-weight: 750; }
 .inventory-tool-meta { color: var(--text-muted); font-size: 12px; }
 .equipment-tab-note { margin: 0 0 10px; font-size: 13px; }
+
+/* Dụng cụ toàn xưởng: tab MỘT hàng + dòng tóm tắt bên phải */
+.equipment-tabs-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 12px; }
+.equipment-tabs { display: flex; gap: 4px; padding: 4px; border: 1px solid #dce4ea; border-radius: 11px; background: #eef3f7; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.equipment-tabs::-webkit-scrollbar { display: none; }
+.equipment-tabs a { display: inline-flex; flex: none; align-items: center; gap: 7px; min-height: 36px; padding: 0 14px; border-radius: 8px; color: #617080; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.equipment-tabs a:hover { color: var(--primary); }
+.equipment-tabs a.is-active { color: var(--primary); background: #fff; box-shadow: 0 1px 4px rgba(15,35,55,.08); }
+.equipment-tabs a.is-empty { opacity: .55; }
+.equipment-tabs b { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: #dfe8ef; color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
+.equipment-tabs a.is-active b { background: var(--primary-soft); color: var(--primary); }
+.equipment-tabs-summary { color: var(--text-secondary, #475569); font-size: 13px; }
+.equipment-tabs-summary b { color: var(--text); font-variant-numeric: tabular-nums; }
+@media (pointer: coarse) { .equipment-tabs a { min-height: 44px; } }

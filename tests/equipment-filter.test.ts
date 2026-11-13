@@ -137,3 +137,17 @@ test("trang và Excel: danh sách chính không còn máy thanh lý / đã mất
   assert.match(route, /listTab !== "machines" \|\| filtersHideTools\(filters\)/, "tab thanh lý / mất không kèm CCDC số lượng");
   assert.match(await source("src/components/equipment-tabs.tsx"), /label: "Thanh lý"[\s\S]*label: "Đã mất"/);
 });
+
+test("vùng dưới khung lọc gọn: một hàng tab (số cùng dòng), không còn hàng chip tình trạng / chip bộ lọc lặp ô lọc; chỉ chip từ khóa", async () => {
+  const page = await source("src/app/(app)/equipment/page.tsx");
+  assert.doesNotMatch(page, /loan-chips|Tóm tắt theo tình trạng/, "bỏ hàng chip tình trạng (ô lọc đã có số đếm)");
+  assert.doesNotMatch(page, /describeFilters\(filters/, "bỏ chip Nhóm / Tình trạng / Nhóm thiết bị lặp ô lọc");
+  assert.match(page, /filters\.q \? \(/, "giữ chip từ khóa vì không có ô nhập hiển thị nó");
+  assert.match(page, /summary=\{hasActiveFilters\(filters\)/, "dòng Hiển thị x / y nằm cùng hàng tab");
+  assert.match(page, /\{CONDITION_FILTER_OPTIONS\.map\(\(\[value, label\]\) => <option key=\{value\} value=\{value\}>\{label\} \(\{conditionCounts\[value\] \?\? 0\}\)<\/option>\)\}/, "số đếm Tình trạng nằm trong ô lọc");
+  const tabs = await source("src/components/equipment-tabs.tsx");
+  assert.match(tabs, /label: "CCDC số lượng"/);
+  assert.match(tabs, /counts\[tab\.key\] === 0 && active !== tab\.key && "is-empty"/);
+  const css = await source("src/app/ui-current.css");
+  assert.match(css, /\.equipment-tabs \{ display: flex;[^}]*overflow-x: auto/, "điện thoại: tab cuộn ngang trong một hàng");
+});
