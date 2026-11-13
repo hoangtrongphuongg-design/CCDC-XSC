@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 180 pass
+npm test           # tsx --test tests/*.test.ts — 187 pass
 ```
 
 Không có ESLint script.
@@ -146,6 +146,7 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 
 ### Xuất Excel
 
+- **Xuất Mượn – Trả và Điều chuyển** (chỉ Quản lý Xưởng/Admin, 403 với người khác; thanh `components/export-bar.tsx` ở đầu trang, lọc theo **ngày đề nghị/đề xuất** giờ VN, để trống = toàn bộ, tối đa 20.000 dòng mỗi loại): `GET /machine-loans/export` (nút ở cả hai tab Mượn máy và CCDC lặt vặt) tải MỘT file 3 sheet **Mượn máy / Mượn nhanh / Tổng hợp**; `GET /transfers/export` tải file 2 sheet **Điều chuyển / Tổng hợp**. Cột ngày là ngày thật, số lượng mượn nhanh là số, cột "Số ngày trễ" = đang giữ quá hạn hoặc trả trễ (trống nếu đúng hạn). Phân tầng: `lib/loans-export.ts` (hàm thuần, test) → `lib/loans-export-data.ts` → `lib/export/loan-workbook.ts` → route.
 - **Xuất phiếu sửa chữa** (`GET /repairs/export?from=&to=`, chỉ Quản lý Xưởng/Admin, 403 với người khác): nút + 2 ô ngày ở đầu trang Sửa chữa; lọc theo **ngày báo hỏng** (giờ VN), **để trống = toàn bộ phiếu**, tối đa 20.000 dòng. Sheet "Phiếu sửa chữa" (25 cột: ngày báo hỏng / tiếp nhận / gửi thuê ngoài / nhận về hoàn tất / nhóm nhận lại, hình thức nội bộ-thuê ngoài, đơn vị sửa ngoài, chi phí dạng số — **để trống khi chưa nhập (0)**, 3 cột số ngày, dòng tổng chi phí) + sheet "Tổng hợp" (theo trạng thái, hình thức, tháng, nhóm). **Ngày gửi thuê ngoài không có cột riêng**: lấy từ nhật ký `repair.external` (xóa nhật ký thì ô trống). Phân tầng: `lib/repairs-export.ts` (hàm thuần, test) → `lib/repairs-export-data.ts` → `lib/export/repair-workbook.ts` → route.
 - Hai route `GET` (tải file, không phải trang): `/equipment/export?q=` (báo cáo toàn xưởng, mọi tài khoản đã đăng nhập, 1 sheet phân nhóm quản lý → loại) và `/my-equipment/export?group=<id|all>` (kiểm kê, chỉ nhóm trong phạm vi quyền, 403 nếu ngoài). Route handler **không đi qua `(app)/layout.tsx`** nên tự gọi `getActiveAuthOrNull()` (`guards.ts`) và chuyển `/login` nếu chưa đăng nhập.
 - Thư viện `exceljs` (chỉ server; `serverExternalPackages` trong `next.config.ts`). Chuỗi người dùng nhập luôn ghi dạng text, công thức duy nhất là cột "Chênh lệch" của sheet kiểm kê CCDC theo số lượng.

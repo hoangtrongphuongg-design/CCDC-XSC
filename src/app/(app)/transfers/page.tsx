@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { workflowTone } from "@/lib/status-style";
 import { Button } from "@/components/ui/button";
+import { ExportBar } from "@/components/export-bar";
 import { FormField } from "@/components/ui/form-field";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
@@ -60,7 +61,11 @@ export default async function TransfersPage() {
 
   return (
     <>
-      <PageHeader title="Điều chuyển" description="Chuyển quyền quản lý cố định sang nhóm khác; mã máy được giữ nguyên suốt vòng đời." />
+      <PageHeader
+        title="Điều chuyển"
+        description="Chuyển quyền quản lý cố định sang nhóm khác; mã máy được giữ nguyên suốt vòng đời."
+        actions={auth.isWorkshopAdmin && !auth.isReadOnlyViewer ? <ExportBar action="/transfers/export" buttonLabel="Xuất Excel điều chuyển" fromLabel="Đề xuất từ ngày" /> : null}
+      />
       <section className="stat-grid">
         <StatCard title="Chờ nhóm xác nhận" value={waitingGroups} icon={Clock3} tone="warning" />
         <StatCard title="Chờ Quản lý Xưởng duyệt" value={waitingWs} icon={ArrowLeftRight} tone="violet" />
