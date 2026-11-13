@@ -2041,7 +2041,6 @@ body {
   .content-grid { display: flex; flex-direction: column; }
   .content-grid > .side-panel { order: -1; }
   .content-grid > .table-card { order: 2; }
-  body:has(.side-panel form[action*="machine"]) .stat-grid { display: none; }
 }
 
 .mobile-loan-return-list { display: none; }
@@ -2084,9 +2083,6 @@ body {
   .loan-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 10px; }
   .loan-tabs a { min-height: 38px; padding: 6px 8px; font-size: 12px; }
   .loan-mobile-page .content-grid { display: flex; flex-direction: column; gap: 10px; }
-  .loan-mobile-page .side-panel { order: -1; }
-  .loan-mobile-page .side-panel .card-header { min-height: 48px; padding: 11px 13px; }
-  .loan-mobile-page .side-panel .card-content { padding: 12px; }
   .loan-mobile-page .form-grid { gap: 10px; }
   .loan-mobile-page .form-field label { font-size: 12px; }
   .loan-mobile-page .form-field small { font-size: 12px; line-height: 1.35; }
@@ -2361,16 +2357,12 @@ body {
 @media (max-width: 760px) {
   .mobile-profile-account-actions { display: block; }
 
-  .loan-mobile-page:not(.mobile-mode-create) .side-panel { display: none !important; }
   .loan-mobile-page.mobile-mode-create .mobile-loan-action-inbox,
   .loan-mobile-page.mobile-mode-create .mobile-loan-return-list { display: none !important; }
-  .loan-mobile-page.mobile-mode-create .side-panel { display: block !important; order: -1; }
   .loan-mobile-page.mobile-mode-return .mobile-loan-action-inbox { display: none !important; }
   .repair-mobile-page > .page-header,
   .repair-mobile-page > .stat-grid { display: none !important; }
   .repair-mobile-page .table-card { display: none !important; }
-  .repair-mobile-page:not(.mobile-mode-create) .side-panel { display: none !important; }
-  .repair-mobile-page.mobile-mode-create .side-panel { display: block !important; }
   .repair-mobile-page.mobile-mode-create .mobile-repair-list { display: none !important; }
   .mobile-repair-list { display: grid; gap: 8px; margin: 0 0 12px; }
   .mobile-repair-card { padding: 11px 12px; border: 1px solid var(--border); border-radius: 12px; background: #fff; box-shadow: var(--shadow-xs); }
@@ -2994,3 +2986,145 @@ body {
 .filter-chip:hover { background: #e3eef7; }
 @media (pointer: coarse) { .filter-chip { min-height: 44px; } }
 
+/* ===== Trang nghiệp vụ: nút đỏ "Tạo phiếu" nổi + cửa sổ nhập + 2 bảng riêng + thống kê gọn ===== */
+.has-ticket-fab { padding-bottom: 88px; }
+.ticket-fab {
+  position: fixed;
+  right: 28px;
+  bottom: calc(24px + var(--ticket-slot, 0) * 60px);
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #d92d20;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(217, 45, 32, .38), 0 2px 6px rgba(15, 23, 42, .18);
+}
+.ticket-fab:hover { background: #b42318; }
+.ticket-fab:focus-visible { outline: 3px solid rgba(217, 45, 32, .35); outline-offset: 2px; }
+@media print { .ticket-fab { display: none; } }
+@media (max-width: 760px) {
+  .ticket-fab { right: 14px; bottom: calc(88px + var(--ticket-slot, 0) * 60px); }
+}
+
+.ticket-modal { width: min(640px, 100%); }
+.ticket-form { display: grid; gap: 14px; align-content: start; padding: 20px 24px 0; }
+.ticket-fields { gap: 14px; }
+.ticket-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(180, 35, 24, .28);
+  border-radius: 10px;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 650;
+}
+.ticket-error svg { flex: none; margin-top: 1px; }
+.ticket-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0 -24px;
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--border);
+  background: #fff;
+}
+@media (max-width: 760px) {
+  .ticket-form { padding: 16px 16px 0; }
+  .ticket-actions { margin: 0 -16px; padding: 12px 16px 16px; }
+  .ticket-actions .btn { flex: 1; }
+}
+
+/* Hai bảng riêng: Chờ xử lý / Đã hoàn thành */
+.ticket-table { margin-bottom: 16px; }
+.ticket-table .card-header { align-items: center; }
+.ticket-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.ticket-table.is-done .ticket-count { background: #eef3f7; color: #617080; }
+.ticket-table.is-done { opacity: .96; }
+.due-cell { display: inline-grid; gap: 2px; }
+.late-note { color: #b42318; font-size: 12px; font-weight: 800; }
+/* Ô Thao tác gọn để bảng vừa khung, không cuộn ngang */
+.ticket-table .row-actions { justify-content: flex-start; gap: 6px; }
+.ticket-table .row-actions form { display: contents; }
+.ticket-table .row-actions .field-inline-lg,
+.ticket-table .row-actions .field-inline-md { width: 130px !important; }
+
+/* Hàng đầu trang Mượn – Trả: tiêu đề + tab + xuất Excel; thanh lọc nhanh bấm được */
+.loan-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px; margin-bottom: 12px; }
+.loan-head-main { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; min-width: 0; }
+.loan-head h1 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -.02em; }
+.loan-head .loan-tabs { margin-bottom: 0; }
+.loan-head-export .repair-export-bar { margin: 0; }
+.loan-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.loan-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text-secondary, #475569);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.loan-chip b { font-variant-numeric: tabular-nums; color: var(--text); }
+.loan-chip:hover { border-color: var(--primary); color: var(--primary); }
+.loan-chip.is-active { border-color: var(--primary); background: var(--primary); color: #fff; }
+.loan-chip.is-active b { color: #fff; }
+.loan-chip.is-alert:not(.is-active) { border-color: rgba(180, 35, 24, .4); background: #fef3f2; color: #b42318; }
+.loan-chip.is-alert:not(.is-active) b { color: #b42318; }
+.loan-chip.is-done { margin-left: auto; background: #eef3f7; }
+@media (pointer: coarse) { .loan-chip { min-height: 44px; } }
+@media (max-width: 760px) {
+  .loan-head h1,
+  .loan-head-export,
+  .loan-chips { display: none; }
+  .loan-head { margin-bottom: 0; }
+  .loan-head .loan-tabs { margin-bottom: 10px; width: 100%; }
+}
+
+/* Thống kê thu gọn (một dòng nhỏ mỗi ô) — dùng cho các trang nghiệp vụ */
+.stat-grid.compact { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stat-grid.compact .stat-card { min-height: 0; padding: 8px 12px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; border-radius: 12px; }
+.stat-grid.compact .stat-card::after,
+.stat-grid.compact .stat-corner,
+.stat-grid.compact .stat-copy small { display: none; }
+.stat-grid.compact .stat-icon { width: 30px; height: 30px; box-shadow: 0 0 0 4px var(--stat-soft, var(--primary-soft)); }
+.stat-grid.compact .stat-icon-ring { inset: -4px; border-width: 1.5px; }
+.stat-grid.compact .stat-icon svg { width: 15px; height: 15px; }
+.stat-grid.compact .stat-copy { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.stat-grid.compact .stat-copy span { font-size: 12px; line-height: 1.25; }
+.stat-grid.compact .stat-copy strong { font-size: 20px; line-height: 1; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .stat-grid.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-grid.compact .stat-card { min-height: 0; padding: 8px 10px; }
+}

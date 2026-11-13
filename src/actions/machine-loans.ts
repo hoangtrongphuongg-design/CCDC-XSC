@@ -92,7 +92,7 @@ export async function createMachineLoanAction(formData: FormData) {
 
   refresh();
 
-  await setFlashMessage("success", 'Đã gửi đề nghị mượn');
+  await setFlashMessage("success", "Đã tạo phiếu thành công", "Đề nghị mượn máy đã gửi nhóm cho mượn duyệt");
 }
 
 /**

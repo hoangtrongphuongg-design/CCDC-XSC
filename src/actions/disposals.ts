@@ -46,7 +46,7 @@ export async function createDisposalAction(formData: FormData) {
   });
   refresh();
 
-  await setFlashMessage("success", 'Đã tạo đề nghị thanh lý');
+  await setFlashMessage("success", "Đã tạo phiếu thành công", "Đề xuất thanh lý máy đã gửi nhóm xác nhận");
 }
 
 export async function confirmDisposalByGroupAction(formData: FormData) {
@@ -164,7 +164,7 @@ export async function createToolDisposalAction(formData: FormData) {
     });
   });
   refresh();
-  await setFlashMessage("success", "Đã tạo đề nghị thanh lý CCDC");
+  await setFlashMessage("success", "Đã tạo phiếu thành công", "Đề xuất thanh lý CCDC đã gửi nhóm xác nhận");
 }
 
 export async function confirmToolDisposalByGroupAction(formData: FormData) {

@@ -102,7 +102,7 @@ export async function createQuickLoanAction(formData: FormData) {
 
   refresh();
 
-  await setFlashMessage("success", 'Đã tạo phiếu mượn nhanh');
+  await setFlashMessage("success", "Đã tạo phiếu thành công", "Đề nghị mượn nhanh đã gửi nhóm cho mượn duyệt");
 }
 
 /** Kỹ sư giám sát hoặc Đốc công nhóm cho mượn đều có quyền duyệt. */

@@ -66,7 +66,7 @@ export async function createTransferAction(formData: FormData) {
   });
   refresh();
 
-  await setFlashMessage("success", 'Đã gửi đề nghị điều chuyển');
+  await setFlashMessage("success", "Đã tạo phiếu thành công", "Đề xuất điều chuyển đã gửi để xác nhận");
 }
 
 export async function acceptTransferCounterpartAction(formData: FormData) {
