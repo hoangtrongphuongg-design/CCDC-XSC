@@ -9,3 +9,8 @@ export function isUniqueViolation(error: unknown, constraint?: string): boolean 
   if (e?.code !== "23505") return false;
   return constraint ? e.constraint === constraint : true;
 }
+
+/** Vi phạm khóa ngoại (SQLSTATE 23503): bản ghi còn được hồ sơ khác tham chiếu. */
+export function isForeignKeyViolation(error: unknown): boolean {
+  return (error as { code?: string } | null)?.code === "23503";
+}

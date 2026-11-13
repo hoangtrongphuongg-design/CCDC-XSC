@@ -8,6 +8,7 @@ import {
   type IndividualEquipmentRow,
 } from "@/components/equipment/equipment-workspace";
 import { buildEquipmentPermissions, loadOperationalGroups, loadScopedEquipment, loadToolRows } from "@/lib/equipment-data";
+import { loadEquipmentHistoryIds } from "@/lib/record-history";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function MyEquipmentPage() {
   } = await loadScopedEquipment(visibleGroupIds);
 
   const groupNameById = new Map(groupRows.map((group) => [group.id, group.name]));
+  const historyIds = await loadEquipmentHistoryIds(rawEquipmentRows.map((row) => row.id));
 
   const equipmentRows: IndividualEquipmentRow[] = rawEquipmentRows.map((row) => {
     const loan = activeLoanByEquipment.get(row.id);
@@ -84,6 +86,7 @@ export default async function MyEquipmentPage() {
       activeTransferStatus: transfer?.status || null,
       activeRepairStatus: repair?.status || null,
       activeRepairType: repair?.repairType || null,
+      hasHistory: historyIds.has(row.id),
       updatedAt: row.updatedAt.toISOString(),
     };
   });

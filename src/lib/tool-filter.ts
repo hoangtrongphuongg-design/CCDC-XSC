@@ -8,6 +8,8 @@ export type ToolRow = ExportTool & {
   notes: string | null;
   /** ISO — dùng làm "phiên bản" để chống ghi đè đồng thời khi sửa. */
   updatedAt: string;
+  /** Đã có phiếu mượn nhanh / thanh lý → không xóa được. */
+  hasHistory: boolean;
 };
 
 export type ToolFilter = {

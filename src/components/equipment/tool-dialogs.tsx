@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
-import { adjustToolQuantityAction, updateQuantityToolAction, type EquipmentFormState } from "@/actions/equipment";
+import { adjustToolQuantityAction, deleteEquipmentAction, deleteToolAction, updateQuantityToolAction, type EquipmentFormState } from "@/actions/equipment";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { EQUIPMENT_CATEGORIES, EQUIPMENT_DISCIPLINE_LABELS, type EquipmentDiscipline } from "@/lib/equipment-categories";
@@ -122,6 +122,41 @@ export function ToolAdjustDialog({ tool, onClose }: { tool: ToolRow; onClose: ()
         <div className="asset-form-footer">
           <Button type="button" variant="ghost" onClick={onClose}>Hủy</Button>
           <Button type="submit" disabled={pending || reason.trim().length < MIN_ADJUST_REASON_LENGTH}>{pending ? "Đang lưu..." : "Lưu hiệu chỉnh"}</Button>
+        </div>
+      </form>
+    </ToolModal>
+  );
+}
+
+/** Xác nhận xóa vĩnh viễn hồ sơ tạo nhầm (máy có mã hoặc CCDC theo số lượng). Chỉ mở khi hồ sơ chưa có lịch sử. */
+export function DeleteRecordDialog({ kind, id, code, name, onClose, onDeleted }: {
+  kind: "machine" | "tool";
+  id: string;
+  code: string | null;
+  name: string;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [state, action, pending] = useActionState(kind === "machine" ? deleteEquipmentAction : deleteToolAction, initialState);
+  useEffect(() => {
+    if (state.status !== "success") return;
+    const timer = window.setTimeout(onDeleted, 300);
+    return () => window.clearTimeout(timer);
+  }, [state.status, onDeleted]);
+
+  return (
+    <ToolModal title={`Xóa ${code || name}`} kicker="XÓA HỒ SƠ TẠO NHẦM" onClose={onClose}>
+      <form action={action} className="asset-form">
+        <input type="hidden" name={kind === "machine" ? "equipmentId" : "toolId"} value={id} />
+        <section className="asset-form-section">
+          <p><strong>{name}</strong>{code ? ` · ${code}` : ""}</p>
+          <div className="admin-warning"><AlertTriangle size={17} /><span>Xóa vĩnh viễn, không khôi phục được. Mã này sẽ không được dùng lại cho hồ sơ khác. Chỉ xóa được khi chưa có mượn – trả, điều chuyển, sửa chữa, thanh lý hay kiểm kê.</span></div>
+          <div className="form-grid"><FormField label="Lý do (không bắt buộc)"><textarea name="reason" rows={2} maxLength={300} placeholder="Ví dụ: Nhập nhầm, đã có sẵn trong danh sách." /></FormField></div>
+        </section>
+        {state.message ? <p className={`form-message ${state.status === "error" ? "error" : "success"}`} role={state.status === "error" ? "alert" : "status"}>{state.message}</p> : null}
+        <div className="asset-form-footer">
+          <Button type="button" variant="ghost" onClick={onClose}>Hủy</Button>
+          <Button type="submit" variant="danger" disabled={pending}>{pending ? "Đang xóa..." : "Xóa vĩnh viễn"}</Button>
         </div>
       </form>
     </ToolModal>
