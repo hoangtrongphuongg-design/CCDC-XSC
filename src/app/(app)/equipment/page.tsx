@@ -11,8 +11,11 @@ import { EQUIPMENT_CATEGORIES, EQUIPMENT_DISCIPLINE_LABELS, getEquipmentCategory
 import {
   CONDITION_FILTER_OPTIONS,
   buildFilterHref,
+  EQUIPMENT_TAB_LABELS,
   conditionGroupOf,
   countByCondition,
+  equipmentTabOf,
+  parseEquipmentTab,
   describeFilters,
   filtersHideTools,
   hasActiveFilters,
@@ -37,7 +40,9 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
   await requireUser();
   const rawParams = await searchParams;
   const filters = parseEquipmentFilters(rawParams);
-  const showTools = (Array.isArray(rawParams.tab) ? rawParams.tab[0] : rawParams.tab) === "tools";
+  const tab = parseEquipmentTab(rawParams.tab);
+  const showTools = tab === "tools";
+  const listTab = tab === "tools" ? "machines" : tab; // danh sách máy đang xem
   const searchText = filters.q;
   const normalizedSearch = searchText.toLocaleLowerCase("vi-VN");
 
@@ -104,7 +109,13 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
   const containsSearch = (...values: Array<string | null | undefined>) => !normalizedSearch || values.some((value) =>
     value?.toLocaleLowerCase("vi-VN").includes(normalizedSearch),
   );
-  const filteredRows = rows.filter((row) => matchesEquipmentFilters(row, filters)).filter((row) => containsSearch(
+  // Máy chia ba danh sách theo trạng thái: chính / Thanh lý / Đã mất (xem equipmentTabOf).
+  const rowsByTab = {
+    machines: rows.filter((row) => equipmentTabOf(row.status) === "machines"),
+    disposal: rows.filter((row) => equipmentTabOf(row.status) === "disposal"),
+    lost: rows.filter((row) => equipmentTabOf(row.status) === "lost"),
+  };
+  const matchesRow = (row: (typeof rows)[number], f: typeof filters) => matchesEquipmentFilters(row, f) && containsSearch(
     row.code,
     row.legacyCode,
     row.name,
@@ -116,7 +127,14 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
     row.currentLocation,
     CONDITION_LABELS[row.condition],
     statusText(row),
-  ));
+  );
+  const filteredByTab = {
+    machines: rowsByTab.machines.filter((row) => matchesRow(row, filters)),
+    disposal: rowsByTab.disposal.filter((row) => matchesRow(row, filters)),
+    lost: rowsByTab.lost.filter((row) => matchesRow(row, filters)),
+  };
+  const listRows = rowsByTab[listTab];
+  const filteredRows = filteredByTab[listTab];
   const hideTools = filtersHideTools(filters);
   const filteredToolRows = hideTools ? [] : toolRows.filter((tool) => matchesToolFilters(tool, filters)).filter((tool) => containsSearch(
     tool.code,
@@ -130,10 +148,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
 
   // Số đếm theo Tình trạng: tính trên các bộ lọc KHÁC (nhóm quản lý, nhóm thiết bị, từ khóa) để người dùng thấy trước kết quả.
   const withoutCondition = { ...filters, condition: "" };
-  const baseRows = rows.filter((row) => matchesEquipmentFilters(row, withoutCondition)).filter((row) => containsSearch(
-    row.code, row.legacyCode, row.name, row.model, row.type, getEquipmentCategoryLabel(row.categoryCode), row.ownerGroup,
-    groupMap.get(row.currentGroupId), row.currentLocation, CONDITION_LABELS[row.condition], statusText(row),
-  ));
+  const baseRows = listRows.filter((row) => matchesRow(row, withoutCondition));
   const conditionCounts = countByCondition(baseRows);
 
   const searchGroupStats = Array.from(
@@ -148,7 +163,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
   // Liên kết giữ bộ lọc; `tab` và `page` đặt thêm.
   const pageHref = (extra: { tab?: string; page?: number }) => {
     const url = new URL(buildFilterHref("/equipment", filters), "http://local");
-    if (extra.tab) url.searchParams.set("tab", extra.tab);
+    if (extra.tab && extra.tab !== "machines") url.searchParams.set("tab", extra.tab);
     if (extra.page && extra.page > 1) url.searchParams.set("page", String(extra.page));
     return `${url.pathname}${url.search}`;
   };
@@ -167,7 +182,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         <h2 className="equipment-filter-title" id="equipment-filter-title">Bộ lọc{hasActiveFilters(filters) ? " (đang lọc)" : ""}</h2>
         <form className="equipment-filter-bar" action="/equipment" method="get">
           {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
-          {showTools ? <input type="hidden" name="tab" value="tools" /> : null}
+          {tab !== "machines" ? <input type="hidden" name="tab" value={tab} /> : null}
           <label>
             <span>Nhóm quản lý</span>
             <select name="group" defaultValue={filters.group}>
@@ -199,7 +214,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
             {/* Tải file qua route handler: dùng <a> thường, không dùng next/link để không prefetch. Xuất đúng phần đang lọc. */}
             <a
               className="btn btn-secondary"
-              href={buildFilterHref("/equipment/export", filters)}
+              href={buildFilterHref("/equipment/export", filters).concat(tab === "disposal" || tab === "lost" ? `${hasActiveFilters(filters) ? "&" : "?"}tab=${tab}` : "")}
               download
               title={hasActiveFilters(filters) ? "Xuất Excel đúng phần đang lọc" : "Xuất Excel toàn bộ dụng cụ, phân theo nhóm"}
             >
@@ -211,7 +226,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
 
       {hasActiveFilters(filters) ? (
         <div className="equipment-filter-chips" aria-label="Bộ lọc đang áp dụng">
-          <span>Hiển thị <b>{filteredRows.length}</b> / {rows.length} máy</span>
+          <span>Hiển thị <b>{filteredRows.length}</b> / {listRows.length} máy</span>
           {describeFilters(filters, { groupName: (id) => groupMap.get(id) ?? "—" }).map((chip) => (
             <Link key={chip.key} className="filter-chip" href={buildFilterHref("/equipment", filters, { omit: chip.key })} aria-label={`Bỏ lọc ${chip.text}`}>{chip.text} <span aria-hidden="true">✕</span></Link>
           ))}
@@ -219,11 +234,9 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
       ) : null}
 
       <EquipmentTabs
-        active={showTools ? "tools" : "machines"}
-        machinesCount={filteredRows.length}
-        toolsCount={filteredToolRows.length}
-        machinesHref={pageHref({})}
-        toolsHref={pageHref({ tab: "tools" })}
+        active={tab}
+        counts={{ machines: filteredByTab.machines.length, tools: filteredToolRows.length, disposal: filteredByTab.disposal.length, lost: filteredByTab.lost.length }}
+        hrefFor={(next) => pageHref({ tab: next })}
       />
 
       {!showTools ? (
@@ -261,8 +274,9 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
           </nav>
 
           <Card className="table-card">
-            <CardHeader><CardTitle>Danh mục máy/CCDC có mã</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{EQUIPMENT_TAB_LABELS[listTab].title}</CardTitle></CardHeader>
             <CardContent>
+              {EQUIPMENT_TAB_LABELS[listTab].note ? <p className="muted equipment-tab-note">{EQUIPMENT_TAB_LABELS[listTab].note}</p> : null}
               <DataTable
                 headers={["Mã hệ thống", "Tem nhôm", "Tên máy", "Nhóm quản lý", "Nhóm đang dùng", "Vị trí", "Trạng thái"]}
                 rows={pageRows.map((row) => [
@@ -278,7 +292,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
                     {conditionGroupOf(row.condition) !== "good" ? <StatusBadge label={conditionLabel(row.condition)} tone={conditionTone(row.condition)} /> : null}
                   </div>,
                 ])}
-                empty={<EmptyState description={searchText ? `Không tìm thấy máy/CCDC phù hợp với “${searchText}”.` : "Chưa có máy/CCDC đã hoàn thành hồ sơ."} />}
+                empty={<EmptyState description={searchText ? `Không tìm thấy máy/CCDC phù hợp với “${searchText}”.` : listTab === "disposal" ? "Chưa có máy nào chờ thanh lý hoặc đã thanh lý." : listTab === "lost" ? "Chưa có máy nào ở trạng thái Đã mất." : "Chưa có máy/CCDC đã hoàn thành hồ sơ."} />}
               />
               <Pager info={paging} hrefFor={(page) => pageHref({ page })} unit="máy" />
             </CardContent>

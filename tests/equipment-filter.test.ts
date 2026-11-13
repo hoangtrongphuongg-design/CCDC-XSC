@@ -5,6 +5,8 @@ import {
   EMPTY_FILTERS,
   conditionGroupOf,
   countByCondition,
+  equipmentTabOf,
+  parseEquipmentTab,
   buildFilterHref,
   describeFilters,
   filtersHideTools,
@@ -80,7 +82,7 @@ async function source(relativePath: string) {
 test("trang và file Excel dùng chung bộ lọc; bảng CCDC theo số lượng ẩn khi lọc tình trạng; không còn ô lọc Trạng thái; một cột Trạng thái, phân trang, tab", async () => {
   const page = await source("src/app/(app)/equipment/page.tsx");
   assert.match(page, /parseEquipmentFilters\(rawParams\)/);
-  assert.match(page, /matchesEquipmentFilters\(row, filters\)/);
+  assert.match(page, /matchesEquipmentFilters\(row, f\)/);
   assert.match(page, /hideTools \? \[\] : toolRows\.filter\(\(tool\) => matchesToolFilters\(tool, filters\)\)/);
   assert.match(page, /action="\/equipment" method="get"/);
   assert.match(page, /<section className="equipment-filter-panel"/, "khung lọc bung sẵn");
@@ -100,7 +102,38 @@ test("trang và file Excel dùng chung bộ lọc; bảng CCDC theo số lượn
   assert.match(page, /conditionGroupOf\(row\.condition\) !== "good"/, "tình trạng chỉ hiện thêm khi không tốt");
   assert.match(page, /buildFilterHref\("\/equipment\/export", filters\)/, "nút Xuất Excel đi theo bộ lọc");
   const route = await source("src/app/(app)/equipment/export/route.ts");
-  assert.match(route, /parseEquipmentFilters\(new URL\(request\.url\)\.searchParams\)/);
+  assert.match(route, /parseEquipmentFilters\(searchParams\)/);
   assert.match(route, /matchesEquipmentFilters\(/);
   assert.match(route, /filtersHideTools\(filters\)/);
+});
+
+test("máy thanh lý / đã mất sang tab riêng; mọi trạng thái đều thuộc đúng một danh sách", async () => {
+  const { EQUIPMENT_STATUS_LABELS } = await import("../src/lib/constants");
+  assert.equal(equipmentTabOf("wait_disposal"), "disposal", "đã tạo phiếu thanh lý");
+  assert.equal(equipmentTabOf("disposal_warehouse"), "disposal", "trong Kho thanh lý");
+  assert.equal(equipmentTabOf("lost"), "lost");
+  for (const status of Object.keys(EQUIPMENT_STATUS_LABELS)) {
+    const expected = status === "wait_disposal" || status === "disposal_warehouse" ? "disposal" : status === "lost" ? "lost" : "machines";
+    assert.equal(equipmentTabOf(status), expected, status);
+  }
+  for (const status of ["in_use_owner", "on_loan", "return_requested", "wait_handover", "wait_inspection", "repairing", "wait_repair_confirm", "inactive"]) {
+    assert.equal(equipmentTabOf(status), "machines", `${status} ở lại danh sách chính`);
+  }
+  assert.equal(parseEquipmentTab("lost"), "lost");
+  assert.equal(parseEquipmentTab(["disposal", "x"]), "disposal");
+  assert.equal(parseEquipmentTab("tools"), "tools");
+  assert.equal(parseEquipmentTab("bậy"), "machines");
+  assert.equal(parseEquipmentTab(undefined), "machines");
+});
+
+test("trang và Excel: danh sách chính không còn máy thanh lý / đã mất; bốn tab; xuất theo tab", async () => {
+  const page = await source("src/app/(app)/equipment/page.tsx");
+  assert.match(page, /equipmentTabOf\(row\.status\) === "machines"/);
+  assert.match(page, /equipmentTabOf\(row\.status\) === "disposal"/);
+  assert.match(page, /equipmentTabOf\(row\.status\) === "lost"/);
+  assert.match(page, /counts=\{\{ machines: /);
+  const route = await source("src/app/(app)/equipment/export/route.ts");
+  assert.match(route, /equipmentTabOf\(row\.status\) === listTab/);
+  assert.match(route, /listTab !== "machines" \|\| filtersHideTools\(filters\)/, "tab thanh lý / mất không kèm CCDC số lượng");
+  assert.match(await source("src/components/equipment-tabs.tsx"), /label: "Thanh lý"[\s\S]*label: "Đã mất"/);
 });
