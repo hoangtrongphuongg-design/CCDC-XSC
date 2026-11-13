@@ -121,17 +121,6 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
       <PageHeader
         title="Dụng cụ toàn xưởng"
         description="Trang tra cứu tập trung, chỉ xem. Việc thêm và cập nhật dụng cụ được thực hiện tại Dụng cụ nhóm tôi."
-        actions={
-          // Tải file qua route handler: dùng <a> thường, không dùng next/link để không prefetch. Xuất đúng phần đang lọc.
-          <a
-            className="btn btn-secondary"
-            href={buildFilterHref("/equipment/export", filters)}
-            download
-            title={hasActiveFilters(filters) ? "Xuất Excel đúng phần đang lọc / tìm" : "Xuất Excel toàn bộ dụng cụ, phân theo nhóm"}
-          >
-            <FileSpreadsheet size={16} aria-hidden="true" /> Xuất Excel{hasActiveFilters(filters) ? " (đang lọc)" : ""}
-          </a>
-        }
       />
 
       <section className="stat-grid">
@@ -149,13 +138,22 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         </a>
       </section>
 
-      <section className="equipment-filter-panel" aria-labelledby="equipment-filter-title">
-        <h2 className="equipment-filter-title" id="equipment-filter-title">Tìm và lọc{hasActiveFilters(filters) ? " (đang lọc)" : ""}</h2>
-        <form className="equipment-filter-bar" action="/equipment" method="get" role="search">
-          <label className="equipment-filter-search">
-            <span><Search size={14} aria-hidden="true" /> Tìm</span>
-            <input name="q" defaultValue={filters.q} placeholder="Mã hệ thống, tem nhôm, tên máy, loại, nhóm, vị trí..." aria-label="Tìm dụng cụ toàn xưởng" />
+      <section className="equipment-global-search" aria-labelledby="equipment-search-title">
+        <h2 className="equipment-search-title" id="equipment-search-title">Tìm kiếm toàn hệ thống</h2>
+        <form className="equipment-search-form" action="/search" method="get" role="search">
+          <label>
+            <span className="sr-only">Từ khóa tìm kiếm</span>
+            <input name="q" type="search" minLength={2} maxLength={120} placeholder="Mã hệ thống, tem nhôm, serial, tên máy, mã phiếu…" autoComplete="off" />
           </label>
+          <button type="submit" className="btn btn-primary"><Search size={16} aria-hidden="true" /> Tìm</button>
+        </form>
+        <p className="equipment-search-hint">Tìm máy, CCDC theo số lượng và các loại phiếu (mượn, điều chuyển, sửa chữa, thanh lý) trong toàn bộ dữ liệu của hệ thống.</p>
+      </section>
+
+      <section className="equipment-filter-panel" aria-labelledby="equipment-filter-title">
+        <h2 className="equipment-filter-title" id="equipment-filter-title">Bộ lọc{hasActiveFilters(filters) ? " (đang lọc)" : ""}</h2>
+        <form className="equipment-filter-bar" action="/equipment" method="get">
+          {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
           <label>
             <span>Nhóm quản lý</span>
             <select name="group" defaultValue={filters.group}>
@@ -192,6 +190,15 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
           <div className="equipment-filter-actions">
             <button type="submit" className="btn btn-primary">Lọc</button>
             {hasActiveFilters(filters) ? <Link className="btn btn-secondary" href="/equipment">Xóa bộ lọc</Link> : null}
+            {/* Tải file qua route handler: dùng <a> thường, không dùng next/link để không prefetch. Xuất đúng phần đang lọc. */}
+            <a
+              className="btn btn-secondary"
+              href={buildFilterHref("/equipment/export", filters)}
+              download
+              title={hasActiveFilters(filters) ? "Xuất Excel đúng phần đang lọc" : "Xuất Excel toàn bộ dụng cụ, phân theo nhóm"}
+            >
+              <FileSpreadsheet size={16} aria-hidden="true" /> Xuất Excel{hasActiveFilters(filters) ? " (đang lọc)" : ""}
+            </a>
           </div>
         </form>
       </section>
