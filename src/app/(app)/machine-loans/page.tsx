@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { workflowTone as tone } from "@/lib/status-style";
 import { Button } from "@/components/ui/button";
+import { ExportBar } from "@/components/export-bar";
 import { FormField } from "@/components/ui/form-field";
 import { SearchableSelect } from "@/components/searchable-select";
 import { LoanTabs } from "@/components/loan-tabs";
@@ -80,6 +81,7 @@ export default async function MachineLoansPage({ searchParams }: { searchParams?
       <PageHeader
         title="Mượn – Trả máy"
         description="Luồng rút gọn: tạo đề nghị → nhóm cho mượn duyệt (đồng thời bàn giao) → đang mượn → gửi trả → nhóm chủ máy xác nhận nhận lại."
+        actions={auth.isWorkshopAdmin && !auth.isReadOnlyViewer ? <ExportBar action="/machine-loans/export" buttonLabel="Xuất Excel mượn – trả" fromLabel="Đề nghị từ ngày" /> : null}
       />
 
       <section className="stat-grid">
