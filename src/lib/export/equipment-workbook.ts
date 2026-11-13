@@ -82,6 +82,8 @@ export async function buildWorkshopWorkbook(input: {
   query: string;
   tree: GroupBucket[];
   tools: ExportTool[];
+  /** Tab thanh lý / đã mất: tên sheet + tiêu đề riêng (mặc định là báo cáo toàn xưởng). */
+  heading?: { sheetName: string; title: string };
 }): Promise<Uint8Array> {
   const workbook = newWorkbook(input.generatedAt);
   const used = new Set<string>();
@@ -91,8 +93,8 @@ export async function buildWorkshopWorkbook(input: {
   const ctx = startSheet(
     workbook,
     used,
-    "Toàn xưởng",
-    "BÁO CÁO DỤNG CỤ TOÀN XƯỞNG – XƯỞNG SỬA CHỮA",
+    input.heading?.sheetName ?? "Toàn xưởng",
+    input.heading?.title ?? "BÁO CÁO DỤNG CỤ TOÀN XƯỞNG – XƯỞNG SỬA CHỮA",
     `Ngày xuất: ${vnDateTime(input.generatedAt)} · Người xuất: ${input.exportedBy} · Tổng: ${total} máy/CCDC có mã${filter}`,
     WORKSHOP_COLUMNS,
   );

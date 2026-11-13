@@ -116,3 +116,29 @@ export function countByCondition(rows: ReadonlyArray<{ condition: string }>): Re
   }
   return counts;
 }
+
+/* ------------------------------ tab của trang ------------------------------ */
+
+export type EquipmentTab = "machines" | "tools" | "disposal" | "lost";
+
+/** Tab đọc từ `?tab=`; giá trị lạ về "machines". */
+export function parseEquipmentTab(value: unknown): EquipmentTab {
+  const first = Array.isArray(value) ? value[0] : value;
+  return first === "tools" || first === "disposal" || first === "lost" ? first : "machines";
+}
+
+/**
+ * Máy thuộc danh sách nào của "Dụng cụ toàn xưởng": máy đã ở trạng thái thanh lý (Chờ thanh lý / Kho thanh lý) sang tab
+ * **Thanh lý**, máy **Đã mất** sang tab Đã mất; còn lại ở danh sách chính. (Máy bị từ chối/hủy thanh lý tự trở về danh sách chính.)
+ */
+export function equipmentTabOf(status: string): "machines" | "disposal" | "lost" {
+  if (status === "wait_disposal" || status === "disposal_warehouse") return "disposal";
+  if (status === "lost") return "lost";
+  return "machines";
+}
+
+export const EQUIPMENT_TAB_LABELS: Record<Exclude<EquipmentTab, "tools">, { title: string; note: string | null }> = {
+  machines: { title: "Danh mục máy/CCDC có mã", note: null },
+  disposal: { title: "Máy chờ thanh lý / đã thanh lý", note: "Máy đã tạo phiếu thanh lý hoặc đã nằm trong Kho thanh lý. Việc thanh lý xử lý ở trang Thanh lý." },
+  lost: { title: "Máy đã mất", note: "Máy đã được Quản lý Xưởng duyệt báo mất. Tìm lại được thì Quản lý Xưởng/Admin khôi phục ở trang Báo mất." },
+};

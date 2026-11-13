@@ -140,7 +140,7 @@ test("trình chạy định kỳ: đóng đợt có closed_by NULL + auto_closed
   const create = await source("src/lib/inventory-create.ts");
   assert.match(create, /"inventory\.schedule_create"/);
   const actions = await source("src/actions/inventory.ts");
-  assert.match(actions, /createInventorySession\(\{ groupId, title: title \|\| null, createdBy: auth\.userId, period: null \}\)/, "đợt mở tay dùng chung hàm tạo đợt");
+  assert.match(actions, /createInventorySession\(\{ groupId, title: title \|\| null, createdBy: auth\.userId, period: null, includeTools: formData\.get\("includeTools"\) === "on" \}\)/, "đợt mở tay dùng chung hàm tạo đợt");
   assert.match(actions, /export async function runMonthlyInventoryAction/);
   assert.match(actions, /auth\.isReadOnlyViewer \|\| !auth\.isWorkshopAdmin/);
   const page = await source("src/app/(app)/inventory/page.tsx");

@@ -5,7 +5,8 @@
 import { and, eq, or, sql } from "drizzle-orm";
 import { writeAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
-import { equipment, inventoryItems, inventorySessions } from "@/lib/db/schema";
+import { equipment, inventoryItems, inventorySessions, toolCatalog } from "@/lib/db/schema";
+import { countUncountedTools } from "@/lib/inventory-tool-pending";
 import { loadOperationalGroups } from "@/lib/equipment-data";
 import { vnDate } from "@/lib/export/equipment-export";
 import { isToolQuarter, summarizeInventory } from "@/lib/inventory";
@@ -20,31 +21,36 @@ export type ScheduleRunSummary = {
   closed: number;
   /** Tổng số máy tại chỗ chưa kiểm của các đợt vừa tự đóng. */
   unchecked: number;
+  /** Tổng số CCDC theo số lượng chưa đếm của các đợt vừa tự đóng. */
+  toolsUnchecked: number;
   errors: string[];
 };
 
 export async function runMonthlyInventory(today: string = vnDate()): Promise<ScheduleRunSummary> {
   const period = periodOf(today);
-  const summary: ScheduleRunSummary = { today, period, created: 0, adopted: 0, closed: 0, unchecked: 0, errors: [] };
+  const summary: ScheduleRunSummary = { today, period, created: 0, adopted: 0, closed: 0, unchecked: 0, toolsUnchecked: 0, errors: [] };
 
-  const [groupRows, machineCounts, sessions] = await Promise.all([
+  const [groupRows, machineCounts, toolCounts, sessions] = await Promise.all([
     loadOperationalGroups(),
     db.select({ groupId: equipment.ownerGroupId, count: sql<number>`count(*)`.mapWith(Number) }).from(equipment)
       .where(eq(equipment.recordStatus, "active")).groupBy(equipment.ownerGroupId),
+    db.select({ groupId: toolCatalog.groupId, count: sql<number>`count(*)`.mapWith(Number) }).from(toolCatalog)
+      .where(and(eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active"))).groupBy(toolCatalog.groupId),
     db.select({ id: inventorySessions.id, groupId: inventorySessions.groupId, status: inventorySessions.status, period: inventorySessions.period, code: inventorySessions.code })
       .from(inventorySessions)
       .where(or(eq(inventorySessions.status, "open"), eq(inventorySessions.period, period))),
   ]);
   const countByGroup = new Map(machineCounts.map((row) => [row.groupId, row.count]));
+  const toolCountByGroup = new Map(toolCounts.map((row) => [row.groupId, row.count]));
   const groupNameById = new Map(groupRows.map((group) => [group.id, group.name]));
   const codeBySession = new Map(sessions.map((session) => [session.id, session.code]));
 
   const actions = plan({
     today,
-    groups: groupRows.map((group) => ({ groupId: group.id, machineCount: countByGroup.get(group.id) ?? 0 })),
+    groups: groupRows.map((group) => ({ groupId: group.id, machineCount: countByGroup.get(group.id) ?? 0, toolCount: toolCountByGroup.get(group.id) ?? 0 })),
     sessions,
   });
-  const detail: Array<{ action: ScheduleAction["type"]; group: string; code?: string; unchecked?: number }> = [];
+  const detail: Array<{ action: ScheduleAction["type"]; group: string; code?: string; unchecked?: number; toolsUnchecked?: number }> = [];
 
   for (const action of actions) {
     const groupName = groupNameById.get(action.groupId) ?? "—";
@@ -54,7 +60,8 @@ export async function runMonthlyInventory(today: string = vnDate()): Promise<Sch
         if (!result) continue;
         summary.closed += 1;
         summary.unchecked += result.unchecked;
-        detail.push({ action: "close", group: groupName, code: codeBySession.get(action.sessionId), unchecked: result.unchecked });
+        summary.toolsUnchecked += result.toolsUnchecked;
+        detail.push({ action: "close", group: groupName, code: codeBySession.get(action.sessionId), unchecked: result.unchecked, toolsUnchecked: result.toolsUnchecked });
       } else if (action.type === "adopt") {
         const adopted = await adoptManualSession(action.sessionId, action.groupId, groupName, action.period);
         if (!adopted) continue;
@@ -77,7 +84,7 @@ export async function runMonthlyInventory(today: string = vnDate()): Promise<Sch
         actorRole: "Hệ thống",
         action: "inventory.schedule_run",
         entityType: "inventory_session",
-        description: `Kiểm kê định kỳ ${period}: mở ${summary.created} đợt, nhận ${summary.adopted} đợt đang mở, tự đóng ${summary.closed} đợt (còn ${summary.unchecked} máy chưa kiểm)${summary.errors.length ? `; ${summary.errors.length} nhóm lỗi` : ""}`,
+        description: `Kiểm kê định kỳ ${period}: mở ${summary.created} đợt, nhận ${summary.adopted} đợt đang mở, tự đóng ${summary.closed} đợt (còn ${summary.unchecked} máy${summary.toolsUnchecked ? ` và ${summary.toolsUnchecked} CCDC số lượng` : ""} chưa kiểm)${summary.errors.length ? `; ${summary.errors.length} nhóm lỗi` : ""}`,
         afterData: { ...summary, detail },
       });
     });
@@ -86,15 +93,16 @@ export async function runMonthlyInventory(today: string = vnDate()): Promise<Sch
 }
 
 /** Đóng đợt định kỳ quá hạn: `closed_by` NULL + `auto_closed`; máy chưa kiểm vẫn ghi "chưa kiểm" trong biên bản. */
-async function closeScheduledSession(sessionId: string): Promise<{ unchecked: number } | null> {
+async function closeScheduledSession(sessionId: string): Promise<{ unchecked: number; toolsUnchecked: number } | null> {
   return db.transaction(async (tx) => {
     const [updated] = await tx.update(inventorySessions)
       .set({ status: "closed", closedBy: null, closedAt: new Date(), autoClosed: true, updatedAt: new Date() })
-      .where(and(eq(inventorySessions.id, sessionId), eq(inventorySessions.status, "open"))).returning({ id: inventorySessions.id });
+      .where(and(eq(inventorySessions.id, sessionId), eq(inventorySessions.status, "open"))).returning({ id: inventorySessions.id, groupId: inventorySessions.groupId, includesTools: inventorySessions.includesTools });
     if (!updated) return null;
     const items = await tx.select({ result: inventoryItems.result, offsite: inventoryItems.offsite, unexpected: inventoryItems.unexpected })
       .from(inventoryItems).where(eq(inventoryItems.sessionId, sessionId));
-    return { unchecked: summarizeInventory(items).pending };
+    const toolsUnchecked = updated.includesTools ? await countUncountedTools(tx, sessionId, updated.groupId) : 0;
+    return { unchecked: summarizeInventory(items).pending, toolsUnchecked };
   });
 }
 
@@ -103,7 +111,7 @@ async function adoptManualSession(sessionId: string, groupId: string, groupName:
   const includesTools = isToolQuarter(period) && (await groupHasActiveTools(groupId));
   return db.transaction(async (tx) => {
     const [updated] = await tx.update(inventorySessions)
-      .set({ period, includesTools, title: sql`coalesce(${inventorySessions.title}, ${periodTitle(period)})`, updatedAt: new Date() })
+      .set({ period, includesTools: sql`${inventorySessions.includesTools} or ${includesTools}`, title: sql`coalesce(${inventorySessions.title}, ${periodTitle(period)})`, updatedAt: new Date() })
       .where(and(eq(inventorySessions.id, sessionId), eq(inventorySessions.status, "open"), sql`${inventorySessions.period} is null`))
       .returning({ id: inventorySessions.id, code: inventorySessions.code });
     if (!updated) return false;

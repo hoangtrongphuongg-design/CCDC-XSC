@@ -1,18 +1,27 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import type { EquipmentTab } from "@/lib/equipment-filter";
 
-/** Tab "Máy có mã | CCDC theo số lượng" của Dụng cụ toàn xưởng (kèm số lượng); chỉ một bảng hiện một lúc. */
-export function EquipmentTabs({ active, machinesCount, toolsCount, machinesHref, toolsHref }: {
-  active: "machines" | "tools";
-  machinesCount: number;
-  toolsCount: number;
-  machinesHref: string;
-  toolsHref: string;
+const TABS: Array<{ key: EquipmentTab; label: string }> = [
+  { key: "machines", label: "Máy có mã" },
+  { key: "tools", label: "CCDC theo số lượng" },
+  { key: "disposal", label: "Thanh lý" },
+  { key: "lost", label: "Đã mất" },
+];
+
+/** Tab của Dụng cụ toàn xưởng (kèm số lượng): Máy có mã | CCDC theo số lượng | Thanh lý | Đã mất; chỉ một bảng hiện một lúc. */
+export function EquipmentTabs({ active, counts, hrefFor }: {
+  active: EquipmentTab;
+  counts: Record<EquipmentTab, number>;
+  hrefFor: (tab: EquipmentTab) => string;
 }) {
   return (
     <nav className="loan-tabs equipment-tabs" aria-label="Chọn loại dụng cụ">
-      <Link href={machinesHref} className={cn(active === "machines" && "is-active")} aria-current={active === "machines" ? "page" : undefined}>Máy có mã <b>{machinesCount}</b></Link>
-      <Link href={toolsHref} className={cn(active === "tools" && "is-active")} aria-current={active === "tools" ? "page" : undefined}>CCDC theo số lượng <b>{toolsCount}</b></Link>
+      {TABS.map((tab) => (
+        <Link key={tab.key} href={hrefFor(tab.key)} className={cn(active === tab.key && "is-active")} aria-current={active === tab.key ? "page" : undefined}>
+          {tab.label} <b>{counts[tab.key]}</b>
+        </Link>
+      ))}
     </nav>
   );
 }

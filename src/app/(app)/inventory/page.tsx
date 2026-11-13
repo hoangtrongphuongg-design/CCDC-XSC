@@ -33,7 +33,7 @@ export default async function InventoryListPage() {
       />
 
       <div className="notice inventory-schedule-note">
-        <b>Kiểm kê định kỳ:</b> ngày 1 hằng tháng hệ thống tự mở đợt cho mỗi nhóm có máy; Đốc công nhóm kiểm trong tháng, hết ngày {INVENTORY_DEADLINE_DAY} đợt tự đóng.
+        <b>Kiểm kê định kỳ:</b> ngày 1 hằng tháng hệ thống tự mở đợt cho mỗi nhóm có máy; Đốc công nhóm kiểm trong tháng, hết ngày {INVENTORY_DEADLINE_DAY} đợt tự đóng. Các đợt tháng 1, 4, 7, 10 kèm đếm CCDC theo số lượng (mỗi 3 tháng một lần); đợt mở tay cũng có thể kèm.
         {canRunSchedule ? (
           <form action={runMonthlyInventoryAction} className="inventory-run-now">
             <Button type="submit" variant="secondary" size="sm">Chạy kiểm kê định kỳ ngay</Button>
@@ -56,6 +56,10 @@ export default async function InventoryListPage() {
               <FormField label="Ghi chú đợt (tùy chọn)" hint="Ví dụ: Kiểm kê cuối quý 4/2026">
                 <input name="title" maxLength={180} placeholder="Kiểm kê cuối quý…" />
               </FormField>
+              <label className="inventory-check">
+                <input type="checkbox" name="includeTools" defaultChecked />
+                <span>Kèm kiểm CCDC theo số lượng <small className="muted">(đếm số thực tế từng CCDC; nhóm cần có CCDC theo số lượng đang hoạt động)</small></span>
+              </label>
               <Button type="submit">Mở đợt kiểm kê</Button>
             </form>
             <p className="muted inventory-note">
@@ -80,13 +84,13 @@ export default async function InventoryListPage() {
                       <span className="inventory-state">{s.status === "open" ? "Đang mở" : "Đã đóng"}</span>
                     </div>
                     <span>{s.groupName}{s.title ? ` · ${s.title}` : ""}</span>
-                    {s.includesTools ? <small className="inventory-tools-tag">Kèm kiểm CCDC theo số lượng (kỳ quý)</small> : null}
+                    {s.includesTools ? <small className="inventory-tools-tag">Kèm kiểm CCDC theo số lượng{s.toolTotal ? ` — đã đếm ${s.toolCounted}/${s.toolTotal}` : ""}</small> : null}
                     {s.status === "open" && s.period ? (
                       <small className="inventory-due">
                         {periodOf(today) === s.period ? `Hạn ${INVENTORY_DEADLINE_DAY}/${Number(s.period.slice(5))} — ${daysUntilDeadline(s.period, today) <= 0 ? "hôm nay là hạn chót" : `còn ${daysUntilDeadline(s.period, today)} ngày`}` : "Quá hạn, chờ hệ thống tự đóng"}
                       </small>
                     ) : null}
-                    {s.autoClosed ? <small className="inventory-auto-closed">Tự đóng — còn {Math.max(s.onsite - s.checkedOnsite, 0)} máy chưa kiểm</small> : null}
+                    {s.autoClosed ? <small className="inventory-auto-closed">Tự đóng — còn {Math.max(s.onsite - s.checkedOnsite, 0)} máy{s.includesTools && s.toolTotal > s.toolCounted ? ` và ${s.toolTotal - s.toolCounted} CCDC số lượng` : ""} chưa kiểm</small> : null}
                     <div className="inventory-bar" aria-label={`Đã kiểm ${percent}%`}><i style={{ width: `${percent}%` }} /></div>
                     <small>
                       {s.checkedOnsite}/{s.onsite} máy đã kiểm · {s.found} có mặt · <b className={s.missing ? "inventory-missing" : ""}>{s.missing} không thấy</b>
