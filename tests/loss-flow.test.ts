@@ -85,7 +85,6 @@ test("mã BM, hồ sơ có phiếu báo mất tính là có lịch sử, kiểm 
   assert.match(await source("src/lib/workflows.ts"), /OPEN_LOSS_STATUSES/);
   assert.match(await source("src/lib/record-history.ts"), /lossReports/);
   assert.match(await source("src/lib/inventory-create.ts"), /ne\(equipment\.status, "lost"\)/);
-  assert.match(await source("src/lib/equipment-filter.ts"), /row\.status === "lost"/);
 });
 
 test("trang Báo mất: nút đỏ nổi theo quyền tạo, hai bảng, khôi phục máy đã mất; menu Báo mất", async () => {

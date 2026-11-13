@@ -3152,3 +3152,15 @@ body {
 .inventory-tool-result.is-short { color: var(--danger); font-weight: 700; }
 .inventory-tool-result.is-over { color: #b54708; font-weight: 700; }
 .inventory-tools-tag { color: var(--primary); font-weight: 700; }
+
+/* Dụng cụ toàn xưởng: tab, một cột Trạng thái, phân trang */
+.equipment-tabs { margin: 0 0 12px; }
+.equipment-tabs b { margin-left: 6px; font-variant-numeric: tabular-nums; }
+.status-stack { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; }
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 4px 2px; font-size: 13px; color: var(--text-secondary, #475569); }
+.pager-pages { display: flex; flex-wrap: wrap; gap: 4px; }
+.pager-pages a, .pager-pages span { display: inline-grid; place-items: center; min-width: 34px; min-height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); font-weight: 650; }
+.pager-pages a:hover { border-color: var(--primary); color: var(--primary); }
+.pager-pages .is-active { border-color: var(--primary); background: var(--primary); color: #fff; }
+.pager-pages .is-gap, .pager-pages .is-disabled { border-color: transparent; background: transparent; color: var(--text-muted); }
+@media (pointer: coarse) { .pager-pages a, .pager-pages span { min-height: 44px; min-width: 44px; } }
