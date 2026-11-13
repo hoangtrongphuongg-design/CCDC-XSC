@@ -4,6 +4,7 @@
  * File này KHÔNG phải Server Action nên không được gắn "use server".
  */
 import { equipment, equipmentTypeCatalog } from "@/lib/db/schema";
+import { statusForCondition } from "@/lib/equipment-status-rule";
 import { writeAudit } from "@/lib/audit";
 import { nextAssetCode, type DbTx } from "@/lib/workflows";
 
@@ -64,7 +65,8 @@ export function buildEquipmentInsertValues(base: NewEquipmentBase, fields: NewEq
     ownerGroupId: base.ownerGroupId,
     currentGroupId: base.ownerGroupId,
     currentLocation: fields.currentLocation || null,
-    status: "in_use_owner",
+    // Sẵn sàng chỉ khi tình trạng Tốt; Hư hỏng / Chưa đánh giá / Không thể phục hồi thì Chờ kiểm tra.
+    status: statusForCondition("in_use_owner", fields.condition) as "in_use_owner" | "wait_inspection",
     condition: fields.condition,
     purchaseDate: fields.purchaseDate || null,
     poContractNo: fields.poContractNo || null,
