@@ -6,7 +6,19 @@ import { db } from "@/lib/db";
 import { equipment, groups, repairs, toolCatalog } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { EQUIPMENT_STATUS_LABELS, CONDITION_LABELS } from "@/lib/constants";
-import { getEquipmentCategoryLabel } from "@/lib/equipment-categories";
+import { EQUIPMENT_CATEGORIES, EQUIPMENT_DISCIPLINE_LABELS, getEquipmentCategoryLabel, type EquipmentDiscipline } from "@/lib/equipment-categories";
+import {
+  CONDITION_FILTER_OPTIONS,
+  IN_PROCESS,
+  IN_PROCESS_LABEL,
+  buildFilterHref,
+  describeFilters,
+  filtersHideTools,
+  hasActiveFilters,
+  matchesEquipmentFilters,
+  matchesToolFilters,
+  parseEquipmentFilters,
+} from "@/lib/equipment-filter";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,10 +30,10 @@ import { conditionTone, equipmentStatusTone } from "@/lib/status-style";
 
 export const dynamic = "force-dynamic";
 
-export default async function EquipmentPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function EquipmentPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireUser();
-  const { q = "" } = await searchParams;
-  const searchText = q.trim();
+  const filters = parseEquipmentFilters(await searchParams);
+  const searchText = filters.q;
   const normalizedSearch = searchText.toLocaleLowerCase("vi-VN");
 
   const [rows, groupRows, toolRows, openRepairs] = await Promise.all([
@@ -71,7 +83,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
   const containsSearch = (...values: Array<string | null | undefined>) => !normalizedSearch || values.some((value) =>
     value?.toLocaleLowerCase("vi-VN").includes(normalizedSearch),
   );
-  const filteredRows = rows.filter((row) => containsSearch(
+  const filteredRows = rows.filter((row) => matchesEquipmentFilters(row, filters)).filter((row) => containsSearch(
     row.code,
     row.legacyCode,
     row.name,
@@ -84,7 +96,8 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
     CONDITION_LABELS[row.condition],
     statusText(row),
   ));
-  const filteredToolRows = toolRows.filter((tool) => containsSearch(
+  const hideTools = filtersHideTools(filters);
+  const filteredToolRows = hideTools ? [] : toolRows.filter((tool) => matchesToolFilters(tool, filters)).filter((tool) => containsSearch(
     tool.code,
     tool.name,
     tool.equipmentType,
@@ -109,36 +122,88 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         title="Dụng cụ toàn xưởng"
         description="Trang tra cứu tập trung, chỉ xem. Việc thêm và cập nhật dụng cụ được thực hiện tại Dụng cụ nhóm tôi."
         actions={
-          <>
-            <form className="workshop-equipment-search" action="/equipment" method="get" role="search">
-              <span className="workshop-search-icon" aria-hidden="true"><Search size={18} /></span>
-              <input
-                name="q"
-                defaultValue={searchText}
-                placeholder="Mã hệ thống, tem nhôm, tên máy, loại, nhóm, vị trí..."
-                aria-label="Tìm dụng cụ toàn xưởng"
-              />
-              <button type="submit">Tìm</button>
-            </form>
-            {/* Tải file qua route handler: dùng <a> thường, không dùng next/link để không prefetch. */}
-            <a
-              className="btn btn-secondary"
-              href={searchText ? `/equipment/export?q=${encodeURIComponent(searchText)}` : "/equipment/export"}
-              download
-              title={searchText ? "Xuất Excel danh sách đang tìm" : "Xuất Excel toàn bộ dụng cụ, phân theo nhóm"}
-            >
-              <FileSpreadsheet size={16} aria-hidden="true" /> Xuất Excel
-            </a>
-          </>
+          // Tải file qua route handler: dùng <a> thường, không dùng next/link để không prefetch. Xuất đúng phần đang lọc.
+          <a
+            className="btn btn-secondary"
+            href={buildFilterHref("/equipment/export", filters)}
+            download
+            title={hasActiveFilters(filters) ? "Xuất Excel đúng phần đang lọc / tìm" : "Xuất Excel toàn bộ dụng cụ, phân theo nhóm"}
+          >
+            <FileSpreadsheet size={16} aria-hidden="true" /> Xuất Excel{hasActiveFilters(filters) ? " (đang lọc)" : ""}
+          </a>
         }
       />
 
       <section className="stat-grid">
-        <StatCard title="Máy/CCDC có mã" value={rows.length} icon={Boxes} tone="primary" />
-        <StatCard title="Sẵn sàng tại nhóm" value={rows.filter((row) => row.status === "in_use_owner").length} icon={CircleCheck} tone="success" />
-        <StatCard title="Đang trong quy trình" value={rows.filter((row) => !["in_use_owner", "disposal_warehouse"].includes(row.status)).length} icon={Wrench} tone="warning" />
-        <StatCard title="Danh mục theo số lượng" value={toolRows.length} icon={PackageOpen} tone="primary" />
+        <Link className={`stat-card-link${!hasActiveFilters(filters, false) ? " is-active" : ""}`} href={buildFilterHref("/equipment", { ...filters, group: "", status: "", condition: "", category: "" })}>
+          <StatCard title="Máy/CCDC có mã" value={rows.length} icon={Boxes} tone="primary" />
+        </Link>
+        <Link className={`stat-card-link${filters.status === "in_use_owner" ? " is-active" : ""}`} href={buildFilterHref("/equipment", filters, { override: { status: "in_use_owner" } })}>
+          <StatCard title="Sẵn sàng tại nhóm" value={rows.filter((row) => row.status === "in_use_owner").length} icon={CircleCheck} tone="success" />
+        </Link>
+        <Link className={`stat-card-link${filters.status === IN_PROCESS ? " is-active" : ""}`} href={buildFilterHref("/equipment", filters, { override: { status: IN_PROCESS } })}>
+          <StatCard title="Đang trong quy trình" value={rows.filter((row) => !["in_use_owner", "disposal_warehouse"].includes(row.status)).length} icon={Wrench} tone="warning" />
+        </Link>
+        <a className="stat-card-link" href="#cc-so-luong">
+          <StatCard title="Danh mục theo số lượng" value={toolRows.length} icon={PackageOpen} tone="primary" />
+        </a>
       </section>
+
+      <details className="equipment-filter-panel" open={hasActiveFilters(filters)}>
+        <summary>Tìm và lọc{hasActiveFilters(filters) ? ` (đang lọc)` : ""}</summary>
+        <form className="equipment-filter-bar" action="/equipment" method="get" role="search">
+          <label className="equipment-filter-search">
+            <span><Search size={14} aria-hidden="true" /> Tìm</span>
+            <input name="q" defaultValue={filters.q} placeholder="Mã hệ thống, tem nhôm, tên máy, loại, nhóm, vị trí..." aria-label="Tìm dụng cụ toàn xưởng" />
+          </label>
+          <label>
+            <span>Nhóm quản lý</span>
+            <select name="group" defaultValue={filters.group}>
+              <option value="">Tất cả nhóm</option>
+              {groupRows.filter((group) => new Set([...rows.map((row) => row.ownerGroupId), ...toolRows.map((tool) => tool.groupId)]).has(group.id)).map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Trạng thái</span>
+            <select name="status" defaultValue={filters.status}>
+              <option value="">Tất cả trạng thái</option>
+              <option value={IN_PROCESS}>{IN_PROCESS_LABEL}</option>
+              {Object.entries(EQUIPMENT_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Tình trạng</span>
+            <select name="condition" defaultValue={filters.condition}>
+              <option value="">Tất cả tình trạng</option>
+              {CONDITION_FILTER_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Nhóm thiết bị</span>
+            <select name="category" defaultValue={filters.category}>
+              <option value="">Tất cả nhóm thiết bị</option>
+              {(["mechanical", "electrical", "other"] as EquipmentDiscipline[]).map((discipline) => (
+                <optgroup key={discipline} label={EQUIPMENT_DISCIPLINE_LABELS[discipline]}>
+                  {EQUIPMENT_CATEGORIES.filter((category) => category.discipline === discipline).map((category) => <option key={category.code} value={category.code}>{category.name}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          <div className="equipment-filter-actions">
+            <button type="submit" className="btn btn-primary">Lọc</button>
+            {hasActiveFilters(filters) ? <Link className="btn btn-secondary" href="/equipment">Xóa bộ lọc</Link> : null}
+          </div>
+        </form>
+      </details>
+
+      {hasActiveFilters(filters) ? (
+        <div className="equipment-filter-chips" aria-label="Bộ lọc đang áp dụng">
+          <span>Hiển thị <b>{filteredRows.length}</b> / {rows.length} máy</span>
+          {describeFilters(filters, { groupName: (id) => groupMap.get(id) ?? "—" }).map((chip) => (
+            <Link key={chip.key} className="filter-chip" href={buildFilterHref("/equipment", filters, { omit: chip.key })} aria-label={`Bỏ lọc ${chip.text}`}>{chip.text} <span aria-hidden="true">✕</span></Link>
+          ))}
+        </div>
+      ) : null}
 
       {searchText ? (
         <section className="search-group-dashboard" aria-label="Thống kê kết quả tìm kiếm theo nhóm quản lý">
@@ -184,7 +249,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         </CardContent>
       </Card>
 
-      <Card className="table-card section-gap">
+      <Card className="table-card section-gap" id="cc-so-luong">
         <CardHeader><CardTitle>Dụng cụ quản lý theo số lượng</CardTitle></CardHeader>
         <CardContent>
           <DataTable
@@ -198,7 +263,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
               tool.groupName,
               <span key="quantity" className="numeric"><strong>{tool.quantity}</strong> {tool.unit}</span>,
             ])}
-            empty={<EmptyState description={searchText ? `Không tìm thấy dụng cụ theo số lượng phù hợp với “${searchText}”.` : "Chưa có dụng cụ theo số lượng đã hoàn thành hồ sơ."} />}
+            empty={<EmptyState description={hideTools ? "Bảng này không có Trạng thái / Tình trạng nên được ẩn khi đang lọc hai mục đó. Bỏ lọc để xem lại." : hasActiveFilters(filters) ? "Không có dụng cụ theo số lượng phù hợp với bộ lọc / từ khóa." : "Chưa có dụng cụ theo số lượng đã hoàn thành hồ sơ."} />}
           />
         </CardContent>
       </Card>
