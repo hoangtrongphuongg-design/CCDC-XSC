@@ -148,7 +148,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
           <StatCard title="Sẵn sàng tại nhóm" value={rows.filter((row) => row.status === "in_use_owner").length} icon={CircleCheck} tone="success" />
         </Link>
         <Link className={`stat-card-link${filters.status === IN_PROCESS ? " is-active" : ""}`} href={buildFilterHref("/equipment", filters, { override: { status: IN_PROCESS } })}>
-          <StatCard title="Đang trong quy trình" value={rows.filter((row) => !["in_use_owner", "disposal_warehouse"].includes(row.status)).length} icon={Wrench} tone="warning" />
+          <StatCard title="Đang trong quy trình" value={rows.filter((row) => !["in_use_owner", "disposal_warehouse", "lost"].includes(row.status)).length} icon={Wrench} tone="warning" />
         </Link>
         <a className="stat-card-link" href="#cc-so-luong">
           <StatCard title="Danh mục theo số lượng" value={toolRows.length} icon={PackageOpen} tone="primary" />

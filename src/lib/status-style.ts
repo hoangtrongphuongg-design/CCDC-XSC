@@ -27,6 +27,7 @@ export function equipmentStatusTone(status: string): Tone {
     case "wait_disposal":
       return "warning";
     case "disposal_warehouse":
+    case "lost":
     case "inactive":
       return "neutral";
     default:

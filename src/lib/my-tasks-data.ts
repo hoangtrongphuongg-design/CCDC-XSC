@@ -1,10 +1,10 @@
 import { cache } from "react";
 import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { disposals, equipment, groups, inventoryItems, inventorySessions, machineLoans, quickLoans, repairs, toolCatalog, toolDisposals, transfers } from "@/lib/db/schema";
+import { disposals, equipment, groups, inventoryItems, lossReports, inventorySessions, machineLoans, quickLoans, repairs, toolCatalog, toolDisposals, transfers } from "@/lib/db/schema";
 import type { AuthContext } from "@/lib/auth/session";
 import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
-import { OPEN_DISPOSAL_STATUSES, OPEN_QUICK_LOAN_STATUSES, OPEN_TRANSFER_STATUSES } from "@/lib/workflow-status";
+import { OPEN_DISPOSAL_STATUSES, OPEN_LOSS_STATUSES, OPEN_QUICK_LOAN_STATUSES, OPEN_TRANSFER_STATUSES } from "@/lib/workflow-status";
 import { buildMyTasks, isWsLevel, type MyTask, type TaskSubject } from "@/lib/my-tasks";
 
 /** Số phiếu đang mở rất ít nên đọc thẳng, không cần phân trang. */
@@ -17,14 +17,29 @@ async function compute(subject: TaskSubject): Promise<MyTask[]> {
     ? db.select({
       id: inventorySessions.id, code: inventorySessions.code, groupId: inventorySessions.groupId, period: inventorySessions.period, createdAt: inventorySessions.createdAt,
       pending: sql<number>`count(${inventoryItems.id}) filter (where ${inventoryItems.offsite} = false and ${inventoryItems.unexpected} = false and ${inventoryItems.result} is null)`.mapWith(Number),
+      // CCDC theo số lượng chưa đếm (chỉ đợt quý có cờ includes_tools).
+      toolPending: sql<number>`case when ${inventorySessions.includesTools} then greatest((select count(*) from tool_catalog tc where tc.group_id = ${inventorySessions.groupId} and tc.is_active = true and tc.record_status = 'active') - (select count(*) from inventory_tool_counts c where c.session_id = ${inventorySessions.id}), 0) else 0 end`.mapWith(Number),
     }).from(inventorySessions)
       .leftJoin(inventoryItems, eq(inventoryItems.sessionId, inventorySessions.id))
       .where(and(eq(inventorySessions.status, "open"), isNotNull(inventorySessions.period)))
-      .groupBy(inventorySessions.id, inventorySessions.code, inventorySessions.groupId, inventorySessions.period, inventorySessions.createdAt)
+      .groupBy(inventorySessions.id, inventorySessions.code, inventorySessions.groupId, inventorySessions.period, inventorySessions.createdAt, inventorySessions.includesTools)
       .catch((error) => { console.error("loadMyTasks inventory failed", error); return []; })
     : Promise.resolve([]);
 
-  const [groupRows, loanRows, quickRows, transferRows, repairRows, disposalRows, toolDisposalRows, inventoryRows] = await Promise.all([
+  // Báo mất chỉ là việc của Quản lý Xưởng / Admin; truy vấn riêng, lỗi (vd chưa chạy SQL V1.7.3) không làm mất các việc khác.
+  const lossRowsPromise = isWsLevel(subject)
+    ? db.select({
+      id: lossReports.id, code: lossReports.code, status: lossReports.status, updatedAt: lossReports.updatedAt,
+      ownerGroupId: lossReports.ownerGroupId, reportedBy: lossReports.reportedBy, quantity: lossReports.quantity,
+      equipmentCode: equipment.code, equipmentName: equipment.name, toolName: toolCatalog.name, unit: toolCatalog.unit,
+    }).from(lossReports)
+      .leftJoin(equipment, eq(equipment.id, lossReports.equipmentId))
+      .leftJoin(toolCatalog, eq(toolCatalog.id, lossReports.toolId))
+      .where(inArray(lossReports.status, [...OPEN_LOSS_STATUSES]))
+      .catch((error) => { console.error("loadMyTasks losses failed", error); return []; })
+    : Promise.resolve([]);
+
+  const [groupRows, loanRows, quickRows, transferRows, repairRows, disposalRows, toolDisposalRows, inventoryRows, lossRows] = await Promise.all([
     db.select({ id: groups.id, name: groups.name, code: groups.code }).from(groups),
     db.select({
       id: machineLoans.id, code: machineLoans.code, status: machineLoans.status, updatedAt: machineLoans.updatedAt,
@@ -60,6 +75,7 @@ async function compute(subject: TaskSubject): Promise<MyTask[]> {
     }).from(toolDisposals).innerJoin(toolCatalog, eq(toolCatalog.id, toolDisposals.toolId))
       .where(inArray(toolDisposals.status, [...OPEN_DISPOSAL_STATUSES])),
     inventoryRowsPromise,
+    lossRowsPromise,
   ]);
 
   return buildMyTasks(subject, {
@@ -71,7 +87,8 @@ async function compute(subject: TaskSubject): Promise<MyTask[]> {
       ...disposalRows.map((r) => ({ ...r, label: `${r.equipmentName} (${r.equipmentCode})` })),
       ...toolDisposalRows.map((r) => ({ ...r, label: `${r.toolName} × ${Number(r.quantity)} ${r.unit}` })),
     ],
-    inventories: inventoryRows.flatMap((r) => (r.period ? [{ id: r.id, code: r.code, groupId: r.groupId, period: r.period, pending: r.pending, updatedAt: r.createdAt }] : [])),
+    losses: lossRows.map((r) => ({ ...r, label: r.equipmentName ? `${r.equipmentName} (${r.equipmentCode})` : `${r.toolName ?? "CCDC"} × ${Number(r.quantity)} ${r.unit ?? ""}`.trim() })),
+    inventories: inventoryRows.flatMap((r) => (r.period ? [{ id: r.id, code: r.code, groupId: r.groupId, period: r.period, pending: r.pending, toolPending: r.toolPending, updatedAt: r.createdAt }] : [])),
     warehouseGroupId: groupRows.find((g) => g.code === "KHO_TL")?.id ?? null,
     groupNames: new Map(groupRows.map((g) => [g.id, g.name])),
   });

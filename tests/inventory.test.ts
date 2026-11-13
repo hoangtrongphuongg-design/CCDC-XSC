@@ -113,16 +113,18 @@ test("filterChecklist: theo tab và từ khóa không dấu", () => {
 
 test("biên bản Excel: tóm tắt ở đầu, các mục theo thứ tự cần chú ý", async () => {
   const detail: InventoryDetail = {
-    session: { id: "s", code: "KK-2026-0001", title: "Cuối quý 4", groupId: A, groupName: "Nhóm A", status: "closed", createdAt: new Date("2026-11-01T01:00:00Z"), closedAt: new Date("2026-11-02T01:00:00Z"), createdByName: "Lan", closedByName: "Minh", period: null, autoClosed: false },
+    session: { id: "s", code: "KK-2026-0001", title: "Cuối quý 4", groupId: A, groupName: "Nhóm A", status: "closed", createdAt: new Date("2026-11-01T01:00:00Z"), closedAt: new Date("2026-11-02T01:00:00Z"), createdByName: "Lan", closedByName: "Minh", period: null, autoClosed: false, includesTools: false },
     items: [
-      { ...item({ equipmentId: "1", code: "A-1", name: "Máy có mặt", result: "found" }), note: null, checkedByName: "Hùng", checkedAt: new Date("2026-11-01T02:00:00Z") },
-      { ...item({ equipmentId: "2", code: "A-2", name: "Máy không thấy", result: "missing" }), note: "Hỏi tổ trưởng", checkedByName: "Hùng", checkedAt: new Date("2026-11-01T03:00:00Z") },
-      { ...item({ equipmentId: "3", code: "A-3", name: "Máy chưa kiểm" }), note: null, checkedByName: null, checkedAt: null },
-      { ...item({ equipmentId: "4", code: "A-4", name: "Máy thừa", unexpected: true, result: "found" }), note: null, checkedByName: "Hùng", checkedAt: new Date("2026-11-01T04:00:00Z") },
-      { ...item({ equipmentId: "5", code: "A-5", name: "Máy nơi khác", offsite: true, expectedNote: "Đang cho Nhóm B mượn" }), note: null, checkedByName: null, checkedAt: null },
+      { ...item({ equipmentId: "1", code: "A-1", name: "Máy có mặt", result: "found" }), note: null, checkedByName: "Hùng", checkedAt: new Date("2026-11-01T02:00:00Z"), lossStatus: null },
+      { ...item({ equipmentId: "2", code: "A-2", name: "Máy không thấy", result: "missing" }), note: "Hỏi tổ trưởng", checkedByName: "Hùng", checkedAt: new Date("2026-11-01T03:00:00Z"), lossStatus: null },
+      { ...item({ equipmentId: "3", code: "A-3", name: "Máy chưa kiểm" }), note: null, checkedByName: null, checkedAt: null, lossStatus: null },
+      { ...item({ equipmentId: "4", code: "A-4", name: "Máy thừa", unexpected: true, result: "found" }), note: null, checkedByName: "Hùng", checkedAt: new Date("2026-11-01T04:00:00Z"), lossStatus: null },
+      { ...item({ equipmentId: "5", code: "A-5", name: "Máy nơi khác", offsite: true, expectedNote: "Đang cho Nhóm B mượn" }), note: null, checkedByName: null, checkedAt: null, lossStatus: null },
     ],
+    tools: [],
     canManage: true,
     canCheck: false,
+    canReportLoss: false,
   };
   const bytes = await buildInventoryWorkbook({ generatedAt: new Date("2026-11-12T03:00:00Z"), exportedBy: "Admin", detail });
   const wb = new ExcelJS.Workbook();

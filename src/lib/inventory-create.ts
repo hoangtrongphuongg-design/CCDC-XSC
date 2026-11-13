@@ -3,13 +3,13 @@
  * Dùng chung cho đợt mở TAY (`createInventoryAction`) và đợt TỰ ĐỘNG hàng tháng (`runMonthlyInventory`), nên không đặt
  * trong file "use server". Không kiểm quyền ở đây: nơi gọi tự kiểm.
  */
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, or } from "drizzle-orm";
 import { writeAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { isUniqueViolation } from "@/lib/db/errors";
-import { equipment, groups, inventoryItems, inventorySessions, machineLoans } from "@/lib/db/schema";
+import { equipment, groups, inventoryItems, inventorySessions, machineLoans, toolCatalog } from "@/lib/db/schema";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
-import { INVENTORY_MAX_ITEMS, classifyExpected } from "@/lib/inventory";
+import { INVENTORY_MAX_ITEMS, classifyExpected, isToolQuarter } from "@/lib/inventory";
 import { BORROWER_HOLDING_STATUSES } from "@/lib/loan-status";
 import { nextWorkflowCode } from "@/lib/workflows";
 
@@ -35,7 +35,7 @@ export async function createInventorySession(input: {
 
   const [ownedRows, holdingLoans, groupRows] = await Promise.all([
     db.select({ id: equipment.id, ownerGroupId: equipment.ownerGroupId, status: equipment.status }).from(equipment)
-      .where(and(eq(equipment.ownerGroupId, groupId), eq(equipment.recordStatus, "active"))).orderBy(asc(equipment.code)),
+      .where(and(eq(equipment.ownerGroupId, groupId), eq(equipment.recordStatus, "active"), ne(equipment.status, "lost"))).orderBy(asc(equipment.code)),
     db.select({ equipmentId: machineLoans.equipmentId, ownerGroupId: machineLoans.ownerGroupId, borrowerGroupId: machineLoans.borrowerGroupId })
       .from(machineLoans)
       .where(and(inArray(machineLoans.status, [...BORROWER_HOLDING_STATUSES]), or(eq(machineLoans.ownerGroupId, groupId), eq(machineLoans.borrowerGroupId, groupId)))),
@@ -55,12 +55,15 @@ export async function createInventorySession(input: {
   const groupName = new Map(groupRows.map((row) => [row.id, row.name]));
   const nameOf = (id: string) => groupName.get(id) ?? "—";
 
+  // Kỳ quý (tháng 1/4/7/10): đợt kèm đếm CCDC theo số lượng nếu nhóm có CCDC đang hoạt động.
+  const includesTools = isToolQuarter(period) && (await groupHasActiveTools(groupId));
+
   let sessionId = "";
   let code = "";
   try {
     await db.transaction(async (tx) => {
       code = await nextWorkflowCode(tx, "KK");
-      const [session] = await tx.insert(inventorySessions).values({ code, groupId, title: input.title, createdBy, period }).returning({ id: inventorySessions.id });
+      const [session] = await tx.insert(inventorySessions).values({ code, groupId, title: input.title, createdBy, period, includesTools }).returning({ id: inventorySessions.id });
       sessionId = session.id;
       const values = machines.map((machine) => {
         const { offsite, note } = classifyExpected({ groupId, ownerGroupId: machine.ownerGroupId, heldByGroupId: heldBy.get(machine.id) ?? null, status: machine.status }, nameOf);
@@ -76,7 +79,7 @@ export async function createInventorySession(input: {
         entityType: "inventory_session",
         entityId: session.id,
         description: period
-          ? `Tự mở đợt kiểm kê ${code} cho ${group.name} (${machines.length} máy) — kỳ ${period}`
+          ? `Tự mở đợt kiểm kê ${code} cho ${group.name} (${machines.length} máy${includesTools ? " + CCDC theo số lượng" : ""}) — kỳ ${period}`
           : `Mở đợt kiểm kê ${code} cho ${group.name} (${machines.length} máy)${input.title ? `: ${input.title}` : ""}`,
       });
     });
@@ -85,4 +88,11 @@ export async function createInventorySession(input: {
     throw error;
   }
   return { sessionId, code, groupName: group.name, machineCount: machines.length };
+}
+
+/** Nhóm có ít nhất một CCDC theo số lượng đang hoạt động (hồ sơ hoàn tất) — điều kiện để kỳ quý có khối đếm CCDC. */
+export async function groupHasActiveTools(groupId: string): Promise<boolean> {
+  const [row] = await db.select({ id: toolCatalog.id }).from(toolCatalog)
+    .where(and(eq(toolCatalog.groupId, groupId), eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active"))).limit(1);
+  return Boolean(row);
 }

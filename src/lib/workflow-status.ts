@@ -24,3 +24,7 @@ export const CLOSED_DISPOSAL_STATUSES = ["completed", "rejected", "cancelled"] a
 
 /** Số phiếu đã đóng gần nhất hiển thị kèm phiếu đang mở trên các trang danh sách. */
 export const RECENT_CLOSED_LIMIT = 100;
+
+/** Phiếu báo mất (máy có mã và CCDC theo số lượng). */
+export const OPEN_LOSS_STATUSES = ["pending_ws"] as const;
+export const CLOSED_LOSS_STATUSES = ["completed", "rejected", "cancelled"] as const;

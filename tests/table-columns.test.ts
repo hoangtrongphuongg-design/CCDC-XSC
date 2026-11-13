@@ -15,7 +15,7 @@ const EXPECTED: Array<[string, ColumnKind]> = [
   ["Trạng thái", "status"], ["Tình trạng", "status"],
   // nhận phần rộng nhất
   ["Tên CCDC", "wide"], ["Tên máy", "wide"], ["Tên dụng cụ", "wide"], ["Máy", "wide"], ["CCDC", "wide"], ["Vật dụng", "wide"],
-  ["Máy / CCDC", "wide"], ["Lý do", "wide"], ["Nội dung", "wide"], ["Nội dung hư", "wide"], ["Nhân viên", "wide"],
+  ["Máy / CCDC", "wide"], ["Lý do", "wide"], ["Nội dung", "wide"], ["Nội dung hư", "wide"], ["Hoàn cảnh", "wide"], ["SL mất", "fit"], ["Nhân viên", "wide"],
   // chữ ngắn / vừa
   ["Nhóm", "text"], ["Nhóm quản lý", "text"], ["Nhóm đang dùng", "text"], ["Nhóm cho", "text"], ["Nhóm mượn", "text"], ["Nhóm cho mượn", "text"],
   ["Nhóm giao", "text"], ["Nhóm nhận", "text"], ["Nhóm báo", "text"], ["Nhóm chính", "text"], ["Nhóm thiết bị", "text"],

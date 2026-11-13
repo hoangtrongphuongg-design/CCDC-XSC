@@ -7,6 +7,7 @@
  * Không đổi nghiệp vụ / quyền / kiểm tra: mọi thứ vẫn do hành động gốc làm.
  */
 import { createDisposalAction, createToolDisposalAction } from "@/actions/disposals";
+import { createLossReportAction, createToolLossReportAction } from "@/actions/loss";
 import { createMachineLoanAction } from "@/actions/machine-loans";
 import { createQuickLoanAction } from "@/actions/quick-loans";
 import { createRepairAction } from "@/actions/repairs";
@@ -44,4 +45,12 @@ export async function submitDisposal(_prev: TicketState, formData: FormData): Pr
 
 export async function submitToolDisposal(_prev: TicketState, formData: FormData): Promise<TicketState> {
   return run(createToolDisposalAction, formData);
+}
+
+export async function submitLoss(_prev: TicketState, formData: FormData): Promise<TicketState> {
+  return run(createLossReportAction, formData);
+}
+
+export async function submitToolLoss(_prev: TicketState, formData: FormData): Promise<TicketState> {
+  return run(createToolLossReportAction, formData);
 }

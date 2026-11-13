@@ -14,7 +14,7 @@ import { foldText } from "@/lib/global-search";
 export type ColumnKind = "fit" | "status" | "wide" | "text" | "actions";
 export type ColumnAlign = "left" | "center" | "right";
 
-const WIDE_EXACT = new Set(["may", "vat dung", "ccdc", "nhan vien", "may / ccdc", "ghi chu", "mo ta"]);
+const WIDE_EXACT = new Set(["may", "vat dung", "ccdc", "nhan vien", "may / ccdc", "ghi chu", "mo ta", "hoan canh"]);
 const WIDE_PREFIX = ["ten ", "noi dung", "ly do"];
 
 const FIT_EXACT = new Set(["stt", "ma", "phieu", "tem nhom", "serial", "sl", "chi phi", "thang", "han tra", "tinh tu", "ket qua", "may/ccdc", "cap nhat", "thoi gian"]);

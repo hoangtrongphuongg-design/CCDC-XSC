@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Download } from "lucide-react";
 import { closeInventoryAction } from "@/actions/inventory";
 import { InventoryChecklist } from "@/components/inventory/inventory-checklist";
+import { InventoryToolCounts } from "@/components/inventory/inventory-tool-counts";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/guards";
-import { summarizeInventory } from "@/lib/inventory";
+import { summarizeInventory, summarizeToolCounts } from "@/lib/inventory";
 import { loadInventoryDetail } from "@/lib/inventory-data";
 import { formatDateTime } from "@/lib/utils";
 
@@ -18,9 +19,10 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
   const { id } = await params;
   const detail = await loadInventoryDetail(auth, id);
   if (!detail) notFound();
-  const { session, items, canManage, canCheck } = detail;
+  const { session, items, tools, canManage, canCheck, canReportLoss } = detail;
   const open = session.status === "open";
   const summary = summarizeInventory(items);
+  const toolSummary = summarizeToolCounts(tools);
 
   return (
     <div className="inventory-page">
@@ -36,7 +38,14 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
         }
       />
 
-      <InventoryChecklist sessionId={session.id} items={items.map(({ checkedAt: _at, checkedByName: _by, ...rest }) => rest)} canCheck={canCheck && open} open={open} />
+      <InventoryChecklist sessionId={session.id} items={items.map(({ checkedAt: _at, checkedByName: _by, ...rest }) => rest)} canCheck={canCheck && open} canReportLoss={canReportLoss} open={open} />
+
+      {session.includesTools ? (
+        <>
+          <h2 className="inventory-section-title">CCDC theo số lượng <small>(kiểm mỗi quý)</small></h2>
+          <InventoryToolCounts sessionId={session.id} tools={tools.map(({ checkedByName: _by, ...rest }) => rest)} canCheck={canCheck} canReportLoss={canReportLoss} open={open} />
+        </>
+      ) : null}
 
       {canManage && open ? (
         <Card>
@@ -46,7 +55,7 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
               <div>
                 <strong>Đóng đợt kiểm kê</strong>
                 <p className="muted">
-                  Hiện còn <b>{summary.pending}</b> máy chưa kiểm{summary.offsitePending ? ` và ${summary.offsitePending} máy ở nơi khác chưa xác nhận` : ""}. Sau khi đóng, kết quả bị khóa và không sửa được nữa; máy chưa kiểm ghi “Chưa kiểm” trong biên bản.
+                  Hiện còn <b>{summary.pending}</b> máy chưa kiểm{summary.offsitePending ? ` và ${summary.offsitePending} máy ở nơi khác chưa xác nhận` : ""}{session.includesTools ? `, ${toolSummary.pending} CCDC theo số lượng chưa đếm` : ""}. Sau khi đóng, kết quả bị khóa và không sửa được nữa; máy chưa kiểm ghi “Chưa kiểm” trong biên bản.
                 </p>
               </div>
               <Button type="submit" variant="secondary">Đóng đợt</Button>

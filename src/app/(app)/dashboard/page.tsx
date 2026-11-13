@@ -43,6 +43,7 @@ const statusMeta = {
   wait_repair_confirm: ["Chờ xác nhận sửa", "#D3A23C"],
   wait_disposal: ["Chờ thanh lý", "#D65A4A"],
   disposal_warehouse: ["Kho thanh lý", "#8996A5"],
+  lost: ["Đã mất", "#6B7280"],
   inactive: ["Ngừng sử dụng", "#AEB7C2"],
 } as const;
 

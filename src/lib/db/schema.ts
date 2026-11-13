@@ -29,6 +29,7 @@ export const equipmentStatusEnum = pgEnum("equipment_status", [
   "wait_disposal",
   "disposal_warehouse",
   "inactive",
+  "lost",
 ]);
 export const conditionEnum = pgEnum("equipment_condition", [
   "good",
@@ -88,6 +89,7 @@ export const disposalStatusEnum = pgEnum("disposal_status", [
 export const notificationTypeEnum = pgEnum("notification_type", ["info", "success", "warning", "danger"]);
 export const equipmentRecordStatusEnum = pgEnum("equipment_record_status", ["draft", "active"]);
 export const equipmentOriginTypeEnum = pgEnum("equipment_origin_type", ["existing", "new_purchase", "other"]);
+export const lossStatusEnum = pgEnum("loss_status", ["pending_ws", "completed", "rejected", "cancelled"]);
 export const inventoryStatusEnum = pgEnum("inventory_status", ["open", "closed"]);
 export const inventoryResultEnum = pgEnum("inventory_result", ["found", "missing"]);
 
@@ -515,6 +517,8 @@ export const inventorySessions = pgTable(
     period: varchar("period", { length: 7 }),
     /** Đợt do hệ thống tự đóng khi quá hạn (hết ngày 15). */
     autoClosed: boolean("auto_closed").notNull().default(false),
+    /** Đợt có kèm kiểm CCDC theo số lượng (tháng 1/4/7/10). */
+    includesTools: boolean("includes_tools").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -547,5 +551,50 @@ export const inventoryItems = pgTable(
   (t) => [
     uniqueIndex("inventory_items_session_equipment_unique").on(t.sessionId, t.equipmentId),
     index("inventory_items_session_idx").on(t.sessionId),
+  ],
+);
+
+/**
+ * Phiếu báo mất: một phiếu cho MỘT máy có mã (`equipmentId`) hoặc MỘT CCDC theo số lượng (`toolId` + `quantity` mất).
+ * Quản lý Xưởng/Admin duyệt → máy thành "Đã mất" / trừ tồn CCDC.
+ */
+export const lossReports = pgTable(
+  "loss_reports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: varchar("code", { length: 40 }).notNull(),
+    equipmentId: uuid("equipment_id").references(() => equipment.id),
+    toolId: uuid("tool_id").references(() => toolCatalog.id),
+    quantity: numeric("quantity", { precision: 12, scale: 2 }),
+    ownerGroupId: uuid("owner_group_id").notNull().references(() => groups.id),
+    reportedBy: uuid("reported_by").notNull().references(() => users.id),
+    circumstances: text("circumstances").notNull(),
+    sourceInventorySessionId: uuid("source_inventory_session_id").references(() => inventorySessions.id, { onDelete: "set null" }),
+    status: lossStatusEnum("status").notNull().default("pending_ws"),
+    wsApprovedBy: uuid("ws_approved_by").references(() => users.id),
+    wsApprovedAt: timestamp("ws_approved_at", { withTimezone: true }),
+    rejectionReason: text("rejection_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("loss_reports_code_unique").on(t.code), index("loss_reports_status_idx").on(t.status)],
+);
+
+/** Kết quả đếm một CCDC theo số lượng trong đợt kiểm kê quý. `expectedQty` = số tồn hệ thống tại lúc đếm. */
+export const inventoryToolCounts = pgTable(
+  "inventory_tool_counts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id").notNull().references(() => inventorySessions.id, { onDelete: "cascade" }),
+    toolId: uuid("tool_id").notNull().references(() => toolCatalog.id),
+    expectedQty: numeric("expected_qty", { precision: 12, scale: 2 }).notNull(),
+    countedQty: numeric("counted_qty", { precision: 12, scale: 2 }).notNull(),
+    note: varchar("note", { length: 240 }),
+    checkedBy: uuid("checked_by").references(() => users.id),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("inventory_tool_counts_session_tool_unique").on(t.sessionId, t.toolId),
+    index("inventory_tool_counts_session_idx").on(t.sessionId),
   ],
 );

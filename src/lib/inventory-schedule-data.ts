@@ -8,8 +8,8 @@ import { db } from "@/lib/db";
 import { equipment, inventoryItems, inventorySessions } from "@/lib/db/schema";
 import { loadOperationalGroups } from "@/lib/equipment-data";
 import { vnDate } from "@/lib/export/equipment-export";
-import { summarizeInventory } from "@/lib/inventory";
-import { createInventorySession } from "@/lib/inventory-create";
+import { isToolQuarter, summarizeInventory } from "@/lib/inventory";
+import { createInventorySession, groupHasActiveTools } from "@/lib/inventory-create";
 import { periodOf, periodTitle, plan, type ScheduleAction } from "@/lib/inventory-schedule";
 
 export type ScheduleRunSummary = {
@@ -100,9 +100,10 @@ async function closeScheduledSession(sessionId: string): Promise<{ unchecked: nu
 
 /** Đợt mở tay còn đang mở được nhận làm đợt của tháng (không tạo thêm đợt thứ hai cho nhóm). */
 async function adoptManualSession(sessionId: string, groupId: string, groupName: string, period: string): Promise<boolean> {
+  const includesTools = isToolQuarter(period) && (await groupHasActiveTools(groupId));
   return db.transaction(async (tx) => {
     const [updated] = await tx.update(inventorySessions)
-      .set({ period, title: sql`coalesce(${inventorySessions.title}, ${periodTitle(period)})`, updatedAt: new Date() })
+      .set({ period, includesTools, title: sql`coalesce(${inventorySessions.title}, ${periodTitle(period)})`, updatedAt: new Date() })
       .where(and(eq(inventorySessions.id, sessionId), eq(inventorySessions.status, "open"), sql`${inventorySessions.period} is null`))
       .returning({ id: inventorySessions.id, code: inventorySessions.code });
     if (!updated) return false;

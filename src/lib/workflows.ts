@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { disposals, equipment, machineLoans, repairs, toolCatalog, transfers } from "@/lib/db/schema";
+import { disposals, equipment, lossReports, machineLoans, repairs, toolCatalog, transfers } from "@/lib/db/schema";
 import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
-import { OPEN_DISPOSAL_STATUSES, OPEN_REPAIR_STATUSES, OPEN_TRANSFER_STATUSES } from "@/lib/workflow-status";
+import { OPEN_DISPOSAL_STATUSES, OPEN_LOSS_STATUSES, OPEN_REPAIR_STATUSES, OPEN_TRANSFER_STATUSES } from "@/lib/workflow-status";
 
 export type DbTx = any; // Transaction object của Drizzle; giữ tương thích giữa các phiên bản Drizzle.
 
@@ -119,7 +119,7 @@ export async function lockEquipment(tx: DbTx, equipmentId: string): Promise<Lock
 export async function assertEquipmentHasNoOtherOpenWorkflow(
   tx: DbTx,
   equipmentId: string,
-  except: { machineLoanId?: string; transferId?: string; repairId?: string; disposalId?: string } = {},
+  except: { machineLoanId?: string; transferId?: string; repairId?: string; disposalId?: string; lossId?: string } = {},
 ) {
   const [loan] = await tx.select({ id: machineLoans.id }).from(machineLoans).where(and(
     eq(machineLoans.equipmentId, equipmentId),
@@ -144,4 +144,10 @@ export async function assertEquipmentHasNoOtherOpenWorkflow(
     inArray(disposals.status, [...OPEN_DISPOSAL_STATUSES]),
   )).limit(1);
   if (disposal && except.disposalId !== disposal.id) throw new Error("Máy đang có phiếu thanh lý chưa hoàn tất.");
+
+  const [loss] = await tx.select({ id: lossReports.id }).from(lossReports).where(and(
+    eq(lossReports.equipmentId, equipmentId),
+    inArray(lossReports.status, [...OPEN_LOSS_STATUSES]),
+  )).limit(1);
+  if (loss && except.lossId !== loss.id) throw new Error("Máy đang có phiếu báo mất chưa xử lý.");
 }

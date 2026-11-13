@@ -134,6 +134,16 @@ test("máy sửa không được: Đốc công nhóm chủ nhận lại; Quản 
   assert.deepEqual(run(subject({ isWsManager: true })), []);
 });
 
+test("báo mất: chỉ Quản lý Xưởng / Admin có việc duyệt", () => {
+  const row = { ...base, code: "BM-1", ownerGroupId: A, reportedBy: OTHER, status: "pending_ws" };
+  const run = (s: TaskSubject, status = "pending_ws") => keys(buildMyTasks(s, input({ losses: [{ ...row, status }] })));
+  assert.deepEqual(run(subject({ isWsManager: true })), ["loss-ws"]);
+  assert.deepEqual(run(subject({ isAdmin: true })), ["loss-ws"]);
+  assert.deepEqual(run(subject({ perms: [[A, "manager"]] })), [], "Đốc công nhóm không có việc duyệt báo mất");
+  assert.deepEqual(run(subject({ isWsManager: true }), "completed"), []);
+  assert.deepEqual(run(subject({ isReadOnlyViewer: true, isWsManager: true })), []);
+});
+
 test("Admin / Quản lý Xưởng không tự có việc của mọi nhóm; Người xem toàn xưởng không có việc nào", () => {
   const all = input({
     loans: [{ ...base, status: "pending_owner", ownerGroupId: A, borrowerGroupId: B, requestedBy: OTHER, expectedReturnDate: "2026-12-01" }],
@@ -156,7 +166,7 @@ test("đếm theo mục menu, sắp việc chờ lâu nhất lên đầu, huy hi
     disposals: [{ ...base, id: "d1", status: "pending_ws", ownerGroupId: A, proposedBy: OTHER, updatedAt: new Date("2026-11-04T00:00:00Z") }],
   }));
   assert.deepEqual(tasks.map((t) => t.section), ["transfers", "repairs", "disposals", "loans"]);
-  assert.deepEqual(countBySection(tasks), { loans: 1, transfers: 1, repairs: 1, disposals: 1, inventory: 0 });
+  assert.deepEqual(countBySection(tasks), { loans: 1, transfers: 1, repairs: 1, disposals: 1, losses: 0, inventory: 0 });
   assert.equal(new Set(tasks.map((t) => t.key)).size, tasks.length, "key không trùng");
   assert.equal(formatBadge(7), "7");
   assert.equal(formatBadge(99), "99");

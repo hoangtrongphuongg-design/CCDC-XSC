@@ -3135,3 +3135,20 @@ body {
 .stat-grid.compact.with-notes .stat-copy span { grid-column: 1; grid-row: 1; }
 .stat-grid.compact.with-notes .stat-copy strong { grid-column: 2; grid-row: 1 / span 2; }
 .stat-grid.compact.with-notes .stat-copy small { display: -webkit-box; grid-column: 1; grid-row: 2; color: var(--text-muted); font-size: 12px; line-height: 1.3; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* Nút nhỏ mở cửa sổ ngay trong dòng (vd "Báo mất" ở danh sách kiểm kê) */
+.ticket-inline-btn { min-height: 36px; padding: 0 14px; border: 1px solid rgba(217, 45, 32, .45); border-radius: 10px; background: #fef3f2; color: #b42318; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
+.ticket-inline-btn:hover { background: #fee4e2; }
+@media (pointer: coarse) { .ticket-inline-btn { min-height: 44px; } }
+
+/* Kiểm kê: huy hiệu báo mất, khối CCDC theo số lượng */
+.inventory-loss-badge { display: block; margin-top: 4px; color: #b42318; font-size: 12px; font-weight: 750; }
+.inventory-section-title { margin: 22px 0 10px; font-size: 16px; }
+.inventory-section-title small { color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.inventory-tools { display: grid; gap: 10px; }
+.inventory-count-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.inventory-count-form input { width: 96px; min-height: 40px; text-align: right; }
+.inventory-tool-result.is-ok { color: var(--success); font-weight: 700; }
+.inventory-tool-result.is-short { color: var(--danger); font-weight: 700; }
+.inventory-tool-result.is-over { color: #b54708; font-weight: 700; }
+.inventory-tools-tag { color: var(--primary); font-weight: 700; }

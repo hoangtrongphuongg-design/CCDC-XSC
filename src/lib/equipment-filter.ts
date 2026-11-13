@@ -60,7 +60,7 @@ export function matchesEquipmentFilters(row: FilterableEquipment, filters: Equip
   if (filters.group && row.ownerGroupId !== filters.group) return false;
   if (filters.status) {
     if (filters.status === IN_PROCESS) {
-      if (row.status === "in_use_owner" || row.status === "disposal_warehouse") return false;
+      if (row.status === "in_use_owner" || row.status === "disposal_warehouse" || row.status === "lost") return false;
     } else if (row.status !== filters.status) return false;
   }
   if (filters.condition && row.condition !== filters.condition) return false;

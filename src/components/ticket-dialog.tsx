@@ -22,6 +22,7 @@ export function TicketDialog({
   defaultOpen = false,
   slot = 0,
   submitDisabled = false,
+  variant = "fab",
   children,
 }: {
   buttonLabel: string;
@@ -32,6 +33,8 @@ export function TicketDialog({
   slot?: number;
   /** Khóa nút gửi khi chưa có gì để chọn (cửa sổ chỉ hiện lời giải thích). */
   submitDisabled?: boolean;
+  /** "fab" = nút đỏ nổi ngoài trang; "inline" = nút nhỏ đặt ngay trong dòng (vd "Báo mất" ở danh sách kiểm kê). */
+  variant?: "fab" | "inline";
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -58,15 +61,19 @@ export function TicketDialog({
 
   return (
     <>
-      <button
-        type="button"
-        className="ticket-fab"
-        style={{ "--ticket-slot": slot } as React.CSSProperties}
-        onClick={() => setOpen(true)}
-      >
-        <Plus size={18} aria-hidden="true" />
-        <span>{buttonLabel}</span>
-      </button>
+      {variant === "inline" ? (
+        <button type="button" className="ticket-inline-btn" onClick={() => setOpen(true)}>{buttonLabel}</button>
+      ) : (
+        <button
+          type="button"
+          className="ticket-fab"
+          style={{ "--ticket-slot": slot } as React.CSSProperties}
+          onClick={() => setOpen(true)}
+        >
+          <Plus size={18} aria-hidden="true" />
+          <span>{buttonLabel}</span>
+        </button>
+      )}
       {open ? (
         <div className="asset-modal-backdrop ticket-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
           <section className="asset-modal ticket-modal" role="dialog" aria-modal="true" aria-label={title}>
