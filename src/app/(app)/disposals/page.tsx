@@ -27,6 +27,7 @@ import { DISPOSABLE_CONDITIONS, DISPOSABLE_STATUSES } from "@/lib/disposal-rule"
 import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
 import { OPEN_REPAIR_STATUSES, OPEN_TRANSFER_STATUSES } from "@/lib/workflow-status";
 import { submitDisposal, submitToolDisposal } from "@/actions/ticket-forms";
+import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { CLOSED_DISPOSAL_STATUSES, OPEN_DISPOSAL_STATUSES, RECENT_CLOSED_LIMIT } from "@/lib/workflow-status";
 
 export default async function DisposalsPage() {
@@ -62,8 +63,11 @@ export default async function DisposalsPage() {
   const disposableTools = toolRows.filter((item) => Number(item.quantityOnHand) > 0 && hasGroupPermission(auth, item.groupId, "operator"));
   const toolMap = new Map(toolRows.map((item) => [item.id, item]));
 
-  const canCreateDisposal = disposableEquipment.length > 0 && !auth.isReadOnlyViewer;
-  const canCreateToolDisposal = disposableTools.length > 0 && !auth.isReadOnlyViewer;
+  // Nút "Tạo phiếu" luôn hiện cho người có quyền tạo (Kỹ sư giám sát trở lên của một nhóm nghiệp vụ, hoặc Quản lý Xưởng/Admin),
+  // không phụ thuộc có máy đủ điều kiện hay chưa — chưa có thì cửa sổ giải thích lý do (giống các tab Mượn – Trả / Điều chuyển).
+  const canCreate = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.some((p) => p.level !== "viewer" && p.groupCode !== "KHO_TL" && isOfficialOperationalGroupCode(p.groupCode)));
+  const canCreateDisposal = canCreate;
+  const canCreateToolDisposal = canCreate;
 
   return (
     <div className={canCreateDisposal || canCreateToolDisposal ? "has-ticket-fab" : undefined}>
@@ -146,14 +150,20 @@ export default async function DisposalsPage() {
       </TicketTableCard>
 
       {canCreateDisposal ? (
-        <TicketDialog buttonLabel="Tạo phiếu thanh lý" title="Đề xuất thanh lý máy" submitLabel="Tạo đề xuất" action={submitDisposal} slot={canCreateToolDisposal ? 1 : 0}>
-          <FormField label="Máy thanh lý" required hint="Máy tình trạng Hư hỏng hoặc Không thể phục hồi của nhóm bạn, chưa nằm trong phiếu khác."><select name="equipmentId">{disposableEquipment.map((e) => <option key={e.id} value={e.id}>{e.code} — {e.name}</option>)}</select></FormField>
+        <TicketDialog buttonLabel="Tạo phiếu thanh lý" title="Đề xuất thanh lý máy" submitLabel="Tạo đề xuất" action={submitDisposal} slot={1} submitDisabled={disposableEquipment.length === 0}>
+          {disposableEquipment.length === 0 ? (
+            <EmptyState title="Chưa có máy để thanh lý" description="Máy phải có tình trạng Hư hỏng hoặc Không thể phục hồi, thuộc nhóm bạn có quyền thao tác và chưa nằm trong phiếu khác. Máy sửa không được sẽ xuất hiện ở đây sau khi Đốc công nhóm bấm Nhận lại máy ở tab Sửa chữa." />
+          ) : null}
+          <FormField label="Máy thanh lý" required hint="Máy tình trạng Hư hỏng hoặc Không thể phục hồi của nhóm bạn, chưa nằm trong phiếu khác."><select name="equipmentId" disabled={disposableEquipment.length === 0}>{disposableEquipment.map((e) => <option key={e.id} value={e.id}>{e.code} — {e.name}</option>)}</select></FormField>
               <FormField label="Tình trạng hư hỏng" required><textarea name="conditionSummary" placeholder="Mô tả tình trạng và kết luận kỹ thuật" /></FormField>
               <FormField label="Lý do đề xuất thanh lý" required><textarea name="reason" /></FormField>
         </TicketDialog>
       ) : null}
       {canCreateToolDisposal ? (
-        <TicketDialog buttonLabel="Tạo thanh lý CCDC số lượng" title="Đề xuất thanh lý CCDC nhỏ lẻ" submitLabel="Tạo đề xuất" action={submitToolDisposal} slot={0}>
+        <TicketDialog buttonLabel="Tạo thanh lý CCDC số lượng" title="Đề xuất thanh lý CCDC nhỏ lẻ" submitLabel="Tạo đề xuất" action={submitToolDisposal} slot={0} submitDisabled={disposableTools.length === 0}>
+          {disposableTools.length === 0 ? (
+            <EmptyState title="Chưa có CCDC để thanh lý" description="Chỉ hiển thị CCDC theo số lượng còn tồn và thuộc nhóm bạn có quyền thao tác." />
+          ) : null}
           <FormField label="CCDC" required>
                   <select name="toolId">
                     {disposableTools.map((tool) => <option key={tool.id} value={tool.id}>{tool.name}{tool.specification ? ` · ${tool.specification}` : ""} · còn {tool.quantityOnHand} {tool.unit}</option>)}

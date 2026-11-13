@@ -21,6 +21,7 @@ export function TicketDialog({
   action,
   defaultOpen = false,
   slot = 0,
+  submitDisabled = false,
   children,
 }: {
   buttonLabel: string;
@@ -29,6 +30,8 @@ export function TicketDialog({
   action: (prev: TicketState, formData: FormData) => Promise<TicketState>;
   defaultOpen?: boolean;
   slot?: number;
+  /** Khóa nút gửi khi chưa có gì để chọn (cửa sổ chỉ hiện lời giải thích). */
+  submitDisabled?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -85,7 +88,7 @@ export function TicketDialog({
               ) : null}
               <div className="ticket-actions">
                 <Button type="button" variant="secondary" onClick={close} disabled={pending}>Hủy</Button>
-                <Button type="submit" disabled={pending}>{pending ? "Đang gửi…" : submitLabel}</Button>
+                <Button type="submit" disabled={pending || submitDisabled}>{pending ? "Đang gửi…" : submitLabel}</Button>
               </div>
             </form>
           </section>
