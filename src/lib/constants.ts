@@ -55,6 +55,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   pending_acceptance: "Chờ tiếp nhận",
   repairing: "Đang sửa chữa",
   wait_owner_confirm: "Chờ nhóm xác nhận",
+  wait_owner_receive: "Chờ nhóm nhận lại (không sửa được)",
   irreparable: "Không thể phục hồi",
   pending_group: "Chờ quản lý nhóm",
   wait_warehouse: "Chờ nhập kho thanh lý",

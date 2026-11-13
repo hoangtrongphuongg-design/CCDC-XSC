@@ -116,6 +116,7 @@ export function buildMovementNote(row: ExportEquipment): string {
       pending_acceptance: "Chờ tiếp nhận sửa chữa",
       repairing: "Đang sửa chữa",
       wait_owner_confirm: "Sửa xong, chờ nhóm chủ nhận lại",
+      wait_owner_receive: "Không sửa được, chờ nhóm chủ nhận lại",
     };
     notes.push(repairLabels[row.repairStatus] ?? "Đang có phiếu sửa chữa");
   }

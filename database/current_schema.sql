@@ -7,7 +7,7 @@ DO $$ BEGIN CREATE TYPE equipment_condition AS ENUM ('good','limited','minor_dam
 DO $$ BEGIN CREATE TYPE machine_loan_status AS ENUM ('pending_owner','approved','wait_handover','on_loan','return_requested','completed','rejected','cancelled','incident'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE transfer_status AS ENUM ('pending_source','pending_target','pending_ws','wait_handover','completed','rejected','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE quick_loan_status AS ENUM ('pending_approval','pending_receipt','borrowed','return_reported','completed','rejected','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE repair_status AS ENUM ('pending_acceptance','repairing','wait_owner_confirm','completed','irreparable','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE repair_status AS ENUM ('pending_acceptance','repairing','wait_owner_confirm','wait_owner_receive','completed','irreparable','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE disposal_status AS ENUM ('pending_group','pending_ws','wait_warehouse','completed','rejected','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE notification_type AS ENUM ('info','success','warning','danger'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE equipment_record_status AS ENUM ('draft','active'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;

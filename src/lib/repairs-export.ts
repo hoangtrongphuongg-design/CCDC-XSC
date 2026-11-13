@@ -108,7 +108,7 @@ export type RepairSummary = {
   byGroup: SummaryLine[];
 };
 
-const STATUS_ORDER = ["pending_acceptance", "repairing", "wait_owner_confirm", "completed", "irreparable", "cancelled"];
+const STATUS_ORDER = ["pending_acceptance", "repairing", "wait_owner_confirm", "wait_owner_receive", "completed", "irreparable", "cancelled"];
 
 function tally(rows: readonly RepairExportRow[], keyOf: (row: RepairExportRow) => string): SummaryLine[] {
   const map = new Map<string, SummaryLine>();

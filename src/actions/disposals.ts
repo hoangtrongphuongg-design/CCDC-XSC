@@ -2,13 +2,21 @@
 
 import { setFlashMessage } from "@/lib/auth/session";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { disposals, equipment, groups, toolCatalog, toolDisposals } from "@/lib/db/schema";
-import { requireGroupPermission, requireWsManager } from "@/lib/auth/guards";
+import { requireGroupPermission, requireUser, requireWsManager } from "@/lib/auth/guards";
 import { assertEquipmentHasNoOtherOpenWorkflow, lockEquipment, nextWorkflowCode } from "@/lib/workflows";
 import { writeAudit } from "@/lib/audit";
+import { canProposeDisposal } from "@/lib/disposal-rule";
+
+/**
+ * Luồng thanh lý (máy có mã và CCDC theo số lượng): nhóm quản lý tạo phiếu → Quản lý Xưởng/Admin duyệt (hoặc từ chối,
+ * người tạo hủy được khi còn chờ) → [máy] chờ nhập kho → Quản lý Xưởng/Admin xác nhận nhập Kho thanh lý.
+ * Không còn bước "Nhóm xác nhận"; phiếu cũ còn `pending_group` vẫn được duyệt như `pending_ws`.
+ */
+const AWAITING_WS = ["pending_ws", "pending_group"] as const;
 
 function refresh() {
   revalidatePath("/disposals");
@@ -26,13 +34,15 @@ export async function createDisposalAction(formData: FormData) {
   if (item.recordStatus !== "active") throw new Error("Dụng cụ chưa hoàn thành hồ sơ nên chưa thể thanh lý.");
   const auth = await requireGroupPermission(item.ownerGroupId, "operator");
   if (!reason || !conditionSummary) throw new Error("Vui lòng ghi rõ lý do và tình trạng.");
-  if (item.condition !== "irreparable" && item.status !== "wait_disposal") throw new Error("Máy chưa có kết luận không thể phục hồi/chờ thanh lý.");
+  if (!canProposeDisposal({ status: item.status, condition: item.condition })) {
+    throw new Error("Chỉ thanh lý máy có tình trạng Hư hỏng hoặc Không thể phục hồi và chưa nằm trong quy trình khác.");
+  }
 
   await db.transaction(async (tx) => {
     await lockEquipment(tx, item.id);
     await assertEquipmentHasNoOtherOpenWorkflow(tx, item.id);
     const code = await nextWorkflowCode(tx, "TL");
-    const [created] = await tx.insert(disposals).values({ code, equipmentId: item.id, ownerGroupId: item.ownerGroupId, proposedBy: auth.userId, reason, conditionSummary, status: "pending_group" }).returning();
+    const [created] = await tx.insert(disposals).values({ code, equipmentId: item.id, ownerGroupId: item.ownerGroupId, proposedBy: auth.userId, reason, conditionSummary, status: "pending_ws" }).returning();
     await tx.update(equipment).set({ status: "wait_disposal", updatedAt: new Date() }).where(eq(equipment.id, item.id));
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
@@ -46,42 +56,17 @@ export async function createDisposalAction(formData: FormData) {
   });
   refresh();
 
-  await setFlashMessage("success", "Đã tạo phiếu thành công", "Đề xuất thanh lý máy đã gửi nhóm xác nhận");
-}
-
-export async function confirmDisposalByGroupAction(formData: FormData) {
-  const disposalId = String(formData.get("disposalId") || "");
-  const [item] = await db.select().from(disposals).where(eq(disposals.id, disposalId)).limit(1);
-  if (!item) throw new Error("Không tìm thấy phiếu.");
-  const auth = await requireGroupPermission(item.ownerGroupId, "manager");
-  if (item.proposedBy === auth.userId) throw new Error("Người tạo phiếu không được tự xác nhận đề xuất của nhóm.");
-  await db.transaction(async (tx) => {
-    const [updated] = await tx.update(disposals).set({ status: "pending_ws", groupConfirmedBy: auth.userId, groupConfirmedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(disposals.id, item.id), eq(disposals.status, "pending_group"))).returning();
-    if (!updated) throw new Error("Phiếu đã được xử lý.");
-    await writeAudit(tx as never, {
-      actorUserId: auth.userId,
-      actorGroupId: item.ownerGroupId,
-      action: "disposal.group_confirm",
-      entityType: "disposal",
-      entityId: item.id,
-      description: `Nhóm quản lý xác nhận đề xuất ${item.code}`,
-      afterData: updated,
-    });
-  });
-  refresh();
-
-  await setFlashMessage("success", 'Nhóm đã xác nhận thanh lý');
+  await setFlashMessage("success", "Đã tạo phiếu thành công", "Đề xuất thanh lý máy đã gửi Quản lý Xưởng duyệt");
 }
 
 export async function approveDisposalByWsAction(formData: FormData) {
   const disposalId = String(formData.get("disposalId") || "");
   const auth = await requireWsManager();
   const [item] = await db.select().from(disposals).where(eq(disposals.id, disposalId)).limit(1);
-  if (!item || item.status !== "pending_ws") throw new Error("Phiếu chưa sẵn sàng để duyệt.");
+  if (!item || !(AWAITING_WS as readonly string[]).includes(item.status)) throw new Error("Phiếu chưa sẵn sàng để duyệt.");
   await db.transaction(async (tx) => {
     const [updated] = await tx.update(disposals).set({ status: "wait_warehouse", wsApprovedBy: auth.userId, wsApprovedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(disposals.id, item.id), eq(disposals.status, "pending_ws"))).returning();
+      .where(and(eq(disposals.id, item.id), inArray(disposals.status, [...AWAITING_WS]))).returning();
     if (!updated) throw new Error("Phiếu đã được xử lý.");
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
@@ -94,14 +79,73 @@ export async function approveDisposalByWsAction(formData: FormData) {
   });
   refresh();
 
-  await setFlashMessage("success", 'Đã duyệt thanh lý');
+  await setFlashMessage("success", 'Đã duyệt thanh lý', 'Nhóm mang máy tới kho; Quản lý Xưởng xác nhận nhập kho');
 }
 
+/** Quản lý Xưởng / Admin từ chối đề xuất (bắt buộc lý do): phiếu đóng, máy về Chờ kiểm tra, giữ nguyên tình trạng. */
+export async function rejectDisposalAction(formData: FormData) {
+  const disposalId = String(formData.get("disposalId") || "");
+  const reason = String(formData.get("rejectionReason") || "").trim();
+  const auth = await requireWsManager();
+  if (!reason) throw new Error("Vui lòng nhập lý do từ chối.");
+  const [item] = await db.select().from(disposals).where(eq(disposals.id, disposalId)).limit(1);
+  if (!item || !(AWAITING_WS as readonly string[]).includes(item.status)) throw new Error("Phiếu chưa ở bước chờ duyệt.");
+  await db.transaction(async (tx) => {
+    await lockEquipment(tx, item.equipmentId);
+    const [updated] = await tx.update(disposals).set({ status: "rejected", rejectionReason: reason, updatedAt: new Date() })
+      .where(and(eq(disposals.id, item.id), inArray(disposals.status, [...AWAITING_WS]))).returning();
+    if (!updated) throw new Error("Phiếu đã được xử lý.");
+    await tx.update(equipment).set({ status: "wait_inspection", updatedAt: new Date() }).where(and(eq(equipment.id, item.equipmentId), eq(equipment.status, "wait_disposal")));
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      action: "disposal.reject",
+      entityType: "disposal",
+      entityId: item.id,
+      description: `Từ chối đề xuất thanh lý ${item.code}: ${reason}`,
+      afterData: updated,
+    });
+  });
+  refresh();
+
+  await setFlashMessage("success", "Đã từ chối đề xuất thanh lý", item.code);
+}
+
+/** Người tạo phiếu (hoặc Quản lý Xưởng / Admin) hủy đề xuất khi còn chờ duyệt: phiếu đóng, máy về Chờ kiểm tra. */
+export async function cancelDisposalAction(formData: FormData) {
+  const disposalId = String(formData.get("disposalId") || "");
+  const auth = await requireUser();
+  const [item] = await db.select().from(disposals).where(eq(disposals.id, disposalId)).limit(1);
+  if (!item) throw new Error("Không tìm thấy phiếu.");
+  if (item.proposedBy !== auth.userId && !auth.isWorkshopAdmin) throw new Error("Chỉ người tạo phiếu hoặc Quản lý Xưởng mới hủy được phiếu này.");
+  if (auth.isReadOnlyViewer) throw new Error("Tài khoản chỉ xem không được hủy phiếu.");
+  if (!(AWAITING_WS as readonly string[]).includes(item.status)) throw new Error("Phiếu đã qua bước duyệt, không hủy được.");
+  await db.transaction(async (tx) => {
+    await lockEquipment(tx, item.equipmentId);
+    const [updated] = await tx.update(disposals).set({ status: "cancelled", updatedAt: new Date() })
+      .where(and(eq(disposals.id, item.id), inArray(disposals.status, [...AWAITING_WS]))).returning();
+    if (!updated) throw new Error("Phiếu đã được xử lý.");
+    await tx.update(equipment).set({ status: "wait_inspection", updatedAt: new Date() }).where(and(eq(equipment.id, item.equipmentId), eq(equipment.status, "wait_disposal")));
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: item.ownerGroupId,
+      action: "disposal.cancel",
+      entityType: "disposal",
+      entityId: item.id,
+      description: `Hủy đề xuất thanh lý ${item.code}`,
+      afterData: updated,
+    });
+  });
+  refresh();
+
+  await setFlashMessage("success", "Đã hủy phiếu thanh lý", item.code);
+}
+
+/** Quản lý Xưởng / Admin xác nhận máy đã được nhóm mang tới Kho thanh lý (bước cuối). */
 export async function receiveDisposalWarehouseAction(formData: FormData) {
   const disposalId = String(formData.get("disposalId") || "");
+  const auth = await requireWsManager();
   const [warehouse] = await db.select().from(groups).where(eq(groups.code, "KHO_TL")).limit(1);
   if (!warehouse) throw new Error("Chưa có nhóm hệ thống KHO_TL.");
-  const auth = await requireGroupPermission(warehouse.id, "operator");
   const [item] = await db.select().from(disposals).where(eq(disposals.id, disposalId)).limit(1);
   if (!item || item.status !== "wait_warehouse") throw new Error("Phiếu chưa chờ nhập kho.");
 
@@ -150,7 +194,7 @@ export async function createToolDisposalAction(formData: FormData) {
       proposedBy: auth.userId,
       reason,
       conditionSummary: conditionSummary || null,
-      status: "pending_group",
+      status: "pending_ws",
     }).returning();
 
     await writeAudit(tx as never, {
@@ -164,33 +208,14 @@ export async function createToolDisposalAction(formData: FormData) {
     });
   });
   refresh();
-  await setFlashMessage("success", "Đã tạo phiếu thành công", "Đề xuất thanh lý CCDC đã gửi nhóm xác nhận");
-}
-
-export async function confirmToolDisposalByGroupAction(formData: FormData) {
-  const disposalId = String(formData.get("disposalId") || "");
-  const [item] = await db.select().from(toolDisposals).where(eq(toolDisposals.id, disposalId)).limit(1);
-  if (!item) throw new Error("Không tìm thấy phiếu thanh lý CCDC.");
-  const auth = await requireGroupPermission(item.ownerGroupId, "manager");
-  if (item.proposedBy === auth.userId) throw new Error("Người tạo phiếu không được tự xác nhận đề xuất của nhóm.");
-
-  const [updated] = await db.update(toolDisposals).set({
-    status: "pending_ws",
-    groupConfirmedBy: auth.userId,
-    groupConfirmedAt: new Date(),
-    updatedAt: new Date(),
-  }).where(and(eq(toolDisposals.id, item.id), eq(toolDisposals.status, "pending_group"))).returning();
-
-  if (!updated) throw new Error("Phiếu đã được xử lý.");
-  refresh();
-  await setFlashMessage("success", "Nhóm đã xác nhận thanh lý CCDC");
+  await setFlashMessage("success", "Đã tạo phiếu thành công", "Đề xuất thanh lý CCDC đã gửi Quản lý Xưởng duyệt");
 }
 
 export async function approveToolDisposalByWsAction(formData: FormData) {
   const disposalId = String(formData.get("disposalId") || "");
   const auth = await requireWsManager();
   const [item] = await db.select().from(toolDisposals).where(eq(toolDisposals.id, disposalId)).limit(1);
-  if (!item || item.status !== "pending_ws") throw new Error("Phiếu chưa sẵn sàng để duyệt.");
+  if (!item || !(AWAITING_WS as readonly string[]).includes(item.status)) throw new Error("Phiếu chưa sẵn sàng để duyệt.");
 
   await db.transaction(async (tx) => {
     const [tool] = await tx.select().from(toolCatalog).where(eq(toolCatalog.id, item.toolId)).limit(1);
@@ -205,7 +230,7 @@ export async function approveToolDisposalByWsAction(formData: FormData) {
       wsApprovedBy: auth.userId,
       wsApprovedAt: new Date(),
       updatedAt: new Date(),
-    }).where(and(eq(toolDisposals.id, item.id), eq(toolDisposals.status, "pending_ws"))).returning();
+    }).where(and(eq(toolDisposals.id, item.id), inArray(toolDisposals.status, [...AWAITING_WS]))).returning();
     if (!updated) throw new Error("Phiếu đã được xử lý.");
 
     await tx.update(toolCatalog).set({
@@ -228,4 +253,55 @@ export async function approveToolDisposalByWsAction(formData: FormData) {
 
   refresh();
   await setFlashMessage("success", "Đã duyệt thanh lý CCDC");
+}
+
+export async function rejectToolDisposalAction(formData: FormData) {
+  const disposalId = String(formData.get("disposalId") || "");
+  const reason = String(formData.get("rejectionReason") || "").trim();
+  const auth = await requireWsManager();
+  if (!reason) throw new Error("Vui lòng nhập lý do từ chối.");
+  const [item] = await db.select().from(toolDisposals).where(eq(toolDisposals.id, disposalId)).limit(1);
+  if (!item || !(AWAITING_WS as readonly string[]).includes(item.status)) throw new Error("Phiếu chưa ở bước chờ duyệt.");
+  await db.transaction(async (tx) => {
+    const [updated] = await tx.update(toolDisposals).set({ status: "rejected", rejectionReason: reason, updatedAt: new Date() })
+      .where(and(eq(toolDisposals.id, item.id), inArray(toolDisposals.status, [...AWAITING_WS]))).returning();
+    if (!updated) throw new Error("Phiếu đã được xử lý.");
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: item.ownerGroupId,
+      action: "tool_disposal.reject",
+      entityType: "tool_disposal",
+      entityId: item.id,
+      description: `Từ chối đề xuất thanh lý CCDC ${item.code}: ${reason}`,
+      afterData: updated,
+    });
+  });
+  refresh();
+  await setFlashMessage("success", "Đã từ chối đề xuất thanh lý CCDC", item.code);
+}
+
+export async function cancelToolDisposalAction(formData: FormData) {
+  const disposalId = String(formData.get("disposalId") || "");
+  const auth = await requireUser();
+  const [item] = await db.select().from(toolDisposals).where(eq(toolDisposals.id, disposalId)).limit(1);
+  if (!item) throw new Error("Không tìm thấy phiếu thanh lý CCDC.");
+  if (item.proposedBy !== auth.userId && !auth.isWorkshopAdmin) throw new Error("Chỉ người tạo phiếu hoặc Quản lý Xưởng mới hủy được phiếu này.");
+  if (auth.isReadOnlyViewer) throw new Error("Tài khoản chỉ xem không được hủy phiếu.");
+  if (!(AWAITING_WS as readonly string[]).includes(item.status)) throw new Error("Phiếu đã qua bước duyệt, không hủy được.");
+  await db.transaction(async (tx) => {
+    const [updated] = await tx.update(toolDisposals).set({ status: "cancelled", updatedAt: new Date() })
+      .where(and(eq(toolDisposals.id, item.id), inArray(toolDisposals.status, [...AWAITING_WS]))).returning();
+    if (!updated) throw new Error("Phiếu đã được xử lý.");
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: item.ownerGroupId,
+      action: "tool_disposal.cancel",
+      entityType: "tool_disposal",
+      entityId: item.id,
+      description: `Hủy đề xuất thanh lý CCDC ${item.code}`,
+      afterData: updated,
+    });
+  });
+  refresh();
+  await setFlashMessage("success", "Đã hủy phiếu thanh lý CCDC", item.code);
 }

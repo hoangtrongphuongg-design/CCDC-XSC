@@ -135,17 +135,26 @@ export async function sendExternalRepairAction(formData: FormData) {
   await setFlashMessage("success", 'Đã chuyển sang thuê ngoài sửa chữa');
 }
 
-export async function markExternalIrreparableAction(formData: FormData) {
+/**
+ * Quản lý Xưởng / Admin kết luận máy KHÔNG THỂ PHỤC HỒI (sửa nội bộ hoặc thuê ngoài). Máy được trả về nhóm quản lý
+ * với tình trạng Không thể phục hồi; phiếu chờ Đốc công nhóm quản lý bấm "Nhận lại máy" (receiveIrreparableByOwnerAction),
+ * sau đó nhóm tự tạo phiếu ở tab Thanh lý.
+ */
+export async function markRepairIrreparableAction(formData: FormData) {
   const repairId = String(formData.get("repairId") || "");
   const resultNotes = String(formData.get("resultNotes") || "").trim();
   const cost = Number(formData.get("cost") || 0);
   const auth = await requireWsManager();
   const [repair] = await db.select().from(repairs).where(eq(repairs.id, repairId)).limit(1);
-  if (!repair || repair.status !== "repairing" || repair.repairType !== "external") throw new Error("Phiếu chưa ở trạng thái thuê ngoài sửa chữa.");
+  if (!repair || repair.status !== "repairing") throw new Error("Phiếu chưa ở trạng thái đang sửa.");
   await db.transaction(async (tx) => {
-    await tx.update(repairs).set({ status: "irreparable", resultNotes: resultNotes || "Đơn vị sửa ngoài kết luận không thể phục hồi", cost: String(Math.max(0, cost)), completedBy: auth.userId, completedAt: new Date(), updatedAt: new Date() }).where(eq(repairs.id, repair.id));
-    await tx.update(equipment).set({ status: "wait_disposal", condition: "irreparable", updatedAt: new Date() }).where(eq(equipment.id, repair.equipmentId));
-    await writeAudit(tx as never, { actorUserId: auth.userId, action: "repair.irreparable", entityType: "repair", entityId: repair.id, description: `Sửa ngoài kết luận không thể phục hồi ${repair.code}`, afterData: { resultNotes, cost } });
+    const external = repair.repairType === "external";
+    const [marked] = await tx.update(repairs).set({ status: "wait_owner_receive", resultNotes: resultNotes || (external ? "Đơn vị sửa ngoài kết luận không thể phục hồi" : "Xưởng kết luận không thể phục hồi"), cost: String(Math.max(0, cost)), completedBy: auth.userId, completedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(repairs.id, repair.id), eq(repairs.status, "repairing"))).returning();
+    if (!marked) throw new Error("Phiếu đã được xử lý.");
+    // Máy về nhóm quản lý, chờ Đốc công nhận lại (chưa phải "Chờ thanh lý": phiếu thanh lý do nhóm tự tạo sau đó).
+    await tx.update(equipment).set({ status: "wait_repair_confirm", condition: "irreparable", updatedAt: new Date() }).where(eq(equipment.id, repair.equipmentId));
+    await writeAudit(tx as never, { actorUserId: auth.userId, action: "repair.irreparable", entityType: "repair", entityId: repair.id, description: `${external ? "Sửa ngoài" : "Sửa nội bộ"} kết luận không thể phục hồi ${repair.code}`, afterData: { resultNotes, cost } });
 
     // Máy hỏng khi đang được mượn: kết luận không thể phục hồi phải đóng luôn phiếu mượn
     // nguồn và trả máy về nhóm quản lý, nếu không phiếu kẹt "có sự cố" mãi, chặn đề xuất
@@ -179,7 +188,38 @@ export async function markExternalIrreparableAction(formData: FormData) {
   });
   refresh();
 
-  await setFlashMessage("success", 'Đã ghi nhận không thể phục hồi');
+  await setFlashMessage("success", 'Đã ghi nhận không thể phục hồi', 'Máy chờ Đốc công nhóm quản lý nhận lại');
+}
+
+/** Đốc công nhóm quản lý nhận lại máy sửa không được: phiếu sửa đóng, máy ở nhóm (Chờ kiểm tra + Không thể phục hồi) để nhóm tạo phiếu thanh lý. */
+export async function receiveIrreparableByOwnerAction(formData: FormData) {
+  const repairId = String(formData.get("repairId") || "");
+  const [repair] = await db.select().from(repairs).where(eq(repairs.id, repairId)).limit(1);
+  if (!repair) throw new Error("Không tìm thấy phiếu.");
+  const [item] = await db.select().from(equipment).where(eq(equipment.id, repair.equipmentId)).limit(1);
+  if (!item) throw new Error("Không tìm thấy máy.");
+  const auth = await requireGroupPermission(item.ownerGroupId, "manager");
+  if (repair.status !== "wait_owner_receive") throw new Error("Phiếu chưa chờ nhóm nhận lại máy không thể phục hồi.");
+
+  await db.transaction(async (tx) => {
+    await lockEquipment(tx, item.id);
+    const [updated] = await tx.update(repairs).set({ status: "irreparable", ownerConfirmedBy: auth.userId, ownerConfirmedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(repairs.id, repair.id), eq(repairs.status, "wait_owner_receive"))).returning();
+    if (!updated) throw new Error("Phiếu đã được xử lý.");
+    await tx.update(equipment).set({ status: "wait_inspection", condition: "irreparable", currentGroupId: item.ownerGroupId, currentHolderId: auth.userId, updatedAt: new Date() }).where(eq(equipment.id, item.id));
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      actorGroupId: item.ownerGroupId,
+      action: "repair.owner_receive_irreparable",
+      entityType: "repair",
+      entityId: repair.id,
+      description: `Nhóm quản lý nhận lại máy không thể phục hồi ${repair.code}`,
+      afterData: { status: "irreparable" },
+    });
+  });
+  refresh();
+
+  await setFlashMessage("success", 'Đã nhận lại máy', 'Nhóm có thể tạo phiếu thanh lý ở tab Thanh lý');
 }
 
 /**

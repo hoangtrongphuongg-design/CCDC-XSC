@@ -70,6 +70,7 @@ export function workflowTone(status: string): Tone {
     case "pending_group":
     case "wait_handover":
     case "wait_owner_confirm":
+    case "wait_owner_receive":
     case "wait_warehouse":
     case "return_requested":
     case "return_reported":

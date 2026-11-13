@@ -33,7 +33,7 @@ test("tình trạng máy theo phiếu sửa: báo hỏng → Hư hỏng; sửa x
   assert.match(complete, /status: "wait_repair_confirm", condition: "good"/);
   const confirm = actions.slice(actions.indexOf("export async function confirmRepairByOwnerAction"));
   assert.match(confirm, /status: "in_use_owner", condition: "good"/, "Đốc công nhận lại thì máy về Sẵn sàng + Tốt");
-  assert.match(actions, /status: "wait_disposal", condition: "irreparable"/);
+  assert.match(actions, /status: "wait_repair_confirm", condition: "irreparable"/);
 });
 
 test("các trang dùng chung nhãn sửa nội bộ / thuê ngoài lấy từ phiếu sửa đang mở", async () => {

@@ -18,6 +18,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { formatDate } from "@/lib/utils";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
+import { OPEN_REPAIR_STATUSES } from "@/lib/workflow-status";
 import { countLoanViews, loanDaysLate, matchesLoanView, parseLoanView } from "@/lib/loan-views";
 import { vnDate } from "@/lib/export/equipment-export";
 import { submitMachineLoan } from "@/actions/ticket-forms";
@@ -57,7 +58,7 @@ export default async function MachineLoansPage({ searchParams }: { searchParams?
     db.select().from(machineLoans).where(inArray(machineLoans.status, ["completed", "rejected", "cancelled"])).orderBy(desc(machineLoans.createdAt)).limit(100),
     db.select({ equipmentId: machineLoans.equipmentId }).from(machineLoans).where(inArray(machineLoans.status, [...OPEN_MACHINE_LOAN_STATUSES])),
     db.select({ equipmentId: transfers.equipmentId }).from(transfers).where(inArray(transfers.status, ["pending_source", "pending_target", "pending_ws", "wait_handover"])),
-    db.select({ equipmentId: repairs.equipmentId }).from(repairs).where(inArray(repairs.status, ["pending_acceptance", "repairing", "wait_owner_confirm"])),
+    db.select({ equipmentId: repairs.equipmentId }).from(repairs).where(inArray(repairs.status, [...OPEN_REPAIR_STATUSES])),
     db.select({ equipmentId: disposals.equipmentId }).from(disposals).where(inArray(disposals.status, ["pending_group", "pending_ws", "wait_warehouse"])),
   ]);
 

@@ -67,6 +67,7 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   "repair.complete": { label: "Hoàn tất sửa chữa", category: "repair" },
   "repair.external": { label: "Chuyển thuê ngoài sửa chữa", category: "repair" },
   "repair.irreparable": { label: "Kết luận không thể phục hồi", category: "repair" },
+  "repair.owner_receive_irreparable": { label: "Nhóm nhận lại máy không thể phục hồi", category: "repair" },
   "repair.owner_confirm": { label: "Nhóm nhận lại máy sau sửa", category: "repair" },
   "repair.cost_update": { label: "Cập nhật chi phí sửa chữa", category: "repair" },
   // Thanh lý
@@ -74,8 +75,12 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   "disposal.group_confirm": { label: "Nhóm xác nhận thanh lý", category: "disposal" },
   "disposal.ws_approve": { label: "Quản lý Xưởng duyệt thanh lý", category: "disposal" },
   "disposal.warehouse_receive": { label: "Nhập Kho thanh lý", category: "disposal" },
+  "disposal.reject": { label: "Từ chối đề xuất thanh lý", category: "disposal" },
+  "disposal.cancel": { label: "Hủy đề xuất thanh lý", category: "disposal" },
   "tool_disposal.create": { label: "Đề xuất thanh lý CCDC theo số lượng", category: "disposal" },
   "tool_disposal.complete": { label: "Duyệt thanh lý CCDC theo số lượng", category: "disposal" },
+  "tool_disposal.reject": { label: "Từ chối thanh lý CCDC theo số lượng", category: "disposal" },
+  "tool_disposal.cancel": { label: "Hủy đề xuất thanh lý CCDC theo số lượng", category: "disposal" },
   // CCDC
   "equipment.create": { label: "Tạo CCDC", category: "ccdc" },
   "equipment.initial_allocation": { label: "Cấp phát ban đầu", category: "ccdc" },

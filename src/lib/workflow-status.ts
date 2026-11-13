@@ -15,7 +15,7 @@ export const CLOSED_QUICK_LOAN_STATUSES = ["completed", "rejected", "cancelled"]
 export const OPEN_TRANSFER_STATUSES = ["pending_source", "pending_target", "pending_ws", "wait_handover"] as const;
 export const CLOSED_TRANSFER_STATUSES = ["completed", "rejected", "cancelled"] as const;
 
-export const OPEN_REPAIR_STATUSES = ["pending_acceptance", "repairing", "wait_owner_confirm"] as const;
+export const OPEN_REPAIR_STATUSES = ["pending_acceptance", "repairing", "wait_owner_confirm", "wait_owner_receive"] as const;
 export const CLOSED_REPAIR_STATUSES = ["completed", "irreparable", "cancelled"] as const;
 
 /** Dùng cho cả phiếu thanh lý máy (`disposals`) lẫn thanh lý CCDC theo số lượng (`tool_disposals`). */
