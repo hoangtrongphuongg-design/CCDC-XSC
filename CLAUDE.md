@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 165 pass
+npm test           # tsx --test tests/*.test.ts — 169 pass
 ```
 
 Không có ESLint script.
@@ -36,6 +36,7 @@ Next.js 15 App Router + React 19 + TypeScript. Một Postgres (Neon) qua **Drizz
 
 - `equipment` — máy **có mã hệ thống riêng** (`code`, unique, không đổi suốt vòng đời kể cả khi điều chuyển). `legacyCode` = mã đã bấm/khắc trên máy, **hiển thị trên giao diện và file Excel là “Tem nhôm”** (còn `code` hiển thị là “Mã hệ thống”). `originGroupId` (nhóm cấp mã gốc) ≠ `ownerGroupId` (nhóm quản lý hiện tại) ≠ `currentGroupId` (nhóm đang giữ). `recordStatus` `draft`/`active` — nghiệp vụ chỉ chạy trên `active`.
 - **Danh tính máy cố định theo mã** (`lib/equipment-identity.ts`, hàm thuần, `tests/identity-lock.test.ts`): lịch sử (phiếu, nhật ký) gắn theo `equipment.id`/mã nên **Tên, Nhóm thiết bị, Loại** khóa sau khi có mã. Form sửa hiện ô chỉ đọc cho người thường; `saveEquipmentRecordAction` (và `updateQuantityToolAction` cho CCDC theo số lượng) **từ chối** nếu đổi mà không phải Quản lý Xưởng/Admin (`canChangeIdentity`); Quản lý Xưởng/Admin đổi được nhưng **bắt buộc lý do** (`correctionReason` / `identityReason`, ghi nhật ký `equipment.admin_correction` / `tool_catalog.update` kèm `reason`). Chỉ khác hoa/thường/khoảng trắng thì giữ nguyên chữ đã lưu. Muốn đổi chủng loại = tạo mã mới. **Tem nhôm là nhãn vật lý của đúng một máy**: trùng với MÁY KHÁC (kể cả máy đã thanh lý trong Kho thanh lý) là **lỗi chặn cứng** (`assertLegacyCodeFree`, so khớp không phân biệt hoa/thường/khoảng trắng; chỉ kiểm khi tem mới hoặc vừa đổi nên hồ sơ cũ đang trùng sẵn vẫn lưu được); tem của máy đã thanh lý không dùng lại — nếu tem thật đã gỡ, Quản lý Xưởng/Admin xóa tem ở hồ sơ máy cũ rồi mới gán cho máy mới. Serial trùng vẫn chỉ cảnh báo "vẫn lưu".
+- **Tình trạng & nhãn máy theo phiếu sửa** (`lib/repair-display.ts`, hàm thuần, `tests/repair-display.test.ts`): có phiếu báo hỏng (`createRepairAction`) → tình trạng máy **Hư hỏng** ngay; "Sửa đạt · bàn giao" (`completeRepairAction`) → tình trạng **Tốt**, trạng thái "Chờ xác nhận sửa"; Đốc công nhóm quản lý bấm "Nhận lại" (`confirmRepairByOwnerAction`) → **Sẵn sàng + Tốt**; không thể phục hồi → Không thể phục hồi. Trạng thái máy trong DB chỉ có `repairing`; **"Đang SC nội bộ" / "Đang thuê ngoài sửa"** suy ra từ `repairs.repair_type` của phiếu đang mở (`equipmentStatusDisplay`, `repairStatusLabel`) ở Dụng cụ nhóm tôi, Dụng cụ toàn xưởng, hồ sơ máy và trang Sửa chữa — không có trạng thái máy riêng, không đổi DB.
 - `tool_catalog` — CCDC nhỏ lẻ **quản lý theo số lượng** (`quantityOnHand`), có thể có `code` hoặc không.
 - 5 workflow, mỗi cái 1 bảng + 1 pgEnum trạng thái: `machine_loans`, `quick_loans`, `transfers`, `repairs`, `disposals` (+ `tool_disposals` cho CCDC theo số lượng).
 - `activity_logs` — audit **append-only**. Mọi hàm ghi gọi `writeAudit(tx, {...})` trong cùng transaction, lưu `beforeData`/`afterData` snapshot. Không hard-delete hồ sơ nghiệp vụ.

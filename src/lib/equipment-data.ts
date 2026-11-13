@@ -30,7 +30,7 @@ export type EquipmentScopePermission = {
 
 export type ActiveLoan = { equipmentId: string; ownerGroupId: string; borrowerGroupId: string; status: string; updatedAt: Date };
 export type ActiveTransfer = { equipmentId: string; sourceGroupId: string; targetGroupId: string; status: string; updatedAt: Date };
-export type ActiveRepair = { equipmentId: string; status: string; updatedAt: Date };
+export type ActiveRepair = { equipmentId: string; status: string; repairType: string | null; updatedAt: Date };
 
 
 /** Nhóm nghiệp vụ chính thức đang hoạt động (bỏ nhóm hệ thống như Kho thanh lý). */
@@ -117,6 +117,7 @@ async function loadOpenRepairs(equipmentIds?: string[]): Promise<ActiveRepair[]>
   return db.select({
     equipmentId: repairs.equipmentId,
     status: repairs.status,
+    repairType: repairs.repairType,
     updatedAt: repairs.updatedAt,
   }).from(repairs)
     .where(equipmentIds ? and(openStatus, inArray(repairs.equipmentId, equipmentIds)) : openStatus)

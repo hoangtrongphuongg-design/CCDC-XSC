@@ -16,6 +16,7 @@ import { markInventoryFromProfileAction } from "@/actions/inventory";
 import { INVENTORY_RESULT_LABELS } from "@/lib/inventory";
 import { ORIGIN_LABELS } from "@/lib/machine-profile";
 import { canPrintLabels } from "@/lib/labels";
+import { equipmentStatusDisplay } from "@/lib/repair-display";
 import { dmy, formatVnd } from "@/lib/reports";
 import { formatDateTime } from "@/lib/utils";
 
@@ -30,7 +31,7 @@ export default async function MachineProfilePage({ params }: { params: Promise<{
   const { id } = await params;
   const profile = await loadMachineProfile(auth, id);
   if (!profile) notFound();
-  const { machine, groupNames, heldByGroupName, tickets, history, showFinancials, inMyScope } = profile;
+  const { machine, groupNames, heldByGroupName, tickets, activeRepairType, history, showFinancials, inMyScope } = profile;
   // Hồ sơ nháp (chưa hoàn thành) chỉ người trong phạm vi máy mới xem.
   if (machine.recordStatus !== "active" && !inMyScope) notFound();
 
@@ -81,7 +82,7 @@ export default async function MachineProfilePage({ params }: { params: Promise<{
       {machine.archivedAt ? <p className="notice warning">Máy này đã được lưu trữ.</p> : null}
 
       <div className="profile-badges">
-        <StatusBadge label={EQUIPMENT_STATUS_LABELS[machine.status] ?? machine.status} tone={statusTone} />
+        <StatusBadge label={equipmentStatusDisplay(machine.status, activeRepairType)} tone={statusTone} />
         <StatusBadge label={CONDITION_LABELS[machine.condition] ?? machine.condition} tone={conditionTone} />
         {heldByGroupName ? <StatusBadge label={`Đang ở ${heldByGroupName} (mượn)`} tone="info" /> : null}
       </div>
