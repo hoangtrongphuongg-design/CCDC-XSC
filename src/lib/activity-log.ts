@@ -68,6 +68,7 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   "repair.external": { label: "Chuyển thuê ngoài sửa chữa", category: "repair" },
   "repair.irreparable": { label: "Kết luận không thể phục hồi", category: "repair" },
   "repair.owner_confirm": { label: "Nhóm nhận lại máy sau sửa", category: "repair" },
+  "repair.cost_update": { label: "Cập nhật chi phí sửa chữa", category: "repair" },
   // Thanh lý
   "disposal.create": { label: "Đề xuất thanh lý", category: "disposal" },
   "disposal.group_confirm": { label: "Nhóm xác nhận thanh lý", category: "disposal" },

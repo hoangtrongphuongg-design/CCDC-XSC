@@ -14,7 +14,7 @@ import { workflowTone } from "@/lib/status-style";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { formatNumber } from "@/lib/utils";
-import { acceptRepairAction, completeRepairAction, confirmRepairByOwnerAction, createRepairAction, markExternalIrreparableAction, sendExternalRepairAction } from "@/actions/repairs";
+import { acceptRepairAction, completeRepairAction, confirmRepairByOwnerAction, createRepairAction, markExternalIrreparableAction, sendExternalRepairAction, updateRepairCostAction } from "@/actions/repairs";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { CLOSED_REPAIR_STATUSES, OPEN_REPAIR_STATUSES, RECENT_CLOSED_LIMIT } from "@/lib/workflow-status";
 
@@ -74,7 +74,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Sea
                 actions.push(<form action={markExternalIrreparableAction} key="external-fail" className="row-actions"><input type="hidden" name="repairId" value={row.id} /><input name="cost" type="number" min="0" step="1000" defaultValue={Number(row.cost || 0)} aria-label="Chi phí" className="field-inline-sm" /><input name="resultNotes" placeholder="Kết luận không thể phục hồi" aria-label="Kết luận" className="field-inline-md" /><Button size="sm" variant="secondary">Không thể phục hồi</Button></form>);
               }
               if (row.status === "wait_owner_confirm" && machine && hasGroupPermission(auth, machine.ownerGroupId, "manager")) actions.push(<form action={confirmRepairByOwnerAction} key="confirm"><input type="hidden" name="repairId" value={row.id} /><Button size="sm">Nhận lại</Button></form>);
-              return [<strong key="code">{row.code}</strong>, machine ? `${machine.code} — ${machine.name}` : row.equipmentId, groupMap.get(row.reportedByGroupId) || "—", row.issueDescription, <span key="cost" className="numeric">{formatNumber(row.cost)}</span>, <StatusBadge key="status" label={repairStatusLabel(row.status, row.repairType)} tone={workflowTone(row.status)} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];
+              return [<strong key="code">{row.code}</strong>, machine ? `${machine.code} — ${machine.name}` : row.equipmentId, groupMap.get(row.reportedByGroupId) || "—", row.issueDescription, auth.isWorkshopAdmin ? <form key="cost" action={updateRepairCostAction} className="row-actions"><input type="hidden" name="repairId" value={row.id} /><input name="cost" type="number" min="0" step="1000" defaultValue={Number(row.cost || 0)} aria-label={`Chi phí ${row.code}`} className="field-inline-sm" /><Button size="sm" variant="secondary">Lưu</Button></form> : <span key="cost" className="numeric">{formatNumber(row.cost)}</span>, <StatusBadge key="status" label={repairStatusLabel(row.status, row.repairType)} tone={workflowTone(row.status)} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];
             })} empty={<EmptyState description="Chưa có phiếu sửa chữa." />} />
           </CardContent>
         </Card>
