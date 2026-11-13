@@ -5,6 +5,7 @@ import type { AuthContext } from "@/lib/auth/session";
 import { canViewWholeWorkshop } from "@/lib/auth/roles";
 import { WORKFLOW_LABELS } from "@/lib/constants";
 import { repairStatusLabel } from "@/lib/repair-display";
+import { displayLocation } from "@/lib/location-display";
 import { HISTORY_LIMIT, canViewEquipmentHistory } from "@/lib/equipment-history";
 import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
 import { canSeeFinancials, heldByGroupId, isInMyScope, isUuid } from "@/lib/machine-profile";
@@ -18,6 +19,8 @@ export type MachineProfile = {
   groupNames: ReadonlyMap<string, string>;
   heldByGroupName: string | null;
   tickets: ProfileTicket[];
+  /** Vị trí hiển thị suy ra theo nghiệp vụ (đang mượn / đang điều chuyển). */
+  locationText: string;
   /** Loại phiếu sửa đang ở bước "đang sửa" (internal / external), null nếu máy không đang sửa. */
   activeRepairType: string | null;
   /** null = tài khoản không có quyền xem lịch sử máy này. */
@@ -81,6 +84,15 @@ export async function loadMachineProfile(auth: AuthContext, id: string): Promise
     groupNames,
     heldByGroupName: heldBy ? name(heldBy) : null,
     tickets,
+    locationText: (() => {
+      const heldLoan = loanRows.find((loan) => loan.status === "on_loan" || loan.status === "incident");
+      const handover = transferRows.find((transfer) => transfer.status === "wait_handover");
+      return displayLocation({
+        stored: machine.currentLocation,
+        loan: heldLoan ? { status: heldLoan.status, borrowerGroupName: name(heldLoan.borrowerGroupId), workLocation: heldLoan.workLocation } : null,
+        transfer: handover ? { status: handover.status, targetGroupName: name(handover.targetGroupId) } : null,
+      });
+    })(),
     activeRepairType: repairRows.find((r) => r.status === "repairing")?.repairType ?? null,
     history,
     showFinancials: canSeeFinancials({ isWorkshopAdmin: auth.isWorkshopAdmin, isReadOnlyViewer: auth.isReadOnlyViewer, groupIds, ownerGroupId: machine.ownerGroupId }),

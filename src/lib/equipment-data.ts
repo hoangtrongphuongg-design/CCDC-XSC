@@ -29,7 +29,7 @@ export type EquipmentScopePermission = {
   level: "viewer" | "operator" | "manager";
 };
 
-export type ActiveLoan = { equipmentId: string; ownerGroupId: string; borrowerGroupId: string; status: string; updatedAt: Date };
+export type ActiveLoan = { equipmentId: string; ownerGroupId: string; borrowerGroupId: string; status: string; workLocation: string | null; updatedAt: Date };
 export type ActiveTransfer = { equipmentId: string; sourceGroupId: string; targetGroupId: string; status: string; updatedAt: Date };
 export type ActiveRepair = { equipmentId: string; status: string; repairType: string | null; updatedAt: Date };
 
@@ -89,6 +89,7 @@ async function loadOpenLoans(groupIds?: string[]): Promise<ActiveLoan[]> {
     ownerGroupId: machineLoans.ownerGroupId,
     borrowerGroupId: machineLoans.borrowerGroupId,
     status: machineLoans.status,
+    workLocation: machineLoans.workLocation,
     updatedAt: machineLoans.updatedAt,
   }).from(machineLoans)
     .where(groupIds

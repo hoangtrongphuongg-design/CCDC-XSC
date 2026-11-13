@@ -9,6 +9,7 @@ import {
 } from "@/components/equipment/equipment-workspace";
 import { buildEquipmentPermissions, loadOperationalGroups, loadScopedEquipment, loadToolRows } from "@/lib/equipment-data";
 import { loadEquipmentHistoryIds } from "@/lib/record-history";
+import { displayLocation } from "@/lib/location-display";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,11 @@ export default async function MyEquipmentPage() {
       currentGroupId: row.currentGroupId,
       currentGroupName: groupNameById.get(row.currentGroupId) || "—",
       currentLocation: row.currentLocation,
+      locationText: displayLocation({
+        stored: row.currentLocation,
+        loan: loan ? { status: loan.status, borrowerGroupName: groupNameById.get(loan.borrowerGroupId) || "—", workLocation: loan.workLocation } : null,
+        transfer: transfer ? { status: transfer.status, targetGroupName: groupNameById.get(transfer.targetGroupId) || "—" } : null,
+      }),
       status: row.status,
       condition: row.condition,
       purchaseDate: row.purchaseDate,

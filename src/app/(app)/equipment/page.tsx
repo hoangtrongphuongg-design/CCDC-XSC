@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { equipmentStatusDisplay } from "@/lib/repair-display";
+import { displayLocation } from "@/lib/location-display";
 import { Boxes, CircleCheck, FileSpreadsheet, PackageOpen, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
-import { equipment, groups, repairs, toolCatalog } from "@/lib/db/schema";
+import { equipment, groups, machineLoans, repairs, toolCatalog, transfers } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { EQUIPMENT_STATUS_LABELS, CONDITION_LABELS } from "@/lib/constants";
 import { EQUIPMENT_CATEGORIES, EQUIPMENT_DISCIPLINE_LABELS, getEquipmentCategoryLabel, type EquipmentDiscipline } from "@/lib/equipment-categories";
@@ -36,7 +37,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
   const searchText = filters.q;
   const normalizedSearch = searchText.toLocaleLowerCase("vi-VN");
 
-  const [rows, groupRows, toolRows, openRepairs] = await Promise.all([
+  const [rows, groupRows, toolRows, openRepairs, heldLoans, handoverTransfers] = await Promise.all([
     db.select({
       id: equipment.id,
       code: equipment.code,
@@ -75,11 +76,27 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
       .orderBy(asc(groups.name), asc(toolCatalog.code), asc(toolCatalog.name)),
     // Máy đang sửa: nội bộ hay thuê ngoài lấy từ phiếu sửa đang mở.
     db.select({ equipmentId: repairs.equipmentId, repairType: repairs.repairType }).from(repairs).where(eq(repairs.status, "repairing")),
+    // Vị trí hiển thị: máy đang do nhóm mượn giữ / đang điều chuyển không thể vẫn ghi vị trí cũ.
+    db.select({ equipmentId: machineLoans.equipmentId, status: machineLoans.status, borrowerGroupId: machineLoans.borrowerGroupId, workLocation: machineLoans.workLocation })
+      .from(machineLoans).where(inArray(machineLoans.status, ["on_loan", "incident"])),
+    db.select({ equipmentId: transfers.equipmentId, status: transfers.status, targetGroupId: transfers.targetGroupId })
+      .from(transfers).where(eq(transfers.status, "wait_handover")),
   ]);
   const repairTypeByEquipment = new Map(openRepairs.map((repair) => [repair.equipmentId, repair.repairType]));
   const statusText = (row: { id: string; status: keyof typeof EQUIPMENT_STATUS_LABELS }) => equipmentStatusDisplay(row.status, repairTypeByEquipment.get(row.id));
 
   const groupMap = new Map(groupRows.map((group) => [group.id, group.name]));
+  const loanByEquipment = new Map(heldLoans.map((loan) => [loan.equipmentId, loan]));
+  const transferByEquipment = new Map(handoverTransfers.map((transfer) => [transfer.equipmentId, transfer]));
+  const locationText = (row: { id: string; currentLocation: string | null }) => {
+    const loan = loanByEquipment.get(row.id);
+    const transfer = transferByEquipment.get(row.id);
+    return displayLocation({
+      stored: row.currentLocation,
+      loan: loan ? { status: loan.status, borrowerGroupName: groupMap.get(loan.borrowerGroupId) ?? "—", workLocation: loan.workLocation } : null,
+      transfer: transfer ? { status: transfer.status, targetGroupName: groupMap.get(transfer.targetGroupId) ?? "—" } : null,
+    });
+  };
   const containsSearch = (...values: Array<string | null | undefined>) => !normalizedSearch || values.some((value) =>
     value?.toLocaleLowerCase("vi-VN").includes(normalizedSearch),
   );
@@ -235,7 +252,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
               <div key="name" className="asset-name-cell"><strong><SafeText>{row.name}</SafeText></strong><small>{row.model || "Chưa có model"}</small></div>,
               row.ownerGroup,
               groupMap.get(row.currentGroupId) || "—",
-              row.currentLocation || "—",
+              locationText(row),
               <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />,
               <StatusBadge key="status" label={statusText(row)} tone={equipmentStatusTone(row.status)} />,
             ])}
