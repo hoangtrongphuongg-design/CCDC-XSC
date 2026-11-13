@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { equipmentStatusDisplay } from "@/lib/repair-display";
-import { Boxes, CircleCheck, FileSpreadsheet, PackageOpen, Search, Wrench } from "lucide-react";
+import { Boxes, CircleCheck, FileSpreadsheet, PackageOpen, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, repairs, toolCatalog } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
@@ -136,18 +136,6 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         <a className="stat-card-link" href="#cc-so-luong">
           <StatCard title="Danh mục theo số lượng" value={toolRows.length} icon={PackageOpen} tone="primary" />
         </a>
-      </section>
-
-      <section className="equipment-global-search" aria-labelledby="equipment-search-title">
-        <h2 className="equipment-search-title" id="equipment-search-title">Tìm kiếm toàn hệ thống</h2>
-        <form className="equipment-search-form" action="/search" method="get" role="search">
-          <label>
-            <span className="sr-only">Từ khóa tìm kiếm</span>
-            <input name="q" type="search" minLength={2} maxLength={120} placeholder="Mã hệ thống, tem nhôm, serial, tên máy, mã phiếu…" autoComplete="off" />
-          </label>
-          <button type="submit" className="btn btn-primary"><Search size={16} aria-hidden="true" /> Tìm</button>
-        </form>
-        <p className="equipment-search-hint">Tìm máy, CCDC theo số lượng và các loại phiếu (mượn, điều chuyển, sửa chữa, thanh lý) trong toàn bộ dữ liệu của hệ thống.</p>
       </section>
 
       <section className="equipment-filter-panel" aria-labelledby="equipment-filter-title">

@@ -82,8 +82,7 @@ test("trang và file Excel dùng chung bộ lọc; bảng CCDC theo số lượn
   assert.match(page, /hideTools \? \[\] : toolRows\.filter\(\(tool\) => matchesToolFilters\(tool, filters\)\)/);
   assert.match(page, /action="\/equipment" method="get"/);
   assert.match(page, /<section className="equipment-filter-panel"/, "khung lọc bung sẵn");
-  assert.match(page, /<section className="equipment-global-search"/, "khung Tìm kiếm tách riêng");
-  assert.match(page, /action="\/search" method="get"/, "tìm kiếm đi tới tìm kiếm chung toàn hệ thống");
+  assert.doesNotMatch(page, /equipment-global-search/, "ô tìm kiếm đã có ở thanh trên nên trang không lặp lại");
   const filterForm = page.slice(page.indexOf('<form className="equipment-filter-bar"'), page.indexOf("</form>", page.indexOf('<form className="equipment-filter-bar"')));
   assert.doesNotMatch(filterForm, /<input name="q"/, "khung lọc không còn ô tìm chữ");
   assert.match(filterForm, /Xuất Excel/, "nút Xuất Excel nằm trong khung lọc");
