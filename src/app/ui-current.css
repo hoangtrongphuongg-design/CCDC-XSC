@@ -3128,3 +3128,10 @@ body {
   .stat-grid.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stat-grid.compact .stat-card { min-height: 0; padding: 8px 10px; }
 }
+
+/* Thống kê thu gọn có ghi chú nhỏ (Báo cáo, Nhóm & phân quyền) */
+.stat-grid.compact.with-notes { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.stat-grid.compact.with-notes .stat-copy { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 1px; align-items: center; }
+.stat-grid.compact.with-notes .stat-copy span { grid-column: 1; grid-row: 1; }
+.stat-grid.compact.with-notes .stat-copy strong { grid-column: 2; grid-row: 1 / span 2; }
+.stat-grid.compact.with-notes .stat-copy small { display: -webkit-box; grid-column: 1; grid-row: 2; color: var(--text-muted); font-size: 12px; line-height: 1.3; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

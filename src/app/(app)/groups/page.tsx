@@ -56,7 +56,7 @@ export default async function GroupsPage() {
         }
       />
 
-      <div className="stat-grid">
+      <div className="stat-grid compact with-notes">
         <StatCard title="Nhóm nghiệp vụ đang hoạt động" value={activeOperationalGroups.length} note="8 cơ · 4 điện · 2 quản lý · 1 nhóm khác" icon={Building2} tone="primary" />
         <StatCard title="Nhóm hệ thống" value={systemGroups.length} note="Được khóa để bảo vệ quy trình" icon={ShieldCheck} tone="violet" />
         <StatCard title="Nhân sự đang hoạt động" value={totalUsers} note="Tính theo nhóm chính của tài khoản" icon={UsersRound} tone="success" />

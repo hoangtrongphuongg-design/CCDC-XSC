@@ -47,7 +47,7 @@ export default async function ReportsPage() {
         description="Việc cần chú ý (quá hạn trả, máy nằm không), chi phí sửa chữa và cơ cấu máy phục vụ điều hành Xưởng Sửa chữa."
         actions={<a className="btn btn-secondary" href="/reports/export"><Download size={16} /> Xuất Excel</a>}
       />
-      <section className="stat-grid six">
+      <section className="stat-grid compact with-notes">
         <StatCard title="Phiếu quá hạn trả" value={overdue.length} icon={AlertTriangle} tone="danger" note="Nhóm mượn còn giữ, đã quá hạn" />
         <StatCard title="Máy nằm không" value={idle.total} icon={PauseCircle} tone="warning" note={`Sẵn sàng, không ai mượn > ${IDLE_DAYS} ngày`} />
         <StatCard title="Chi phí sửa 12 tháng" value={formatVnd(repairTotalCost)} icon={Wallet} tone="violet" note={`${repairTotalTickets} phiếu hoàn tất`} />

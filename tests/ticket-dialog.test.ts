@@ -113,6 +113,9 @@ test("thống kê thu gọn ở các trang Điều chuyển / Sửa chữa / Tha
   for (const path of ["src/app/(app)/transfers/page.tsx", "src/app/(app)/repairs/page.tsx", "src/app/(app)/disposals/page.tsx"]) {
     assert.match(await source(path), /<section className="stat-grid compact">/, path);
   }
+  for (const [path, cls] of [["equipment", "compact"], ["reports", "compact with-notes"], ["groups", "compact with-notes"]]) {
+    assert.match(await source(`src/app/(app)/${path}/page.tsx`), new RegExp(`className="stat-grid ${cls}"`), path);
+  }
   for (const path of ["machine-loans", "quick-loans", "transfers", "repairs", "disposals"]) {
     assert.match(await source(`src/actions/${path}.ts`), /setFlashMessage\("success", "Đã tạo phiếu thành công"/, path);
   }
