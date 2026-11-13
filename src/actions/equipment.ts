@@ -8,7 +8,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { equipment, equipmentTypeCatalog, groups, toolCatalog } from "@/lib/db/schema";
 import { hasGroupPermission, requireGroupPermission, requireUser } from "@/lib/auth/guards";
-import { isUniqueViolation } from "@/lib/db/errors";
+import { isForeignKeyViolation, isUniqueViolation } from "@/lib/db/errors";
 import { writeAudit } from "@/lib/audit";
 import { EQUIPMENT_CATEGORIES } from "@/lib/equipment-categories";
 import { assertEquipmentHasNoOtherOpenWorkflow, lockEquipment, nextAssetCode } from "@/lib/workflows";
@@ -18,6 +18,8 @@ import { cleanLabel } from "@/lib/canonical-text";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { GROUP_PERMISSION_LABELS } from "@/lib/auth/roles";
 import { validateQuantityAdjustment } from "@/lib/tool-permissions";
+import { HISTORY_BLOCK_MESSAGE, PERMISSION_BLOCK_MESSAGE, hasDeletePermission } from "@/lib/delete-rule";
+import { equipmentHasHistory, toolHasHistory } from "@/lib/record-history";
 import { canChangeIdentity, changedIdentityFields, legacyConflictMessage, normalizeLegacyCode } from "@/lib/equipment-identity";
 
 export type EquipmentFormState = {
@@ -621,5 +623,85 @@ export async function adjustToolQuantityAction(
     return { status: "success", message: "Đã hiệu chỉnh số lượng.", afterSave: "close" };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "Không thể hiệu chỉnh số lượng." };
+  }
+}
+
+/**
+ * Xóa hồ sơ máy TẠO NHẦM. Kỹ sư giám sát trở lên của nhóm quản lý (Quản lý Xưởng / Admin mọi nhóm); chỉ khi chưa có
+ * lịch sử (mượn – trả, điều chuyển, sửa chữa, thanh lý, kiểm kê) — kiểm lại ngay trong transaction sau khi khóa dòng.
+ * Trả trạng thái thay vì ném lỗi để thông báo hiện được ở production. Mã đã xóa không cấp lại (bộ đếm chỉ tăng).
+ */
+export async function deleteEquipmentAction(_previousState: EquipmentFormState, formData: FormData): Promise<EquipmentFormState> {
+  const equipmentId = String(formData.get("equipmentId") || "");
+  const reason = String(formData.get("reason") || "").trim().replace(/\s+/g, " ").slice(0, 300);
+  if (!equipmentId) return { status: "error", message: "Thiếu thông tin hồ sơ cần xóa." };
+  try {
+    const [item] = await db.select().from(equipment).where(eq(equipment.id, equipmentId)).limit(1);
+    if (!item) return { status: "error", message: "Không tìm thấy hồ sơ (có thể đã được xóa). Hãy tải lại trang." };
+    const auth = await requireUser();
+    const level = auth.permissions.find((permission) => permission.groupId === item.ownerGroupId)?.level ?? null;
+    if (!hasDeletePermission({ isReadOnlyViewer: auth.isReadOnlyViewer, isWorkshopAdmin: auth.isWorkshopAdmin, level })) {
+      return { status: "error", message: PERMISSION_BLOCK_MESSAGE };
+    }
+    await db.transaction(async (tx) => {
+      await lockEquipment(tx, equipmentId);
+      if (await equipmentHasHistory(equipmentId, tx)) throw new Error(HISTORY_BLOCK_MESSAGE);
+      await tx.delete(equipment).where(eq(equipment.id, equipmentId));
+      await writeAudit(tx as never, {
+        actorUserId: auth.userId,
+        actorGroupId: item.ownerGroupId,
+        actorRole: getActorRoleLabel(auth, item.ownerGroupId),
+        action: "equipment.delete",
+        entityType: "equipment",
+        entityId: equipmentId,
+        description: `Xóa hồ sơ tạo nhầm ${item.code} - ${item.name}`,
+        beforeData: item,
+        reason: reason || null,
+      });
+    });
+    await setFlashMessage("success", "Đã xóa hồ sơ", `${item.code} · ${item.name}`);
+    refreshEquipmentConsumers();
+    return { status: "success", message: `Đã xóa ${item.code}.`, afterSave: "close" };
+  } catch (error) {
+    if (isForeignKeyViolation(error)) return { status: "error", message: HISTORY_BLOCK_MESSAGE };
+    return { status: "error", message: error instanceof Error ? error.message : "Không thể xóa hồ sơ." };
+  }
+}
+
+/** Xóa CCDC theo số lượng TẠO NHẦM: cùng quy tắc quyền và lịch sử (phiếu mượn nhanh / thanh lý). */
+export async function deleteToolAction(_previousState: EquipmentFormState, formData: FormData): Promise<EquipmentFormState> {
+  const toolId = String(formData.get("toolId") || "");
+  const reason = String(formData.get("reason") || "").trim().replace(/\s+/g, " ").slice(0, 300);
+  if (!toolId) return { status: "error", message: "Thiếu thông tin hồ sơ cần xóa." };
+  try {
+    const [item] = await db.select().from(toolCatalog).where(eq(toolCatalog.id, toolId)).limit(1);
+    if (!item) return { status: "error", message: "Không tìm thấy hồ sơ (có thể đã được xóa). Hãy tải lại trang." };
+    const auth = await requireUser();
+    const level = auth.permissions.find((permission) => permission.groupId === item.groupId)?.level ?? null;
+    if (!hasDeletePermission({ isReadOnlyViewer: auth.isReadOnlyViewer, isWorkshopAdmin: auth.isWorkshopAdmin, level })) {
+      return { status: "error", message: PERMISSION_BLOCK_MESSAGE };
+    }
+    await db.transaction(async (tx) => {
+      await tx.select({ id: toolCatalog.id }).from(toolCatalog).where(eq(toolCatalog.id, toolId)).for("update");
+      if (await toolHasHistory(toolId, tx)) throw new Error(HISTORY_BLOCK_MESSAGE);
+      await tx.delete(toolCatalog).where(eq(toolCatalog.id, toolId));
+      await writeAudit(tx as never, {
+        actorUserId: auth.userId,
+        actorGroupId: item.groupId,
+        actorRole: getActorRoleLabel(auth, item.groupId),
+        action: "tool_catalog.delete",
+        entityType: "tool_catalog",
+        entityId: toolId,
+        description: `Xóa hồ sơ tạo nhầm ${item.code ?? ""} ${item.name}`.replace(/\s+/g, " "),
+        beforeData: item,
+        reason: reason || null,
+      });
+    });
+    await setFlashMessage("success", "Đã xóa hồ sơ", `${item.code ?? ""} · ${item.name}`.trim());
+    refreshEquipmentConsumers();
+    return { status: "success", message: "Đã xóa hồ sơ.", afterSave: "close" };
+  } catch (error) {
+    if (isForeignKeyViolation(error)) return { status: "error", message: HISTORY_BLOCK_MESSAGE };
+    return { status: "error", message: error instanceof Error ? error.message : "Không thể xóa hồ sơ." };
   }
 }

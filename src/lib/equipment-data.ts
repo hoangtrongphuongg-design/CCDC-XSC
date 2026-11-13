@@ -11,6 +11,7 @@ import { OPEN_MACHINE_LOAN_STATUSES, isHeldByBorrower } from "@/lib/loan-status"
 import { CLOSED_REPAIR_STATUSES, CLOSED_TRANSFER_STATUSES } from "@/lib/workflow-status";
 import type { ExportTool } from "@/lib/export/equipment-export";
 import type { ToolRow } from "@/lib/tool-filter";
+import { loadToolHistoryIds } from "@/lib/record-history";
 
 export type OperationalGroup = {
   id: string;
@@ -223,5 +224,6 @@ export async function loadToolRows(groupIds?: string[]): Promise<ToolRow[]> {
     .innerJoin(groups, eq(toolCatalog.groupId, groups.id))
     .where(groupIds ? and(active, inArray(toolCatalog.groupId, groupIds)) : active)
     .orderBy(asc(groups.name), asc(toolCatalog.code), asc(toolCatalog.name));
-  return rows.map((row) => ({ ...row, quantity: Number(row.quantity), updatedAt: row.updatedAt.toISOString() }));
+  const withHistory = await loadToolHistoryIds(rows.map((row) => row.id));
+  return rows.map((row) => ({ ...row, quantity: Number(row.quantity), updatedAt: row.updatedAt.toISOString(), hasHistory: withHistory.has(row.id) }));
 }

@@ -94,6 +94,8 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   "equipment.admin_correction": { label: "Admin hiệu chỉnh CCDC", category: "ccdc" },
   "equipment.condition.update": { label: "Cập nhật tình trạng CCDC", category: "ccdc" },
   "tool_catalog.create": { label: "Thêm CCDC theo số lượng", category: "ccdc" },
+  "tool_catalog.delete": { label: "Xóa hồ sơ CCDC theo số lượng tạo nhầm", category: "ccdc" },
+  "equipment.delete": { label: "Xóa hồ sơ tạo nhầm", category: "ccdc" },
   "tool_catalog.update": { label: "Sửa thông tin CCDC theo số lượng", category: "ccdc" },
   "tool_catalog.adjust_quantity": { label: "Hiệu chỉnh số lượng CCDC", category: "ccdc" },
   // Tài khoản & nhóm (chỉ Admin hệ thống thấy)

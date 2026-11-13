@@ -11,7 +11,7 @@ function tool(over: Partial<ToolRow> = {}): ToolRow {
   return {
     id: "t1", code: "NBS-VT-0001", name: "Mũi khoan Ø12", specification: "HSS Ø12", unit: "Cái", quantity: 10,
     categoryCode: "KHAC", equipmentType: "Mũi khoan Ø12", groupId: A, groupCode: "NBS", groupName: "Nhóm NBS",
-    condition: "good", currentLocation: "Tủ số 2", notes: null, updatedAt: "2026-11-01T00:00:00.000Z",
+    condition: "good", currentLocation: "Tủ số 2", notes: null, updatedAt: "2026-11-01T00:00:00.000Z", hasHistory: false,
     ...over,
   };
 }

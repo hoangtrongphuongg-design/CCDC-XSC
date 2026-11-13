@@ -23,7 +23,8 @@ import { loadEquipmentHistoryAction } from "@/actions/equipment-history";
 import { DataTable } from "@/components/data-table";
 import { SafeText } from "@/components/safe-text";
 import { equipmentStatusDisplay } from "@/lib/repair-display";
-import { ToolAdjustDialog, ToolEditDialog } from "@/components/equipment/tool-dialogs";
+import { DeleteRecordDialog, ToolAdjustDialog, ToolEditDialog } from "@/components/equipment/tool-dialogs";
+import { canDeleteRecord } from "@/lib/delete-rule";
 import { filterTools, type ToolRow } from "@/lib/tool-filter";
 import { canAdjustToolQuantity, canEditTool } from "@/lib/tool-permissions";
 import { EmptyState } from "@/components/empty-state";
@@ -91,6 +92,8 @@ export type IndividualEquipmentRow = {
   activeRepairStatus: string | null;
   /** "internal" | "external" của phiếu sửa đang mở (máy đang sửa nội bộ hay thuê ngoài). */
   activeRepairType: string | null;
+  /** Đã có mượn – trả / điều chuyển / sửa chữa / thanh lý / kiểm kê → không xóa được. */
+  hasHistory: boolean;
   updatedAt: string;
 };
 
@@ -589,9 +592,11 @@ function DetailModal({
   tab,
   history,
   canEdit,
+  canDelete,
   onClose,
   onEdit,
   onClone,
+  onDelete,
   onTab,
   groupNames,
   displayStatus,
@@ -600,9 +605,11 @@ function DetailModal({
   tab: DetailTab;
   history: HistoryState;
   canEdit: boolean;
+  canDelete: boolean;
   onClose: () => void;
   onEdit: () => void;
   onClone: () => void;
+  onDelete: () => void;
   onTab: (tab: DetailTab) => void;
   groupNames: Map<string, string>;
   displayStatus: string;
@@ -670,6 +677,8 @@ function DetailModal({
           )}
         </div>
         <footer className="asset-detail-footer">
+          {canEdit && row.hasHistory ? <small className="muted">Đã có lịch sử nên không xóa được; dùng Ngừng sử dụng hoặc Thanh lý.</small> : null}
+          {canDelete ? <Button type="button" variant="danger" onClick={onDelete}><X size={15} /> Xóa</Button> : null}
           {canEdit ? <Button type="button" variant="secondary" onClick={onClone}><Copy size={15} /> Sao chép để tạo mới</Button> : null}
           {canEdit ? <Button type="button" onClick={onEdit}><Edit3 size={15} /> Chỉnh sửa</Button> : null}
         </footer>
@@ -715,6 +724,8 @@ export function EquipmentWorkspace({
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [toolEditing, setToolEditing] = useState<ToolRow | null>(null);
   const [toolAdjusting, setToolAdjusting] = useState<ToolRow | null>(null);
+  const [toolDeleting, setToolDeleting] = useState<ToolRow | null>(null);
+  const [machineDeleting, setMachineDeleting] = useState<IndividualEquipmentRow | null>(null);
 
   const actionablePermissions = permissions.filter((permission) => permissionRank(permission.level) >= 1);
   const permissionByGroup = useMemo(() => new Map(permissions.map((permission) => [permission.groupId, permission])), [permissions]);
@@ -824,6 +835,9 @@ export function EquipmentWorkspace({
   const toolPermissions = permissions.map((permission) => ({ groupId: permission.groupId, level: permission.level }));
   const toolCanEdit = (tool: ToolRow) => !isReadOnlyViewer && canEditTool(toolPermissions, tool.groupId);
   const toolCanAdjust = (tool: ToolRow) => !isReadOnlyViewer && canAdjustToolQuantity(toolPermissions, tool.groupId);
+  const levelAt = (groupId: string) => permissionByGroup.get(groupId)?.level ?? null;
+  const toolCanDelete = (tool: ToolRow) => canDeleteRecord({ isReadOnlyViewer, isWorkshopAdmin, level: levelAt(tool.groupId), hasHistory: tool.hasHistory });
+  const machineCanDelete = (row: IndividualEquipmentRow) => canDeleteRecord({ isReadOnlyViewer, isWorkshopAdmin, level: levelAt(row.ownerGroupId), hasHistory: row.hasHistory });
 
   function canEditRow(row: IndividualEquipmentRow) {
     if (isReadOnlyViewer) return false;
@@ -905,10 +919,11 @@ export function EquipmentWorkspace({
                   <span>{[tool.code, tool.specification, tool.groupName].filter(Boolean).join(" · ")}</span>
                 </div>
                 <div className="mobile-tool-qty"><strong>{formatQuantity(tool.quantity)}</strong><small>{tool.unit}</small></div>
-                {toolCanEdit(tool) || toolCanAdjust(tool) ? (
+                {toolCanEdit(tool) || toolCanAdjust(tool) || toolCanDelete(tool) ? (
                   <div className="mobile-tool-actions">
                     {toolCanEdit(tool) ? <button type="button" onClick={() => setToolEditing(tool)}>Sửa</button> : null}
                     {toolCanAdjust(tool) ? <button type="button" onClick={() => setToolAdjusting(tool)}>Hiệu chỉnh SL</button> : null}
+                    {toolCanDelete(tool) ? <button type="button" onClick={() => setToolDeleting(tool)}>Xóa</button> : null}
                   </div>
                 ) : null}
               </article>
@@ -989,6 +1004,7 @@ export function EquipmentWorkspace({
                   <div key="actions" className="row-actions equipment-row-actions">
                     {toolCanEdit(tool) ? <Button type="button" size="sm" variant="ghost" onClick={() => setToolEditing(tool)}><Edit3 size={14} /> Sửa</Button> : null}
                     {toolCanAdjust(tool) ? <Button type="button" size="sm" variant="ghost" onClick={() => setToolAdjusting(tool)}><ClipboardList size={14} /> Hiệu chỉnh SL</Button> : null}
+                    {toolCanDelete(tool) ? <Button type="button" size="sm" variant="ghost" onClick={() => setToolDeleting(tool)}><X size={14} /> Xóa</Button> : null}
                   </div>,
                 ])}
                 empty={<EmptyState title="Chưa có CCDC theo số lượng" description={canAdd ? "Dùng nút Thêm dụng cụ → “Theo số lượng” để thêm mũi khoan, taro, đá mài..." : "Nhóm hiện chưa có CCDC theo số lượng."} />}
@@ -1000,6 +1016,8 @@ export function EquipmentWorkspace({
 
       {toolEditing ? <ToolEditDialog key={toolEditing.id} tool={toolEditing} canChangeIdentity={isWorkshopAdmin && !isReadOnlyViewer} onClose={() => setToolEditing(null)} /> : null}
       {toolAdjusting ? <ToolAdjustDialog key={toolAdjusting.id} tool={toolAdjusting} onClose={() => setToolAdjusting(null)} /> : null}
+      {toolDeleting ? <DeleteRecordDialog key={toolDeleting.id} kind="tool" id={toolDeleting.id} code={toolDeleting.code} name={toolDeleting.name} onClose={() => setToolDeleting(null)} onDeleted={() => setToolDeleting(null)} /> : null}
+      {machineDeleting ? <DeleteRecordDialog key={machineDeleting.id} kind="machine" id={machineDeleting.id} code={machineDeleting.code} name={machineDeleting.name} onClose={() => setMachineDeleting(null)} onDeleted={() => { setMachineDeleting(null); setDetailRecord(null); }} /> : null}
 
       {editorOpen ? <div className="asset-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}>
         <section className="asset-modal asset-editor-modal" role="dialog" aria-modal="true" aria-labelledby="asset-dialog-title">
@@ -1011,7 +1029,7 @@ export function EquipmentWorkspace({
         </section>
       </div> : null}
 
-      {detailRecord ? <DetailModal row={detailRecord} tab={detailTab} history={detailHistory} canEdit={canEditRow(detailRecord)} onClose={() => setDetailRecord(null)} onEdit={() => openEdit(detailRecord)} onClone={() => openClone(detailRecord)} onTab={setDetailTab} groupNames={groupNameById} displayStatus={displayEquipmentStatus(detailRecord)} /> : null}
+      {detailRecord ? <DetailModal row={detailRecord} tab={detailTab} history={detailHistory} canEdit={canEditRow(detailRecord)} canDelete={machineCanDelete(detailRecord)} onClose={() => setDetailRecord(null)} onEdit={() => openEdit(detailRecord)} onClone={() => openClone(detailRecord)} onDelete={() => setMachineDeleting(detailRecord)} onTab={setDetailTab} groupNames={groupNameById} displayStatus={displayEquipmentStatus(detailRecord)} /> : null}
     </>
   );
 }
