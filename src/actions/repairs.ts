@@ -9,6 +9,7 @@ import { equipment, groups, machineLoans, repairs } from "@/lib/db/schema";
 import { requireGroupPermission, requireWsManager } from "@/lib/auth/guards";
 import { assertEquipmentHasNoOtherOpenWorkflow, lockEquipment, nextWorkflowCode } from "@/lib/workflows";
 import { writeAudit } from "@/lib/audit";
+import { parseRepairCost } from "@/lib/repair-cost";
 
 function refresh() {
   revalidatePath("/repairs");
@@ -179,6 +180,40 @@ export async function markExternalIrreparableAction(formData: FormData) {
   refresh();
 
   await setFlashMessage("success", 'Đã ghi nhận không thể phục hồi');
+}
+
+/**
+ * Quản lý Xưởng / Admin cập nhật CHI PHÍ sửa chữa của phiếu BẤT CỨ LÚC NÀO (đang chờ, đang sửa, thuê ngoài, đã xong...).
+ * Khóa dòng phiếu, ghi nhật ký số cũ → số mới. Báo cáo /reports cộng theo ngày kết thúc phiếu nên tự khớp.
+ */
+export async function updateRepairCostAction(formData: FormData) {
+  const repairId = String(formData.get("repairId") || "");
+  const parsed = parseRepairCost(formData.get("cost"));
+  if (!parsed.ok) throw new Error(parsed.message);
+  const auth = await requireWsManager();
+
+  const result = await db.transaction(async (tx) => {
+    const [locked] = await tx.select().from(repairs).where(eq(repairs.id, repairId)).for("update");
+    if (!locked) throw new Error("Không tìm thấy phiếu sửa chữa.");
+    const before = Number(locked.cost);
+    if (Math.round(before * 100) === Math.round(parsed.cost * 100)) return { changed: false as const, code: locked.code };
+    await tx.update(repairs).set({ cost: String(parsed.cost), updatedAt: new Date() }).where(eq(repairs.id, locked.id));
+    await writeAudit(tx as never, {
+      actorUserId: auth.userId,
+      action: "repair.cost_update",
+      entityType: "repair",
+      entityId: locked.id,
+      description: `Cập nhật chi phí sửa ${locked.code}: ${before} → ${parsed.cost}`,
+      beforeData: { cost: before },
+      afterData: { cost: parsed.cost },
+    });
+    return { changed: true as const, code: locked.code };
+  });
+  refresh();
+  revalidatePath("/reports");
+  revalidatePath("/activities");
+
+  await setFlashMessage("success", result.changed ? "Đã cập nhật chi phí sửa chữa" : "Chi phí không thay đổi", result.code);
 }
 
 export async function confirmRepairByOwnerAction(formData: FormData) {
