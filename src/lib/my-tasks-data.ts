@@ -18,7 +18,7 @@ async function compute(subject: TaskSubject): Promise<MyTask[]> {
       id: inventorySessions.id, code: inventorySessions.code, groupId: inventorySessions.groupId, period: inventorySessions.period, createdAt: inventorySessions.createdAt,
       pending: sql<number>`count(${inventoryItems.id}) filter (where ${inventoryItems.offsite} = false and ${inventoryItems.unexpected} = false and ${inventoryItems.result} is null)`.mapWith(Number),
       // CCDC theo số lượng chưa đếm (chỉ đợt quý có cờ includes_tools).
-      toolPending: sql<number>`case when ${inventorySessions.includesTools} then greatest((select count(*) from tool_catalog tc where tc.group_id = ${inventorySessions.groupId} and tc.is_active = true and tc.record_status = 'active') - (select count(*) from inventory_tool_counts c where c.session_id = ${inventorySessions.id}), 0) else 0 end`.mapWith(Number),
+      toolPending: sql<number>`case when ${inventorySessions.includesTools} then (select count(*) from tool_catalog tc where tc.group_id = ${inventorySessions.groupId} and tc.is_active = true and tc.record_status = 'active' and not exists (select 1 from inventory_tool_counts c where c.session_id = ${inventorySessions.id} and c.tool_id = tc.id)) else 0 end`.mapWith(Number),
     }).from(inventorySessions)
       .leftJoin(inventoryItems, eq(inventoryItems.sessionId, inventorySessions.id))
       .where(and(eq(inventorySessions.status, "open"), isNotNull(inventorySessions.period)))

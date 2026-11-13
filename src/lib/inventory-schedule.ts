@@ -6,6 +6,8 @@
  * Mọi ngày là chuỗi YYYY-MM-DD theo giờ Việt Nam (`vnDate`), không dùng UTC.
  */
 
+import { isToolQuarter } from "@/lib/inventory";
+
 /** Hạn kiểm kê: hết ngày này của tháng thì tự đóng. */
 export const INVENTORY_DEADLINE_DAY = 15;
 
@@ -45,7 +47,8 @@ export function daysUntilDeadline(period: string, today: string): number {
   return dayNumber(deadlineOf(period)) - dayNumber(today);
 }
 
-export type ScheduleGroup = { groupId: string; machineCount: number };
+/** `toolCount` = CCDC theo số lượng đang hoạt động; nhóm chưa có máy vẫn có đợt ở kỳ quý (1/4/7/10) nếu có CCDC. */
+export type ScheduleGroup = { groupId: string; machineCount: number; toolCount?: number };
 export type ScheduleSession = { id: string; groupId: string; status: "open" | "closed"; period: string | null };
 
 export type ScheduleAction =
@@ -77,7 +80,7 @@ export function plan(input: { today: string; groups: readonly ScheduleGroup[]; s
   if (day > INVENTORY_DEADLINE_DAY) return actions;
 
   for (const group of input.groups) {
-    if (group.machineCount <= 0) continue;
+    if (group.machineCount <= 0 && !(isToolQuarter(period) && (group.toolCount ?? 0) > 0)) continue;
     const ofGroup = input.sessions.filter((s) => s.groupId === group.groupId);
     if (ofGroup.some((s) => s.period === period)) continue; // đã có đợt kỳ này (mở hoặc đã đóng)
     const stillOpen = ofGroup.filter((s) => s.status === "open" && !closing.has(s.id));

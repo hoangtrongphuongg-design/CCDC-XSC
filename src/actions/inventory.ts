@@ -25,6 +25,7 @@ import {
 import { BORROWER_HOLDING_STATUSES } from "@/lib/loan-status";
 import { isUuid } from "@/lib/machine-profile";
 import { createInventorySession } from "@/lib/inventory-create";
+import { countUncountedTools } from "@/lib/inventory-tool-pending";
 import { runMonthlyInventory } from "@/lib/inventory-schedule-data";
 
 const MAX_NOTE = 200;
@@ -44,10 +45,10 @@ export async function createInventoryAction(formData: FormData) {
   if (!isUuid(groupId)) throw new Error("Hãy chọn nhóm cần kiểm kê.");
   if (!canOpenInventory(auth)) throw new Error("Chỉ Quản lý Xưởng hoặc Admin được mở đợt kiểm kê tay. Đợt định kỳ tự mở ngày 1 hằng tháng.");
 
-  const created = await createInventorySession({ groupId, title: title || null, createdBy: auth.userId, period: null });
+  const created = await createInventorySession({ groupId, title: title || null, createdBy: auth.userId, period: null, includeTools: formData.get("includeTools") === "on" });
 
   refresh(created.sessionId);
-  await setFlashMessage("success", "Đã mở đợt kiểm kê", `${created.machineCount} máy cần kiểm.`);
+  await setFlashMessage("success", "Đã mở đợt kiểm kê", `${created.machineCount} máy cần kiểm${created.includesTools ? " + CCDC theo số lượng cần đếm" : ""}.`);
   redirect(`/inventory/${created.sessionId}`);
 }
 
@@ -218,10 +219,10 @@ export async function closeInventoryAction(formData: FormData) {
     const summary = summarizeInventory(items);
     let toolText = "";
     if (session.includesTools) {
-      const [{ n }] = await tx.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(toolCatalog).where(and(eq(toolCatalog.groupId, session.groupId), eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active")));
+      const uncounted = await countUncountedTools(tx, sessionId, session.groupId);
       const counts = await tx.select({ counted: inventoryToolCounts.countedQty, expected: inventoryToolCounts.expectedQty }).from(inventoryToolCounts).where(eq(inventoryToolCounts.sessionId, sessionId));
       const tools = summarizeToolCounts(counts.map((c) => ({ counted: Number(c.counted), expected: Number(c.expected) })));
-      toolText = `; CCDC số lượng: ${tools.ok} đủ, ${tools.short} thiếu, ${tools.over} thừa, ${Math.max(n - tools.counted, 0)} chưa đếm`;
+      toolText = `; CCDC số lượng: ${tools.ok} đủ, ${tools.short} thiếu, ${tools.over} thừa, ${uncounted} chưa đếm`;
     }
     await writeAudit(tx, {
       actorUserId: auth.userId,

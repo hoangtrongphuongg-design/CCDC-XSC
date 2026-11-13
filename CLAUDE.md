@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 npm run build      # cần AUTH_SECRET + DATABASE_URL trong env, nếu không sẽ lỗi "Collecting page data"
 npm run start
 npm run typecheck  # tsc --noEmit
-npm test           # tsx --test tests/*.test.ts — 243 pass
+npm test           # tsx --test tests/*.test.ts — 247 pass
 ```
 
 Không có ESLint script.
@@ -93,11 +93,12 @@ Trang danh sách quy trình (Mượn máy, Mượn nhanh, Điều chuyển, Sử
 - Nhật ký: `inventory.create` / `inventory.close` hiện ở Lịch sử hoạt động; **`inventory.check` (từng máy) khai báo `mirror`** — chỉ ở tab Lịch sử của máy, ẩn khỏi `/activities` để kiểm cả nhóm không làm ngập. Biên bản `GET /inventory/[id]/export` (`lib/export/inventory-workbook.ts`): tóm tắt đầu sheet, các mục Không thấy → Chưa kiểm → Thừa → Nơi khác → Có mặt.
 - Kiểm kê CCDC theo số lượng: xem mục "Kiểm kê CCDC theo số lượng (mỗi quý)" bên dưới. Chưa có: tự cập nhật hồ sơ máy theo kết quả (đợt kiểm kê chỉ **ghi nhận**, không đổi trạng thái / vị trí máy; máy "Không thấy" thì Đốc công/Kỹ sư bấm **Báo mất**).
 
-#### Kiểm kê CCDC theo số lượng (mỗi quý) + Báo mất từ kiểm kê
+#### Kiểm kê CCDC theo số lượng (mỗi quý + đợt mở tay) và Báo mất từ kiểm kê
 
-- **Mỗi 3 tháng một lần**: đợt kiểm kê định kỳ của tháng **1, 4, 7, 10** (`isToolQuarter(period)`, `lib/inventory.ts`) được gắn `inventory_sessions.includes_tools = true` lúc tạo (`createInventorySession`) hoặc lúc nhận đợt mở tay (`adoptManualSession`), **chỉ khi nhóm có ≥ 1 CCDC theo số lượng đang hoạt động** (`groupHasActiveTools`); các tháng khác chỉ kiểm máy. Cùng cron, cùng hạn hết ngày 15, cùng tự đóng.
-- Không chụp danh sách: hàng CCDC lấy trực tiếp từ `tool_catalog` của nhóm (đang hoạt động, hồ sơ hoàn tất); người kiểm nhập **số đếm thực tế** ở `/inventory/[id]` (`components/inventory/inventory-tool-counts.tsx`, `countInventoryToolAction`: khóa dòng đợt, chỉ đợt mở có cờ, hoàn tác = xóa). `inventory_tool_counts.expected_qty` = **số tồn hệ thống tại lúc đếm** (mượn nhanh / thanh lý làm tồn đổi trong 15 ngày). Kết quả Đủ / Thiếu / Thừa (`toolCountState`); **Thiếu → nút "Báo mất N"** (điền sẵn số thiếu, `sourceSessionId`); Thừa chỉ nhắc dùng "Hiệu chỉnh SL". Mọi thành viên nhóm đếm được; Báo mất cần Kỹ sư giám sát trở lên. Nhật ký `inventory.count_tool` khai báo `mirror`.
-- Việc chờ Đốc công, dòng `inventory.close`, danh sách `/inventory` và biên bản Excel (thêm sheet "CCDC theo số lượng") **gồm cả CCDC chưa đếm**. **DB V1.7.3** (`update.sql` + `current_schema.sql` + `schema.ts`): cột `includes_tools`, bảng `inventory_tool_counts` — chạy trong Neon TRƯỚC khi deploy (cùng khối với Báo mất).
+- **Khi nào có khối đếm** (`inventory_sessions.includes_tools`): đợt **định kỳ tháng 1, 4, 7, 10** tự gắn (`isToolQuarter(period)`, `lib/inventory.ts`; `createInventorySession` / `adoptManualSession`) — mỗi 3 tháng một lần; **đợt mở TAY** của Quản lý Xưởng/Admin gắn khi tích ô **"Kèm kiểm CCDC theo số lượng"** (mặc định tích; `createInventoryAction` truyền `includeTools`). Chỉ khi nhóm có ≥ 1 CCDC theo số lượng đang hoạt động (`groupHasActiveTools`): tích mà nhóm không có CCDC thì **báo lỗi rõ**, kỳ quý thì tự bỏ qua. `adoptManualSession` chỉ **bật thêm** cờ (`includes_tools OR …`), không ghi đè. Nhóm **chỉ có CCDC, chưa có máy** vẫn có đợt ở kỳ quý (`plan()` nhận `toolCount`; danh sách máy rỗng được phép khi đợt kèm CCDC). Cùng cron, cùng hạn hết ngày 15, cùng tự đóng.
+- Không chụp danh sách: hàng CCDC lấy trực tiếp từ `tool_catalog` của nhóm (đang hoạt động, hồ sơ hoàn tất). Người kiểm nhập **số đếm thực tế** ở `/inventory/[id]` (`components/inventory/inventory-tool-counts.tsx`, `countInventoryToolAction`: khóa dòng đợt, chỉ đợt mở có cờ, hoàn tác = xóa, số đếm ≤ 1.000.000, tối đa 2 chữ số thập phân). `inventory_tool_counts.expected_qty` = **số tồn hệ thống tại lúc đếm** (mượn nhanh / thanh lý đổi tồn trong 15 ngày); nếu tồn đổi sau lúc đếm thì dòng cảnh báo "nên đếm lại" (`toolCountDrifted`). Kết quả Đủ / Thiếu / Thừa (`toolCountState`); **Thiếu → nút "Báo mất N"** (điền sẵn số thiếu, `sourceSessionId`); Thừa chỉ nhắc dùng "Hiệu chỉnh SL" (kiểm kê **không tự đổi tồn**; chỉ phiếu báo mất được duyệt mới trừ). Tab lọc *Cần đếm / Thiếu / Đủ / Thừa / Tất cả* + ô tìm không dấu (`filterToolRows`), Enter lưu và nhảy ô kế tiếp, hiện người đếm + giờ. Mọi thành viên nhóm đếm được; Báo mất cần Kỹ sư giám sát trở lên. Nhật ký `inventory.count_tool` khai báo `mirror`.
+- **Số "CCDC chưa đếm"** = CCDC đang hoạt động CHƯA có dòng đếm (`countUncountedTools`, `lib/inventory-tool-pending.ts`, NOT EXISTS — không dùng phép trừ vì CCDC đã đếm rồi bị ngừng làm lệch), dùng chung ở việc chờ Đốc công, dòng `inventory.close`, tự đóng (`toolsUnchecked` trong tóm tắt lần chạy) và danh sách `/inventory` ("đã đếm x/y"). Biên bản Excel thêm sheet "CCDC theo số lượng" (kèm người đếm, thời gian). **DB V1.7.3**: cột `includes_tools`, bảng `inventory_tool_counts`.
+- Máy "Không thấy" trong danh sách kiểm kê có nút **Báo mất** (xem mục Báo mất).
 
 #### Kiểm kê định kỳ hàng tháng (tự động)
 

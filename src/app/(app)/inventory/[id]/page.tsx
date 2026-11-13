@@ -43,7 +43,7 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
       {session.includesTools ? (
         <>
           <h2 className="inventory-section-title">CCDC theo số lượng <small>(kiểm mỗi quý)</small></h2>
-          <InventoryToolCounts sessionId={session.id} tools={tools.map(({ checkedByName: _by, ...rest }) => rest)} canCheck={canCheck} canReportLoss={canReportLoss} open={open} />
+          <InventoryToolCounts sessionId={session.id} tools={tools.map((tool) => ({ ...tool, checkedAt: tool.checkedAt ? tool.checkedAt.toISOString() : null }))} canCheck={canCheck} canReportLoss={canReportLoss} open={open} />
         </>
       ) : null}
 

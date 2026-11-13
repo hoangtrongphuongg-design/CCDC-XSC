@@ -15,7 +15,7 @@ import { nextWorkflowCode } from "@/lib/workflows";
 
 const INSERT_CHUNK = 400;
 
-export type CreatedInventory = { sessionId: string; code: string; groupName: string; machineCount: number };
+export type CreatedInventory = { sessionId: string; code: string; groupName: string; machineCount: number; includesTools: boolean };
 
 export async function createInventorySession(input: {
   groupId: string;
@@ -24,6 +24,8 @@ export async function createInventorySession(input: {
   createdBy: string | null;
   /** "YYYY-MM" cho đợt định kỳ; null cho đợt mở tay. */
   period: string | null;
+  /** Đợt mở TAY: kèm kiểm CCDC theo số lượng (đợt định kỳ tự kèm ở kỳ quý 1/4/7/10). */
+  includeTools?: boolean;
 }): Promise<CreatedInventory> {
   const { groupId, createdBy, period } = input;
   const [group] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
@@ -49,14 +51,16 @@ export async function createInventorySession(input: {
       .where(and(inArray(equipment.id, borrowedInIds), eq(equipment.recordStatus, "active")))
     : [];
 
+  // CCDC theo số lượng: kỳ quý tự kèm; đợt tay kèm khi được tích. Tích mà nhóm không có CCDC thì báo rõ (không âm thầm bỏ qua).
+  const hasTools = await groupHasActiveTools(groupId);
+  if (input.includeTools && !hasTools) throw new Error("Nhóm chưa có CCDC theo số lượng nào đang hoạt động. Bỏ tích ô \"Kèm kiểm CCDC theo số lượng\" để chỉ kiểm máy.");
+  const includesTools = (isToolQuarter(period) || Boolean(input.includeTools)) && hasTools;
+
   const machines = [...ownedRows, ...borrowedInRows];
-  if (!machines.length) throw new Error("Nhóm chưa có máy nào hoàn thành hồ sơ để kiểm kê.");
+  if (!machines.length && !includesTools) throw new Error("Nhóm chưa có máy nào hoàn thành hồ sơ để kiểm kê.");
   if (machines.length > INVENTORY_MAX_ITEMS) throw new Error(`Nhóm có ${machines.length} máy, vượt giới hạn ${INVENTORY_MAX_ITEMS} máy mỗi đợt.`);
   const groupName = new Map(groupRows.map((row) => [row.id, row.name]));
   const nameOf = (id: string) => groupName.get(id) ?? "—";
-
-  // Kỳ quý (tháng 1/4/7/10): đợt kèm đếm CCDC theo số lượng nếu nhóm có CCDC đang hoạt động.
-  const includesTools = isToolQuarter(period) && (await groupHasActiveTools(groupId));
 
   let sessionId = "";
   let code = "";
@@ -80,14 +84,14 @@ export async function createInventorySession(input: {
         entityId: session.id,
         description: period
           ? `Tự mở đợt kiểm kê ${code} cho ${group.name} (${machines.length} máy${includesTools ? " + CCDC theo số lượng" : ""}) — kỳ ${period}`
-          : `Mở đợt kiểm kê ${code} cho ${group.name} (${machines.length} máy)${input.title ? `: ${input.title}` : ""}`,
+          : `Mở đợt kiểm kê ${code} cho ${group.name} (${machines.length} máy${includesTools ? " + CCDC theo số lượng" : ""})${input.title ? `: ${input.title}` : ""}`,
       });
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw new Error("Nhóm vừa có đợt kiểm kê khác (hoặc đã có đợt của kỳ này). Hãy tải lại trang.");
     throw error;
   }
-  return { sessionId, code, groupName: group.name, machineCount: machines.length };
+  return { sessionId, code, groupName: group.name, machineCount: machines.length, includesTools };
 }
 
 /** Nhóm có ít nhất một CCDC theo số lượng đang hoạt động (hồ sơ hoàn tất) — điều kiện để kỳ quý có khối đếm CCDC. */

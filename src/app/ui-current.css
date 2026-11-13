@@ -3164,3 +3164,9 @@ body {
 .pager-pages .is-active { border-color: var(--primary); background: var(--primary); color: #fff; }
 .pager-pages .is-gap, .pager-pages .is-disabled { border-color: transparent; background: transparent; color: var(--text-muted); }
 @media (pointer: coarse) { .pager-pages a, .pager-pages span { min-height: 44px; min-width: 44px; } }
+
+.inventory-check { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; cursor: pointer; }
+.inventory-check input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+.inventory-tools .inventory-tabs { margin-top: 8px; }
+.inventory-tool-drift { display: block; margin-top: 4px; color: #b54708; font-size: 12px; font-weight: 750; }
+.inventory-tool-meta { color: var(--text-muted); font-size: 12px; }

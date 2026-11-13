@@ -22,8 +22,11 @@ export type InventoryListRow = {
   period: string | null;
   /** Hệ thống tự đóng khi quá hạn. */
   autoClosed: boolean;
-  /** Đợt quý có kèm đếm CCDC theo số lượng. */
+  /** Đợt có kèm đếm CCDC theo số lượng. */
   includesTools: boolean;
+  /** CCDC theo số lượng đang hoạt động của nhóm / số đã đếm (chỉ có nghĩa khi `includesTools`). */
+  toolTotal: number;
+  toolCounted: number;
   onsite: number;
   checkedOnsite: number;
   found: number;
@@ -68,9 +71,25 @@ export async function loadInventoryList(auth: AuthContext): Promise<InventoryLis
     .groupBy(inventoryItems.sessionId);
   const bySession = new Map(counts.map((row) => [row.sessionId, row]));
 
+  // Tiến độ CCDC theo số lượng của các đợt có cờ: tổng CCDC đang hoạt động của nhóm + số đã đếm (chỉ tính CCDC còn hoạt động).
+  const toolSessions = sessions.filter((s) => s.includesTools);
+  const toolTotals = new Map<string, number>();
+  const toolCountedBySession = new Map<string, number>();
+  if (toolSessions.length) {
+    const totals = await db.select({ groupId: toolCatalog.groupId, n: sql<number>`count(*)`.mapWith(Number) }).from(toolCatalog)
+      .where(and(inArray(toolCatalog.groupId, [...new Set(toolSessions.map((s) => s.groupId))]), eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active")))
+      .groupBy(toolCatalog.groupId);
+    for (const row of totals) toolTotals.set(row.groupId, row.n);
+    const counted = await db.select({ sessionId: inventoryToolCounts.sessionId, n: sql<number>`count(*)`.mapWith(Number) }).from(inventoryToolCounts)
+      .innerJoin(toolCatalog, eq(toolCatalog.id, inventoryToolCounts.toolId))
+      .where(and(inArray(inventoryToolCounts.sessionId, toolSessions.map((s) => s.id)), eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active")))
+      .groupBy(inventoryToolCounts.sessionId);
+    for (const row of counted) toolCountedBySession.set(row.sessionId, row.n);
+  }
+
   return sessions.map((s) => {
     const c = bySession.get(s.id);
-    return { ...s, onsite: c?.onsite ?? 0, checkedOnsite: c?.checkedOnsite ?? 0, found: c?.found ?? 0, missing: c?.missing ?? 0 };
+    return { ...s, toolTotal: toolTotals.get(s.groupId) ?? 0, toolCounted: toolCountedBySession.get(s.id) ?? 0, onsite: c?.onsite ?? 0, checkedOnsite: c?.checkedOnsite ?? 0, found: c?.found ?? 0, missing: c?.missing ?? 0 };
   });
 }
 
@@ -91,6 +110,7 @@ export type InventoryToolRow = {
   expected: number | null;
   note: string | null;
   checkedByName: string | null;
+  checkedAt: Date | null;
   lossQuantity: number | null;
   lossStatus: LossBadge;
 };
@@ -191,7 +211,7 @@ export async function loadInventoryDetail(auth: AuthContext, id: string): Promis
     const toolRows = await db.select({
       toolId: toolCatalog.id, code: toolCatalog.code, name: toolCatalog.name, specification: toolCatalog.specification, unit: toolCatalog.unit,
       onHand: toolCatalog.quantityOnHand, counted: inventoryToolCounts.countedQty, expected: inventoryToolCounts.expectedQty,
-      note: inventoryToolCounts.note, checkedBy: inventoryToolCounts.checkedBy,
+      note: inventoryToolCounts.note, checkedBy: inventoryToolCounts.checkedBy, checkedAt: inventoryToolCounts.checkedAt,
     }).from(toolCatalog)
       .leftJoin(inventoryToolCounts, and(eq(inventoryToolCounts.toolId, toolCatalog.id), eq(inventoryToolCounts.sessionId, id)))
       .where(and(eq(toolCatalog.groupId, session.groupId), eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active")))
@@ -204,7 +224,7 @@ export async function loadInventoryDetail(auth: AuthContext, id: string): Promis
     tools = toolRows.map((r) => ({
       toolId: r.toolId, code: r.code, name: r.name, specification: r.specification, unit: r.unit,
       onHand: Number(r.onHand), counted: r.counted === null ? null : Number(r.counted), expected: r.expected === null ? null : Number(r.expected),
-      note: r.note, checkedByName: r.checkedBy ? userName.get(r.checkedBy) ?? null : null,
+      note: r.note, checkedByName: r.checkedBy ? userName.get(r.checkedBy) ?? null : null, checkedAt: r.checkedAt,
       lossQuantity: lossByTool.get(r.toolId)?.quantity ?? null, lossStatus: lossByTool.get(r.toolId)?.status ?? null,
     }));
   }

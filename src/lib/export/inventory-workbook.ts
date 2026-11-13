@@ -65,12 +65,14 @@ export async function buildInventoryWorkbook(input: { generatedAt: Date; exporte
         { header: "Kết quả", width: 12 },
         { header: "Báo mất", width: 26 },
         { header: "Ghi chú", width: 30 },
+        { header: "Người đếm", width: 22 },
+        { header: "Thời gian đếm", width: 18 },
       ]);
     tools.forEach((tool, index) => {
       const state = toolCountState(tool);
       const diff = toolCountDiff(tool);
       const loss = tool.lossStatus ? `${tool.lossQuantity ?? ""} ${tool.unit} — ${tool.lossStatus === "completed" ? "đã duyệt" : "chờ duyệt"}` : "";
-      addDataRow(toolCtx, [index + 1, tool.code ?? "", tool.name, tool.specification ?? "", tool.unit, tool.expected ?? "", tool.counted ?? "", diff ?? "", TOOL_COUNT_LABELS[state], loss, tool.note ?? ""]);
+      addDataRow(toolCtx, [index + 1, tool.code ?? "", tool.name, tool.specification ?? "", tool.unit, tool.expected ?? "", tool.counted ?? "", diff ?? "", TOOL_COUNT_LABELS[state], loss, tool.note ?? "", tool.checkedByName ?? "", tool.checkedAt ? vnDateTime(tool.checkedAt) : ""]);
     });
     finishSheet(toolCtx);
   }

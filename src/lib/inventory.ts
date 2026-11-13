@@ -204,12 +204,42 @@ export function summarizeToolCounts(rows: ReadonlyArray<{ counted: number | null
   return s;
 }
 
+export type ToolFilter = "pending" | "short" | "ok" | "over" | "all";
+
+type ToolRowLike = { code: string | null; name: string; specification: string | null; counted: number | null; expected: number | null };
+
+/** Lọc danh sách CCDC theo tab và từ khóa (không phân biệt hoa/thường và dấu; nhiều từ = khớp tất cả). */
+export function filterToolRows<T extends ToolRowLike>(rows: readonly T[], filter: ToolFilter, query: string): T[] {
+  const terms = foldText(query).split(" ").filter(Boolean);
+  return rows.filter((row) => {
+    if (filter !== "all" && toolCountState(row) !== filter) return false;
+    if (!terms.length) return true;
+    const haystack = foldText([row.code, row.name, row.specification].filter(Boolean).join(" "));
+    return terms.every((term) => haystack.includes(term));
+  });
+}
+
+export function countToolFilters(rows: readonly ToolRowLike[]): Record<ToolFilter, number> {
+  const counts: Record<ToolFilter, number> = { pending: 0, short: 0, ok: 0, over: 0, all: rows.length };
+  for (const row of rows) counts[toolCountState(row)] += 1;
+  return counts;
+}
+
+/** Số hệ thống đã đổi SAU lúc đếm (mượn nhanh / thanh lý / hiệu chỉnh trong lúc kiểm kê) → nên đếm lại. */
+export function toolCountDrifted(row: { counted: number | null; expected: number | null; onHand: number }): boolean {
+  return row.counted !== null && row.expected !== null && Math.abs(row.onHand - row.expected) > 0.005;
+}
+
+/** Giới hạn trên của số đếm (như số lượng mượn nhanh), chặn nhập nhầm. */
+export const MAX_COUNTED_QTY = 1_000_000;
+
 /** Số đếm nhập từ ô số: ≥ 0, tối đa 2 chữ số thập phân. */
 export function parseCountedQty(raw: unknown): { ok: true; value: number } | { ok: false; message: string } {
   const text = String(raw ?? "").trim().replace(",", ".");
   if (text === "") return { ok: false, message: "Vui lòng nhập số lượng đếm được." };
   const value = Number(text);
   if (!Number.isFinite(value) || value < 0) return { ok: false, message: "Số lượng đếm phải là số từ 0 trở lên." };
+  if (value > MAX_COUNTED_QTY) return { ok: false, message: `Số lượng đếm không được vượt ${MAX_COUNTED_QTY.toLocaleString("vi-VN")}.` };
   if (Math.abs(Math.round(value * 100) - value * 100) > 1e-6) return { ok: false, message: "Số lượng chỉ nhận tối đa 2 chữ số thập phân." };
   return { ok: true, value: round2(value) };
 }
