@@ -149,8 +149,8 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         </a>
       </section>
 
-      <details className="equipment-filter-panel" open={hasActiveFilters(filters)}>
-        <summary>Tìm và lọc{hasActiveFilters(filters) ? ` (đang lọc)` : ""}</summary>
+      <section className="equipment-filter-panel" aria-labelledby="equipment-filter-title">
+        <h2 className="equipment-filter-title" id="equipment-filter-title">Tìm và lọc{hasActiveFilters(filters) ? " (đang lọc)" : ""}</h2>
         <form className="equipment-filter-bar" action="/equipment" method="get" role="search">
           <label className="equipment-filter-search">
             <span><Search size={14} aria-hidden="true" /> Tìm</span>
@@ -194,7 +194,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
             {hasActiveFilters(filters) ? <Link className="btn btn-secondary" href="/equipment">Xóa bộ lọc</Link> : null}
           </div>
         </form>
-      </details>
+      </section>
 
       {hasActiveFilters(filters) ? (
         <div className="equipment-filter-chips" aria-label="Bộ lọc đang áp dụng">
