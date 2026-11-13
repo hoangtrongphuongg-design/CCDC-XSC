@@ -9,6 +9,8 @@ import { equipment, groups, machineLoans, transfers } from "@/lib/db/schema";
 import { requireGroupPermission, requireWsManager } from "@/lib/auth/guards";
 import { assertEquipmentHasNoOtherOpenWorkflow, lockEquipment, nextWorkflowCode } from "@/lib/workflows";
 import { writeAudit } from "@/lib/audit";
+import { loadCanonicalizers } from "@/lib/canonical-data";
+import { statusForCondition } from "@/lib/equipment-status-rule";
 
 function refresh() {
   revalidatePath("/transfers");
@@ -164,9 +166,12 @@ export async function confirmTransferReceiptAction(formData: FormData) {
   if (!transfer) throw new Error("Không tìm thấy phiếu.");
   const auth = await requireGroupPermission(transfer.targetGroupId, "manager");
   if (!transfer.handedOverAt || transfer.status !== "wait_handover") throw new Error("Nhóm giao chưa xác nhận bàn giao.");
+  // Vị trí tại nhóm nhận (không bắt buộc). Không nhập thì xóa vị trí cũ của nhóm giao, tuyệt đối không giữ lại.
+  const typedLocation = String(formData.get("currentLocation") || "").trim().replace(/\s+/g, " ").slice(0, 255);
+  const newLocation = typedLocation ? (await loadCanonicalizers()).canonicalLocation(typedLocation) || typedLocation : null;
 
   await db.transaction(async (tx) => {
-    await lockEquipment(tx, transfer.equipmentId);
+    const lockedMachine = await lockEquipment(tx, transfer.equipmentId);
     const [updated] = await tx.update(transfers).set({ status: "completed", receivedBy: auth.userId, receivedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(transfers.id, transfer.id), eq(transfers.status, "wait_handover"))).returning();
     if (!updated) throw new Error("Phiếu đã được xử lý.");
@@ -174,7 +179,9 @@ export async function confirmTransferReceiptAction(formData: FormData) {
       ownerGroupId: transfer.targetGroupId,
       currentGroupId: transfer.targetGroupId,
       currentHolderId: auth.userId,
-      status: "in_use_owner",
+      currentLocation: newLocation,
+      // Sẵn sàng chỉ khi tình trạng Tốt (máy Hư hỏng điều chuyển xong thì Chờ kiểm tra).
+      status: statusForCondition("in_use_owner", lockedMachine.condition) as "in_use_owner" | "wait_inspection",
       updatedAt: new Date(),
     }).where(eq(equipment.id, transfer.equipmentId));
     if (transfer.linkedLoanId) {

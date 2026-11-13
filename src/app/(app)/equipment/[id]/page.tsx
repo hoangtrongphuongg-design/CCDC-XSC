@@ -31,7 +31,7 @@ export default async function MachineProfilePage({ params }: { params: Promise<{
   const { id } = await params;
   const profile = await loadMachineProfile(auth, id);
   if (!profile) notFound();
-  const { machine, groupNames, heldByGroupName, tickets, activeRepairType, history, showFinancials, inMyScope } = profile;
+  const { machine, groupNames, heldByGroupName, tickets, locationText, activeRepairType, history, showFinancials, inMyScope } = profile;
   // Hồ sơ nháp (chưa hoàn thành) chỉ người trong phạm vi máy mới xem.
   if (machine.recordStatus !== "active" && !inMyScope) notFound();
 
@@ -94,7 +94,7 @@ export default async function MachineProfilePage({ params }: { params: Promise<{
             <dl className="profile-dl">
               <Field label="Nhóm quản lý">{name(machine.ownerGroupId)}</Field>
               <Field label="Nhóm đang giữ">{heldByGroupName ? `${heldByGroupName} (đang mượn)` : name(machine.ownerGroupId)}</Field>
-              <Field label="Vị trí">{machine.currentLocation}</Field>
+              <Field label="Vị trí">{locationText}</Field>
               <Field label="Cập nhật lần cuối">{formatDateTime(machine.updatedAt)}</Field>
             </dl>
           </CardContent>

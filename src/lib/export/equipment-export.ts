@@ -4,6 +4,7 @@
  * test được bằng dữ liệu giả và để file xuất luôn khớp với danh sách trên màn hình.
  */
 import { EQUIPMENT_CATEGORIES, getEquipmentCategoryLabel } from "@/lib/equipment-categories";
+import { displayLocation } from "@/lib/location-display";
 import { CONDITION_LABELS, EQUIPMENT_STATUS_LABELS } from "@/lib/constants";
 import { groupSortOrder } from "@/lib/group-structure";
 import { isHeldByBorrower } from "@/lib/loan-status";
@@ -348,7 +349,7 @@ type RawEquipmentRow = {
 
 export type ExportContext = {
   groupById: Map<string, { code: string; name: string }>;
-  loan?: { status: string; ownerGroupId: string; borrowerGroupId: string } | null;
+  loan?: { status: string; ownerGroupId: string; borrowerGroupId: string; workLocation?: string | null } | null;
   transfer?: { status: string; sourceGroupId: string; targetGroupId: string } | null;
   repair?: { status: string } | null;
 };
@@ -374,7 +375,13 @@ export function toExportEquipment(row: RawEquipmentRow, ctx: ExportContext): Exp
     currentGroupName: isHeldByBorrower(ctx.loan?.status)
       ? group(ctx.loan?.borrowerGroupId)?.name ?? owner?.name ?? "—"
       : owner?.name ?? group(row.currentGroupId)?.name ?? "—",
-    currentLocation: row.currentLocation,
+    // Vị trí theo nghiệp vụ: đang mượn → tại nhóm mượn; đang điều chuyển → nhóm nhận; còn lại vị trí đã lưu (trống thì để trống).
+    currentLocation: displayLocation({
+      stored: row.currentLocation,
+      loan: ctx.loan ? { status: ctx.loan.status, borrowerGroupName: group(ctx.loan.borrowerGroupId)?.name ?? "—", workLocation: ctx.loan.workLocation ?? null } : null,
+      transfer: ctx.transfer ? { status: ctx.transfer.status, targetGroupName: group(ctx.transfer.targetGroupId)?.name ?? "—" } : null,
+      empty: "",
+    }) || null,
     status: row.status,
     condition: row.condition,
     loanStatus: ctx.loan?.status ?? null,

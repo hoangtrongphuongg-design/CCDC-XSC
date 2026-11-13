@@ -74,6 +74,8 @@ export type IndividualEquipmentRow = {
   currentGroupId: string;
   currentGroupName: string;
   currentLocation: string | null;
+  /** Vị trí hiển thị suy ra theo nghiệp vụ (đang mượn / đang điều chuyển), xem lib/location-display.ts. */
+  locationText: string;
   status: keyof typeof EQUIPMENT_STATUS_LABELS;
   condition: keyof typeof CONDITION_LABELS;
   purchaseDate: string | null;
@@ -642,7 +644,7 @@ function DetailModal({
                 <div><dt>Nhóm gốc</dt><dd>{row.originGroupName}</dd></div>
                 <div><dt>Nguồn hình thành</dt><dd>{originLabels[row.originType]}</dd></div>
                 <div><dt>Ngày ghi nhận</dt><dd>{formatDate(row.recordedDate)}</dd></div>
-                <div><dt>Vị trí</dt><dd>{row.currentLocation || "—"}</dd></div>
+                <div><dt>Vị trí</dt><dd>{row.locationText}</dd></div>
               </dl></section>
               <section><h3>Phân loại & nhận dạng</h3><dl>
                 <div><dt>Nhóm thiết bị</dt><dd>{category}</dd></div>
@@ -971,7 +973,7 @@ export function EquipmentWorkspace({
                 row.legacyCode || "—",
                 <div key="name" className="asset-name-cell"><strong><SafeText>{row.name}</SafeText></strong><small>{row.ownerGroupName}</small></div>,
                 <span key="brand-model">{[row.brand, row.model].filter(Boolean).join(" / ") || "—"}</span>,
-                row.currentLocation || "—",
+                row.locationText,
                 <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />,
                 <StatusBadge key="status" label={displayEquipmentStatus(row)} tone={statusTone(row.status)} />,
                 <span key="updated" className="equipment-updated-at">{formatDateTime(row.updatedAt)}</span>,
