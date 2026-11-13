@@ -1,12 +1,12 @@
 import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
-import { CheckCircle2, Clock3, PackageCheck, Plus, ShieldCheck, Zap } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { db } from "@/lib/db";
 import { groups, quickLoans, toolCatalog } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { WORKFLOW_LABELS } from "@/lib/constants";
-import { PageHeader } from "@/components/page-header";
-import { StatCard } from "@/components/stat-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoanFilterBar, LoanHead } from "@/components/loan-head";
+import { TicketDialog } from "@/components/ticket-dialog";
+import { TicketTableCard } from "@/components/ticket-table-card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -15,16 +15,17 @@ import { Button } from "@/components/ui/button";
 import { ExportBar } from "@/components/export-bar";
 import { FormField } from "@/components/ui/form-field";
 import { SearchableSelect } from "@/components/searchable-select";
-import { LoanTabs } from "@/components/loan-tabs";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import {
   approveQuickLoanAction,
   closeQuickLoanAction,
-  createQuickLoanAction,
   rejectQuickLoanAction,
   reportQuickLoanReturnAction,
 } from "@/actions/quick-loans";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
+import { countLoanViews, loanDaysLate, matchesLoanView, parseLoanView } from "@/lib/loan-views";
+import { vnDate } from "@/lib/export/equipment-export";
+import { submitQuickLoan } from "@/actions/ticket-forms";
 
 export const dynamic = "force-dynamic";
 
@@ -55,26 +56,21 @@ export default async function QuickLoansPage({ searchParams }: { searchParams?: 
     (permission) => permission.groupCode !== "KHO_TL" && isOfficialOperationalGroupCode(permission.groupCode),
   );
 
-  const pendingApproval = rows.filter((row) => row.status === "pending_approval").length;
-  const borrowed = rows.filter((row) => ["pending_receipt", "borrowed"].includes(row.status)).length;
-  const waitingClose = rows.filter((row) => row.status === "return_reported").length;
-  const completed = rows.filter((row) => row.status === "completed").length;
+  // Thanh lọc nhanh: đếm trên phiếu ĐANG MỞ; chọn thẻ thì bảng "Chờ xử lý" chỉ hiện phiếu thuộc thẻ đó.
+  const today = vnDate();
+  const view = parseLoanView(params.view);
+  const toViewRow = (row: (typeof openRows)[number]) => ({ status: row.status, dueDate: row.expectedReturnAt ? vnDate(row.expectedReturnAt) : null });
+  const counts = countLoanViews(openRows.map(toViewRow), today);
+  const shownOpenRows = openRows.filter((row) => matchesLoanView(toViewRow(row), view, today));
+  const canCreate = borrowerGroups.length > 0 && !auth.isReadOnlyViewer;
 
   return (
-    <div className={`loan-mobile-page quick-loans-page mobile-mode-${mobileMode}`}>
-      <LoanTabs active="quick" />
-      <PageHeader
-        title="Mượn – Trả CCDC lặt vặt"
-        description="Luồng giống Mượn máy: tạo đề nghị → nhóm cho mượn duyệt (đồng thời bàn giao/đã nhận) → báo trả → nhóm cho mượn xác nhận nhận lại."
-        actions={auth.isWorkshopAdmin && !auth.isReadOnlyViewer ? <ExportBar action="/machine-loans/export" buttonLabel="Xuất Excel mượn – trả" fromLabel="Đề nghị từ ngày" /> : null}
+    <div className={`loan-mobile-page quick-loans-page has-ticket-fab mobile-mode-${mobileMode}`}>
+      <LoanHead
+        active="quick"
+        exportSlot={auth.isWorkshopAdmin && !auth.isReadOnlyViewer ? <ExportBar action="/machine-loans/export" buttonLabel="Xuất Excel mượn – trả" fromLabel="Đề nghị từ ngày" /> : null}
       />
-
-      <section className="stat-grid">
-        <StatCard title="Chờ nhóm cho mượn duyệt" value={pendingApproval} icon={Clock3} tone="warning" />
-        <StatCard title="Đã duyệt / đang mượn" value={borrowed} icon={Zap} tone="violet" />
-        <StatCard title="Chờ nhóm cho nhận lại" value={waitingClose} icon={PackageCheck} tone="cyan" />
-        <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
-      </section>
+      <LoanFilterBar basePath="/quick-loans" view={view} counts={counts} doneCount={closedRows.length} />
 
       <section className="mobile-loan-action-inbox" aria-label="Việc cần xử lý mượn nhanh">
         <div className="mobile-loan-section-title">
@@ -127,13 +123,10 @@ export default async function QuickLoansPage({ searchParams }: { searchParams?: 
         })}
       </div>
 
-      <div className="content-grid">
-        <Card className="table-card">
-          <CardHeader><CardTitle>Giao dịch mượn nhanh</CardTitle><Zap size={18} /></CardHeader>
-          <CardContent>
+      <TicketTableCard title="Chờ xử lý" count={shownOpenRows.length}>
             <DataTable
               headers={["Phiếu", "Vật dụng", "SL", "Nhóm cho", "Nhóm mượn", "Hạn trả", "Trạng thái", "Thao tác"]}
-              rows={rows.map((row) => {
+              rows={shownOpenRows.map((row) => {
                 const actions: React.ReactNode[] = [];
 
                 if (row.status === "pending_approval" && hasGroupPermission(auth, row.sourceGroupId, "operator")) {
@@ -172,6 +165,7 @@ export default async function QuickLoansPage({ searchParams }: { searchParams?: 
                   );
                 }
 
+                const late = loanDaysLate({ status: row.status, dueDate: row.expectedReturnAt ? vnDate(row.expectedReturnAt) : null }, today);
                 return [
                   <strong key="code">{row.code}</strong>,
                   <div key="item" className="quick-loan-item-cell">
@@ -184,7 +178,7 @@ export default async function QuickLoansPage({ searchParams }: { searchParams?: 
                   `${row.quantityBorrowed} ${row.unit}`,
                   groupMap.get(row.sourceGroupId) || "—",
                   groupMap.get(row.borrowerGroupId) || "—",
-                  row.expectedReturnAt ? formatDate(row.expectedReturnAt) : "—",
+                  <span key="due" className="due-cell">{row.expectedReturnAt ? formatDate(row.expectedReturnAt) : "—"}{late ? <small className="late-note">Trễ {late} ngày</small> : null}</span>,
                   <StatusBadge
                     key="status"
                     label={
@@ -199,17 +193,38 @@ export default async function QuickLoansPage({ searchParams }: { searchParams?: 
                   <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>,
                 ];
               })}
-              empty={<EmptyState description="Chưa có giao dịch mượn nhanh." />}
+              empty={<EmptyState description={view === "all" ? "Không có giao dịch mượn nhanh nào đang chờ xử lý." : "Không có phiếu nào thuộc mục này."} />}
             />
-          </CardContent>
-        </Card>
+      </TicketTableCard>
 
-        <Card className="side-panel" id="new-quick-loan">
-          <CardHeader><CardTitle>Tạo đề nghị mượn nhanh</CardTitle><Plus size={18} /></CardHeader>
-          <CardContent>
-            {borrowerGroups.length ? (
-              <form action={createQuickLoanAction} className="form-grid">
-                <FormField label="Nhóm mượn" required hint="Mọi mức quyền trong nhóm đều được lập đề nghị.">
+      <TicketTableCard id="da-hoan-thanh" title="Đã hoàn thành" count={closedRows.length} tone="done">
+        <DataTable
+          headers={["Phiếu", "Vật dụng", "SL", "Nhóm cho", "Nhóm mượn", "Hạn trả", "Trạng thái"]}
+          rows={closedRows.map((row) => [
+            <strong key="code">{row.code}</strong>,
+            <div key="item" className="quick-loan-item-cell">
+              <strong>{row.itemName}</strong>
+              {row.specification ? <small>{row.specification}</small> : null}
+            </div>,
+            `${row.quantityBorrowed} ${row.unit}`,
+            groupMap.get(row.sourceGroupId) || "—",
+            groupMap.get(row.borrowerGroupId) || "—",
+            row.expectedReturnAt ? formatDate(row.expectedReturnAt) : "—",
+            <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={tone(row.status)} />,
+          ])}
+          empty={<EmptyState description="Chưa có giao dịch mượn nhanh nào hoàn thành." />}
+        />
+      </TicketTableCard>
+
+      {canCreate ? (
+        <TicketDialog
+          buttonLabel="Tạo phiếu mượn nhanh"
+          title="Tạo đề nghị mượn nhanh CCDC"
+          submitLabel="Gửi đề nghị mượn nhanh"
+          action={submitQuickLoan}
+          defaultOpen={mobileMode === "create"}
+        >
+          <FormField label="Nhóm mượn" required hint="Mọi mức quyền trong nhóm đều được lập đề nghị.">
                   <select name="borrowerGroupId">
                     {borrowerGroups.map((group) => <option key={group.groupId} value={group.groupId}>{group.groupName}</option>)}
                   </select>
@@ -265,14 +280,8 @@ export default async function QuickLoansPage({ searchParams }: { searchParams?: 
                 </div>
                 <FormField label="Ngày dự kiến trả"><input name="expectedReturnAt" type="date" /></FormField>
                 <FormField label="Nội dung đề nghị"><textarea name="borrowerNote" placeholder="Mục đích sử dụng hoặc lưu ý cần thiết" /></FormField>
-                <Button type="submit">Gửi đề nghị mượn nhanh</Button>
-              </form>
-            ) : (
-              <EmptyState title="Chưa được gán nhóm" description="Tài khoản cần thuộc ít nhất một nhóm nghiệp vụ để lập đề nghị." />
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        </TicketDialog>
+      ) : null}
     </div>
   );
 }

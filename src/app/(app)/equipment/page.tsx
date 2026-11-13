@@ -140,7 +140,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
         description="Trang tra cứu tập trung, chỉ xem. Việc thêm và cập nhật dụng cụ được thực hiện tại Dụng cụ nhóm tôi."
       />
 
-      <section className="stat-grid">
+      <section className="stat-grid compact">
         <Link className={`stat-card-link${!hasActiveFilters(filters, false) ? " is-active" : ""}`} href={buildFilterHref("/equipment", { ...filters, group: "", status: "", condition: "", category: "" })}>
           <StatCard title="Máy/CCDC có mã" value={rows.length} icon={Boxes} tone="primary" />
         </Link>

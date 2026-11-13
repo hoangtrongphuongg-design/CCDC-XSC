@@ -1,12 +1,13 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { ArrowLeftRight, CheckCircle2, Clock3, PackageCheck, Plus } from "lucide-react";
+import { ArrowLeftRight, CheckCircle2, Clock3, PackageCheck } from "lucide-react";
 import { db } from "@/lib/db";
 import { disposals, equipment, groups, machineLoans, repairs, transfers } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { WORKFLOW_LABELS } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TicketDialog } from "@/components/ticket-dialog";
+import { TicketTableCard } from "@/components/ticket-table-card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -20,9 +21,9 @@ import {
   approveTransferByWsAction,
   confirmTransferHandoverAction,
   confirmTransferReceiptAction,
-  createTransferAction,
 } from "@/actions/transfers";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
+import { submitTransfer } from "@/actions/ticket-forms";
 import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
 import {
   CLOSED_TRANSFER_STATUSES,
@@ -59,24 +60,23 @@ export default async function TransfersPage() {
   const handover = rows.filter((row) => row.status === "wait_handover").length;
   const completed = rows.filter((row) => row.status === "completed").length;
 
+  const canCreate = actingGroups.length > 0 && !auth.isReadOnlyViewer;
+
   return (
-    <>
+    <div className={canCreate ? "has-ticket-fab" : undefined}>
       <PageHeader
         title="Điều chuyển"
         description="Chuyển quyền quản lý cố định sang nhóm khác; mã máy được giữ nguyên suốt vòng đời."
         actions={auth.isWorkshopAdmin && !auth.isReadOnlyViewer ? <ExportBar action="/transfers/export" buttonLabel="Xuất Excel điều chuyển" fromLabel="Đề xuất từ ngày" /> : null}
       />
-      <section className="stat-grid">
+      <section className="stat-grid compact">
         <StatCard title="Chờ nhóm xác nhận" value={waitingGroups} icon={Clock3} tone="warning" />
         <StatCard title="Chờ Quản lý Xưởng duyệt" value={waitingWs} icon={ArrowLeftRight} tone="violet" />
         <StatCard title="Chờ bàn giao" value={handover} icon={PackageCheck} tone="cyan" />
         <StatCard title="Đã hoàn thành" value={completed} icon={CheckCircle2} tone="success" />
       </section>
-      <div className="content-grid">
-        <Card className="table-card">
-          <CardHeader><CardTitle>Danh sách phiếu điều chuyển</CardTitle><ArrowLeftRight size={18} /></CardHeader>
-          <CardContent>
-            <DataTable headers={["Phiếu", "Máy", "Nhóm giao", "Nhóm nhận", "Trạng thái", "Thao tác"]} rows={rows.map((row) => {
+      <TicketTableCard title="Chờ xử lý" count={openRows.length}>
+        <DataTable headers={["Phiếu", "Máy", "Nhóm giao", "Nhóm nhận", "Trạng thái", "Thao tác"]} rows={openRows.map((row) => {
               const actions = [] as React.ReactNode[];
               const counterpartGroup = row.status === "pending_target" ? row.targetGroupId : row.status === "pending_source" ? row.sourceGroupId : null;
               if (counterpartGroup && hasGroupPermission(auth, counterpartGroup, "manager")) actions.push(<form action={acceptTransferCounterpartAction} key="accept"><input type="hidden" name="transferId" value={row.id} /><Button size="sm">Đồng ý</Button></form>);
@@ -84,14 +84,20 @@ export default async function TransfersPage() {
               if (row.status === "wait_handover" && !row.handedOverAt && hasGroupPermission(auth, row.sourceGroupId, "manager")) actions.push(<form action={confirmTransferHandoverAction} key="handover" className="row-actions"><input type="hidden" name="transferId" value={row.id} /><input name="handoverCondition" placeholder="Tình trạng bàn giao" aria-label="Tình trạng bàn giao" className="field-inline-lg" /><Button size="sm" variant="secondary">Đã giao</Button></form>);
               if (row.status === "wait_handover" && row.handedOverAt && hasGroupPermission(auth, row.targetGroupId, "manager")) actions.push(<form action={confirmTransferReceiptAction} key="receive" className="row-actions"><input type="hidden" name="transferId" value={row.id} /><input name="currentLocation" maxLength={255} placeholder="Vị trí tại nhóm nhận (không bắt buộc)" aria-label="Vị trí tại nhóm nhận" className="field-inline-md" /><Button size="sm">Đã nhận</Button></form>);
               return [<strong key="code">{row.code}</strong>, equipmentMap.get(row.equipmentId) || "—", groupMap.get(row.sourceGroupId) || "—", groupMap.get(row.targetGroupId) || "—", <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={workflowTone(row.status)} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];
-            })} empty={<EmptyState description="Chưa có phiếu điều chuyển." />} />
-          </CardContent>
-        </Card>
-        <Card className="side-panel">
-          <CardHeader><CardTitle>Tạo đề xuất điều chuyển</CardTitle><Plus size={18} /></CardHeader>
-          <CardContent>
-            {actingGroups.length ? <form action={createTransferAction} className="form-grid">
-              <FormField label="Đại diện nhóm" required hint="Chỉ các nhóm mà bạn có vai trò Đốc công khu vực."><select name="actingGroupId" id="transfer-acting-group">{actingGroups.map((g) => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
+            })} empty={<EmptyState description="Không có phiếu điều chuyển nào đang chờ xử lý." />} />
+      </TicketTableCard>
+
+      <TicketTableCard title="Đã hoàn thành" count={closedRows.length} tone="done">
+        <DataTable
+          headers={["Phiếu", "Máy", "Nhóm giao", "Nhóm nhận", "Trạng thái"]}
+          rows={closedRows.map((row) => [<strong key="code">{row.code}</strong>, equipmentMap.get(row.equipmentId) || "—", groupMap.get(row.sourceGroupId) || "—", groupMap.get(row.targetGroupId) || "—", <StatusBadge key="status" label={WORKFLOW_LABELS[row.status] || row.status} tone={workflowTone(row.status)} />])}
+          empty={<EmptyState description="Chưa có phiếu điều chuyển nào hoàn thành." />}
+        />
+      </TicketTableCard>
+
+      {canCreate ? (
+        <TicketDialog buttonLabel="Tạo điều chuyển" title="Tạo đề xuất điều chuyển" submitLabel="Gửi đề xuất" action={submitTransfer}>
+          <FormField label="Đại diện nhóm" required hint="Chỉ các nhóm mà bạn có vai trò Đốc công khu vực."><select name="actingGroupId" id="transfer-acting-group">{actingGroups.map((g) => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
               <FormField label="Máy" required hint="Chỉ hiển thị máy thuộc quyền quản lý của nhóm đại diện và không nằm trong quy trình khác.">
                 <SearchableSelect
                   name="equipmentId"
@@ -111,11 +117,8 @@ export default async function TransfersPage() {
               </FormField>
               <FormField label="Nhóm nhận" required><select name="targetGroupId">{groupRows.filter((g) => !g.isSystem && isOfficialOperationalGroupCode(g.code)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></FormField>
               <FormField label="Lý do điều chuyển" required><textarea name="reason" placeholder="Nêu rõ nhu cầu và lý do thay đổi nhóm quản lý" /></FormField>
-              <Button type="submit">Gửi đề xuất</Button>
-            </form> : <EmptyState title="Không có quyền tạo điều chuyển" description="Chỉ Đốc công khu vực của nhóm quản lý máy mới được lập đề xuất điều chuyển." />}
-          </CardContent>
-        </Card>
-      </div>
-    </>
+        </TicketDialog>
+      ) : null}
+    </div>
   );
 }

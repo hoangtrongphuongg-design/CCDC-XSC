@@ -63,7 +63,7 @@ export async function createRepairAction(formData: FormData) {
   });
   refresh();
 
-  await setFlashMessage("success", 'Đã gửi báo hư / đề nghị sửa chữa');
+  await setFlashMessage("success", "Đã tạo phiếu thành công", "Phiếu báo hư đã gửi Xưởng tiếp nhận");
 }
 
 export async function acceptRepairAction(formData: FormData) {

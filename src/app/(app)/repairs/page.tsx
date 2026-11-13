@@ -1,12 +1,13 @@
 import { asc, desc, eq, inArray } from "drizzle-orm";
-import { CheckCircle2, Clock3, FileSpreadsheet, Plus, ShieldAlert, Wrench } from "lucide-react";
+import { CheckCircle2, Clock3, FileSpreadsheet, ShieldAlert, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, repairs } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
 import { repairStatusLabel } from "@/lib/repair-display";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TicketDialog } from "@/components/ticket-dialog";
+import { TicketTableCard } from "@/components/ticket-table-card";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -14,8 +15,9 @@ import { workflowTone } from "@/lib/status-style";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { formatNumber } from "@/lib/utils";
-import { acceptRepairAction, completeRepairAction, confirmRepairByOwnerAction, createRepairAction, markExternalIrreparableAction, sendExternalRepairAction, updateRepairCostAction } from "@/actions/repairs";
+import { acceptRepairAction, completeRepairAction, confirmRepairByOwnerAction, markExternalIrreparableAction, sendExternalRepairAction, updateRepairCostAction } from "@/actions/repairs";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
+import { submitRepair } from "@/actions/ticket-forms";
 import { CLOSED_REPAIR_STATUSES, OPEN_REPAIR_STATUSES, RECENT_CLOSED_LIMIT } from "@/lib/workflow-status";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -43,7 +45,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Sea
   const completed = rows.filter((row) => row.status === "completed").length;
 
   return (
-    <div className={`repair-mobile-page mobile-mode-${mobileMode}`}>
+    <div className={`repair-mobile-page${actingGroups.length && !auth.isReadOnlyViewer ? " has-ticket-fab" : ""} mobile-mode-${mobileMode}`}>
       <PageHeader
         title="Sửa chữa"
         description="Báo hư, tiếp nhận, thực hiện sửa và xác nhận hoàn thành theo từng mã máy."
@@ -56,7 +58,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Sea
           </form>
         ) : null}
       />
-      <section className="stat-grid">
+      <section className="stat-grid compact">
         <StatCard title="Chờ tiếp nhận" value={pending} icon={Clock3} tone="warning" />
         <StatCard title="Sửa nội bộ" value={repairing} icon={Wrench} tone="primary" />
         <StatCard title="Thuê ngoài" value={externalRepairing} icon={Wrench} tone="warning" />
@@ -68,11 +70,8 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Sea
         {rows.slice(0, 20).map((row) => { const machine = equipmentMap.get(row.equipmentId); return <article className="mobile-repair-card" key={`mobile-repair-${row.id}`}><div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || row.code} · {groupMap.get(row.reportedByGroupId) || "—"}</span><small>{repairStatusLabel(row.status, row.repairType)}</small></div></article>; })}
         {!rows.length ? <p className="mobile-ops-empty">Chưa có phiếu báo hư.</p> : null}
       </section>
-      <div className="content-grid">
-        <Card className="table-card">
-          <CardHeader><CardTitle>Danh sách phiếu sửa chữa</CardTitle><Wrench size={18} /></CardHeader>
-          <CardContent>
-            <DataTable headers={["Phiếu", "Máy", "Nhóm báo", "Nội dung hư", "Chi phí", "Trạng thái", "Thao tác"]} rows={rows.map((row) => {
+      <TicketTableCard title="Chờ xử lý" count={openRows.length}>
+        <DataTable headers={["Phiếu", "Máy", "Nhóm báo", "Nội dung hư", "Chi phí", "Trạng thái", "Thao tác"]} rows={openRows.map((row) => {
               const machine = equipmentMap.get(row.equipmentId);
               const actions = [] as React.ReactNode[];
               if (row.status === "pending_acceptance" && auth.isWorkshopAdmin) actions.push(<form action={acceptRepairAction} key="accept"><input type="hidden" name="repairId" value={row.id} /><Button size="sm">Tiếp nhận</Button></form>);
@@ -86,21 +85,27 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Sea
               }
               if (row.status === "wait_owner_confirm" && machine && hasGroupPermission(auth, machine.ownerGroupId, "manager")) actions.push(<form action={confirmRepairByOwnerAction} key="confirm"><input type="hidden" name="repairId" value={row.id} /><Button size="sm">Nhận lại</Button></form>);
               return [<strong key="code">{row.code}</strong>, machine ? `${machine.code} — ${machine.name}` : row.equipmentId, groupMap.get(row.reportedByGroupId) || "—", row.issueDescription, auth.isWorkshopAdmin ? <form key="cost" action={updateRepairCostAction} className="row-actions"><input type="hidden" name="repairId" value={row.id} /><input name="cost" type="number" min="0" step="1000" defaultValue={Number(row.cost || 0)} aria-label={`Chi phí ${row.code}`} className="field-inline-sm" /><Button size="sm" variant="secondary">Lưu</Button></form> : <span key="cost" className="numeric">{formatNumber(row.cost)}</span>, <StatusBadge key="status" label={repairStatusLabel(row.status, row.repairType)} tone={workflowTone(row.status)} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];
-            })} empty={<EmptyState description="Chưa có phiếu sửa chữa." />} />
-          </CardContent>
-        </Card>
-        <Card className="side-panel" id="new-repair">
-          <CardHeader><CardTitle>Báo hư / yêu cầu sửa</CardTitle><Plus size={18} /></CardHeader>
-          <CardContent>
-            {actingGroups.length ? <form action={createRepairAction} className="form-grid">
-              <FormField label="Nhóm báo hư" required><select name="reportingGroupId">{actingGroups.map((g) => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
+})} empty={<EmptyState description="Không có phiếu sửa chữa nào đang chờ xử lý." />} />
+      </TicketTableCard>
+
+      <TicketTableCard title="Đã hoàn thành" count={closedRows.length} tone="done">
+        <DataTable
+          headers={["Phiếu", "Máy", "Nhóm báo", "Nội dung hư", "Chi phí", "Trạng thái"]}
+          rows={closedRows.map((row) => {
+            const machine = equipmentMap.get(row.equipmentId);
+            return [<strong key="code">{row.code}</strong>, machine ? `${machine.code} — ${machine.name}` : row.equipmentId, groupMap.get(row.reportedByGroupId) || "—", row.issueDescription, auth.isWorkshopAdmin ? <form key="cost" action={updateRepairCostAction} className="row-actions"><input type="hidden" name="repairId" value={row.id} /><input name="cost" type="number" min="0" step="1000" defaultValue={Number(row.cost || 0)} aria-label={`Chi phí ${row.code}`} className="field-inline-sm" /><Button size="sm" variant="secondary">Lưu</Button></form> : <span key="cost" className="numeric">{formatNumber(row.cost)}</span>, <StatusBadge key="status" label={repairStatusLabel(row.status, row.repairType)} tone={workflowTone(row.status)} />];
+          })}
+          empty={<EmptyState description="Chưa có phiếu sửa chữa nào hoàn thành." />}
+        />
+      </TicketTableCard>
+
+      {actingGroups.length && !auth.isReadOnlyViewer ? (
+        <TicketDialog buttonLabel="Tạo phiếu sửa chữa" title="Báo hư / yêu cầu sửa" submitLabel="Tạo phiếu sửa" action={submitRepair} defaultOpen={mobileMode === "create"}>
+          <FormField label="Nhóm báo hư" required><select name="reportingGroupId">{actingGroups.map((g) => <option key={g.groupId} value={g.groupId}>{g.groupName}</option>)}</select></FormField>
               <FormField label="Máy" required><select name="equipmentId">{equipmentRows.map((e) => <option key={e.id} value={e.id}>{e.code} — {e.name}</option>)}</select></FormField>
               <FormField label="Hiện tượng hư" required><textarea name="issueDescription" placeholder="Mô tả hiện tượng thực tế, thời điểm và điều kiện xảy ra." /></FormField>
-              <Button type="submit">Tạo phiếu sửa</Button>
-            </form> : <EmptyState title="Chỉ xem" />}
-          </CardContent>
-        </Card>
-      </div>
+        </TicketDialog>
+      ) : null}
     </div>
   );
 }

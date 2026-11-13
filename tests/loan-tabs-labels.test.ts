@@ -31,6 +31,7 @@ test("sidebar chỉ còn một mục Mượn – Trả; hai trang dùng chung Lo
   const sidebar = await source("src/components/sidebar.tsx");
   assert.match(sidebar, /"Mượn – Trả"/);
   assert.doesNotMatch(sidebar, /Cho mượn nhanh/);
-  assert.match(await source("src/app/(app)/machine-loans/page.tsx"), /<LoanTabs active="machine" \/>/);
-  assert.match(await source("src/app/(app)/quick-loans/page.tsx"), /<LoanTabs active="quick" \/>/);
+  assert.match(await source("src/app/(app)/machine-loans/page.tsx"), /<LoanHead[\s\S]*?active="machine"/);
+  assert.match(await source("src/app/(app)/quick-loans/page.tsx"), /<LoanHead[\s\S]*?active="quick"/);
+  assert.match(await source("src/components/loan-head.tsx"), /<LoanTabs active=\{active\} \/>/);
 });
