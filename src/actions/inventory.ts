@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/guards";
@@ -8,7 +8,7 @@ import { setFlashMessage, type AuthContext } from "@/lib/auth/session";
 import { writeAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { isUniqueViolation } from "@/lib/db/errors";
-import { equipment, groups, inventoryItems, inventorySessions, machineLoans } from "@/lib/db/schema";
+import { equipment, groups, inventoryItems, inventorySessions, inventoryToolCounts, machineLoans, toolCatalog } from "@/lib/db/schema";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import {
   INVENTORY_MAX_ITEMS,
@@ -17,6 +17,8 @@ import {
   canManageInventory,
   canOpenInventory,
   classifyExpected,
+  parseCountedQty,
+  summarizeToolCounts,
   summarizeInventory,
   type InventoryResult,
 } from "@/lib/inventory";
@@ -135,6 +137,56 @@ export async function checkInventoryItemAction(input: { sessionId: string; equip
   return outcome;
 }
 
+/**
+ * Ghi số đếm thực tế của một CCDC theo số lượng trong đợt kiểm kê quý (`counted = null` là hoàn tác).
+ * Số hệ thống (`expected`) được ghi nhận tại lúc đếm vì mượn nhanh / thanh lý làm tồn đổi trong 15 ngày.
+ * Gọi từ danh sách (client): trả kết quả thay vì ném lỗi vì Next che nội dung lỗi ở production.
+ */
+export async function countInventoryToolAction(input: { sessionId: string; toolId: string; counted: string | number | null; note?: string | null }): Promise<CheckOutcome> {
+  const auth = await requireUser();
+  if (!isUuid(input.sessionId) || !isUuid(input.toolId)) return { ok: false, message: "Dữ liệu không hợp lệ." };
+  const parsed = input.counted === null ? null : parseCountedQty(input.counted);
+  if (parsed && !parsed.ok) return { ok: false, message: parsed.message };
+  const note = (input.note ?? "").replace(/s+/g, " ").trim().slice(0, MAX_NOTE) || null;
+
+  const [session] = await db.select().from(inventorySessions).where(eq(inventorySessions.id, input.sessionId)).limit(1);
+  if (!session) return { ok: false, message: "Không tìm thấy đợt kiểm kê." };
+  if (!canCheckInventory(auth, session.groupId)) return { ok: false, message: "Bạn không có quyền kiểm kê cho nhóm này." };
+  if (!session.includesTools) return { ok: false, message: "Đợt kiểm kê này không kèm kiểm CCDC theo số lượng." };
+
+  try {
+    await db.transaction(async (tx) => {
+      const [fresh] = await tx.select({ status: inventorySessions.status }).from(inventorySessions).where(eq(inventorySessions.id, session.id)).for("update");
+      if (!fresh || fresh.status !== "open") throw new Error("Đợt kiểm kê đã đóng.");
+      const [tool] = await tx.select().from(toolCatalog).where(and(eq(toolCatalog.id, input.toolId), eq(toolCatalog.groupId, session.groupId), eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active"))).limit(1);
+      if (!tool) throw new Error("CCDC không thuộc nhóm của đợt kiểm kê hoặc đã ngừng hoạt động.");
+      const expected = Number(tool.quantityOnHand);
+      const now = new Date();
+      if (parsed && parsed.ok) {
+        await tx.insert(inventoryToolCounts).values({ sessionId: session.id, toolId: tool.id, expectedQty: String(expected), countedQty: String(parsed.value), note, checkedBy: auth.userId, checkedAt: now })
+          .onConflictDoUpdate({ target: [inventoryToolCounts.sessionId, inventoryToolCounts.toolId], set: { expectedQty: String(expected), countedQty: String(parsed.value), note, checkedBy: auth.userId, checkedAt: now } });
+      } else {
+        await tx.delete(inventoryToolCounts).where(and(eq(inventoryToolCounts.sessionId, session.id), eq(inventoryToolCounts.toolId, tool.id)));
+      }
+      await writeAudit(tx, {
+        actorUserId: auth.userId,
+        actorGroupId: session.groupId,
+        action: "inventory.count_tool",
+        entityType: "tool_catalog",
+        entityId: tool.id,
+        description: parsed && parsed.ok
+          ? `Kiểm kê ${session.code}: đếm ${tool.name} = ${parsed.value} ${tool.unit} (hệ thống ${expected})${note ? ` (${note})` : ""}`
+          : `Kiểm kê ${session.code}: hoàn tác số đếm — ${tool.name}`,
+      });
+    });
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Không ghi được số đếm." };
+  }
+  revalidatePath("/inventory");
+  revalidatePath(`/inventory/${input.sessionId}`);
+  return { ok: true };
+}
+
 /** Gọi từ hồ sơ máy (quét QR bằng camera điện thoại): đánh dấu máy này; chưa có trong danh sách thì thêm là "thừa". */
 export async function markInventoryFromProfileAction(formData: FormData) {
   const auth = await requireUser();
@@ -164,13 +216,20 @@ export async function closeInventoryAction(formData: FormData) {
     if (!updated) throw new Error("Đợt kiểm kê đã được đóng trước đó.");
     const items = await tx.select({ result: inventoryItems.result, offsite: inventoryItems.offsite, unexpected: inventoryItems.unexpected }).from(inventoryItems).where(eq(inventoryItems.sessionId, sessionId));
     const summary = summarizeInventory(items);
+    let toolText = "";
+    if (session.includesTools) {
+      const [{ n }] = await tx.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(toolCatalog).where(and(eq(toolCatalog.groupId, session.groupId), eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active")));
+      const counts = await tx.select({ counted: inventoryToolCounts.countedQty, expected: inventoryToolCounts.expectedQty }).from(inventoryToolCounts).where(eq(inventoryToolCounts.sessionId, sessionId));
+      const tools = summarizeToolCounts(counts.map((c) => ({ counted: Number(c.counted), expected: Number(c.expected) })));
+      toolText = `; CCDC số lượng: ${tools.ok} đủ, ${tools.short} thiếu, ${tools.over} thừa, ${Math.max(n - tools.counted, 0)} chưa đếm`;
+    }
     await writeAudit(tx, {
       actorUserId: auth.userId,
       actorGroupId: session.groupId,
       action: "inventory.close",
       entityType: "inventory_session",
       entityId: sessionId,
-      description: `Đóng đợt kiểm kê ${session.code}: ${summary.found} có mặt, ${summary.missing} không thấy, ${summary.pending} chưa kiểm, ${summary.unexpected} thừa`,
+      description: `Đóng đợt kiểm kê ${session.code}: ${summary.found} có mặt, ${summary.missing} không thấy, ${summary.pending} chưa kiểm, ${summary.unexpected} thừa${toolText}`,
       afterData: summary,
     });
   });

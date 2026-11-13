@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 DO $$ BEGIN CREATE TYPE account_status AS ENUM ('pending','active','rejected','blocked'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE permission_level AS ENUM ('viewer','operator','manager'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE equipment_status AS ENUM ('in_use_owner','wait_handover','on_loan','return_requested','wait_inspection','repairing','wait_repair_confirm','wait_disposal','disposal_warehouse','inactive'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE equipment_status AS ENUM ('in_use_owner','wait_handover','on_loan','return_requested','wait_inspection','repairing','wait_repair_confirm','wait_disposal','disposal_warehouse','inactive','lost'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE equipment_condition AS ENUM ('good','limited','minor_damage','major_damage','awaiting_assessment','irreparable','unknown'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE machine_loan_status AS ENUM ('pending_owner','approved','wait_handover','on_loan','return_requested','completed','rejected','cancelled','incident'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE transfer_status AS ENUM ('pending_source','pending_target','pending_ws','wait_handover','completed','rejected','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -435,3 +435,45 @@ CREATE TABLE IF NOT EXISTS inventory_items (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS inventory_items_session_equipment_unique ON inventory_items(session_id, equipment_id);
 CREATE INDEX IF NOT EXISTS inventory_items_session_idx ON inventory_items(session_id);
+
+-- V1.7.3: Báo mất (máy có mã + CCDC theo số lượng) và kiểm kê CCDC theo số lượng mỗi quý. Idempotent.
+-- Chạy TRƯỚC khi deploy. Nếu Neon báo "unsafe use of new value of enum type", chạy riêng dòng ALTER TYPE rồi chạy phần còn lại.
+ALTER TYPE equipment_status ADD VALUE IF NOT EXISTS 'lost';
+DO $$ BEGIN CREATE TYPE loss_status AS ENUM ('pending_ws','completed','rejected','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS loss_reports (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code varchar(40) NOT NULL UNIQUE,
+  equipment_id uuid REFERENCES equipment(id),
+  tool_id uuid REFERENCES tool_catalog(id),
+  quantity numeric(12,2),
+  owner_group_id uuid NOT NULL REFERENCES groups(id),
+  reported_by uuid NOT NULL REFERENCES users(id),
+  circumstances text NOT NULL,
+  source_inventory_session_id uuid REFERENCES inventory_sessions(id) ON DELETE SET NULL,
+  status loss_status NOT NULL DEFAULT 'pending_ws',
+  ws_approved_by uuid REFERENCES users(id),
+  ws_approved_at timestamptz,
+  rejection_reason text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT loss_reports_one_target CHECK ((equipment_id IS NOT NULL AND tool_id IS NULL) OR (equipment_id IS NULL AND tool_id IS NOT NULL AND quantity IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS loss_reports_status_idx ON loss_reports(status);
+CREATE INDEX IF NOT EXISTS loss_reports_equipment_idx ON loss_reports(equipment_id);
+CREATE INDEX IF NOT EXISTS loss_reports_tool_idx ON loss_reports(tool_id);
+
+-- Kiểm kê CCDC theo số lượng: đợt tháng 1/4/7/10 của nhóm (period) có cờ includes_tools.
+ALTER TABLE inventory_sessions ADD COLUMN IF NOT EXISTS includes_tools boolean NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS inventory_tool_counts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL REFERENCES inventory_sessions(id) ON DELETE CASCADE,
+  tool_id uuid NOT NULL REFERENCES tool_catalog(id),
+  expected_qty numeric(12,2) NOT NULL,
+  counted_qty numeric(12,2) NOT NULL,
+  note varchar(240),
+  checked_by uuid REFERENCES users(id),
+  checked_at timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS inventory_tool_counts_session_tool_unique ON inventory_tool_counts(session_id, tool_id);
+CREATE INDEX IF NOT EXISTS inventory_tool_counts_session_idx ON inventory_tool_counts(session_id);

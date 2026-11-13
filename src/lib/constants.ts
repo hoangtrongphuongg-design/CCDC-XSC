@@ -21,6 +21,7 @@ export const EQUIPMENT_STATUS_LABELS = {
   wait_repair_confirm: "Chờ xác nhận sửa",
   wait_disposal: "Chờ thanh lý",
   disposal_warehouse: "Kho thanh lý",
+  lost: "Đã mất",
   inactive: "Ngừng sử dụng",
 } as const;
 

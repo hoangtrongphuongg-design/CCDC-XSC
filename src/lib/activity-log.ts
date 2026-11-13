@@ -8,16 +8,17 @@
 import { isIsoDate } from "@/lib/date-check";
 import { vnDate } from "@/lib/export/equipment-export";
 
-export type ActivityCategory = "loan" | "transfer" | "repair" | "disposal" | "ccdc" | "account" | "other";
+export type ActivityCategory = "loan" | "transfer" | "repair" | "disposal" | "loss" | "ccdc" | "account" | "other";
 
 /** Thứ tự sheet trong file Excel; nhãn cũng là tên sheet. */
-export const CATEGORY_ORDER: ActivityCategory[] = ["loan", "transfer", "repair", "disposal", "ccdc", "account", "other"];
+export const CATEGORY_ORDER: ActivityCategory[] = ["loan", "transfer", "repair", "disposal", "loss", "ccdc", "account", "other"];
 
 export const CATEGORY_LABELS: Record<ActivityCategory, string> = {
   loan: "Cho mượn",
   transfer: "Điều chuyển",
   repair: "Sửa chữa",
   disposal: "Thanh lý",
+  loss: "Báo mất",
   ccdc: "CCDC",
   account: "Tài khoản & nhóm",
   other: "Khác",
@@ -81,6 +82,13 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   "tool_disposal.complete": { label: "Duyệt thanh lý CCDC theo số lượng", category: "disposal" },
   "tool_disposal.reject": { label: "Từ chối thanh lý CCDC theo số lượng", category: "disposal" },
   "tool_disposal.cancel": { label: "Hủy đề xuất thanh lý CCDC theo số lượng", category: "disposal" },
+  // Báo mất
+  "loss.create": { label: "Báo mất máy / CCDC", category: "loss" },
+  "loss.approve": { label: "Quản lý Xưởng duyệt báo mất", category: "loss" },
+  "loss.apply": { label: "Áp dụng báo mất (ghi theo máy / CCDC)", category: "loss", mirror: true },
+  "loss.reject": { label: "Từ chối báo mất", category: "loss" },
+  "loss.cancel": { label: "Hủy phiếu báo mất", category: "loss" },
+  "equipment.restore_lost": { label: "Khôi phục máy đã tìm thấy", category: "loss" },
   // CCDC
   "equipment.create": { label: "Tạo CCDC", category: "ccdc" },
   "equipment.initial_allocation": { label: "Cấp phát ban đầu", category: "ccdc" },
@@ -92,6 +100,7 @@ export const ACTIVITY_ACTIONS: Record<string, ActionInfo> = {
   "inventory.schedule_run": { label: "Kiểm kê định kỳ (hệ thống tự chạy)", category: "ccdc" },
   "inventory.schedule_create": { label: "Tự mở đợt kiểm kê định kỳ (ghi theo đợt)", category: "ccdc", mirror: true },
   // Kết quả kiểm từng máy: chỉ cho tab Lịch sử của máy, ẩn khỏi bảng tin để khỏi ngập khi kiểm cả nhóm.
+  "inventory.count_tool": { label: "Kiểm kê CCDC theo số lượng (ghi theo CCDC)", category: "ccdc", mirror: true },
   "inventory.check": { label: "Kiểm kê máy (ghi theo máy)", category: "ccdc", mirror: true },
   // Bản ghi theo từng máy của đợt nhập Excel: chỉ cho tab Lịch sử của máy, ẩn khỏi bảng tin để khỏi ngập.
   "equipment.import_create": { label: "Tạo CCDC (nhập Excel, ghi theo máy)", category: "ccdc", mirror: true },

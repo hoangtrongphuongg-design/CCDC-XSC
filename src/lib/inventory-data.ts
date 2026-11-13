@@ -1,9 +1,11 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { equipment, groups, inventoryItems, inventorySessions, users } from "@/lib/db/schema";
+import { equipment, groups, inventoryItems, inventorySessions, inventoryToolCounts, lossReports, toolCatalog, users } from "@/lib/db/schema";
 import type { AuthContext } from "@/lib/auth/session";
 import { canViewWholeWorkshop } from "@/lib/auth/roles";
 import { canCheckInventory, canManageInventory, canViewInventory, type ChecklistItem, type InventoryResult } from "@/lib/inventory";
+import { hasGroupPermission } from "@/lib/auth/guards";
+import { OPEN_LOSS_STATUSES } from "@/lib/workflow-status";
 import { isUuid } from "@/lib/machine-profile";
 
 export type InventoryListRow = {
@@ -20,6 +22,8 @@ export type InventoryListRow = {
   period: string | null;
   /** Hệ thống tự đóng khi quá hạn. */
   autoClosed: boolean;
+  /** Đợt quý có kèm đếm CCDC theo số lượng. */
+  includesTools: boolean;
   onsite: number;
   checkedOnsite: number;
   found: number;
@@ -44,6 +48,7 @@ export async function loadInventoryList(auth: AuthContext): Promise<InventoryLis
     createdByName: users.fullName,
     period: inventorySessions.period,
     autoClosed: inventorySessions.autoClosed,
+    includesTools: inventorySessions.includesTools,
   }).from(inventorySessions)
     .innerJoin(groups, eq(groups.id, inventorySessions.groupId))
     .leftJoin(users, eq(users.id, inventorySessions.createdBy))
@@ -69,7 +74,26 @@ export async function loadInventoryList(auth: AuthContext): Promise<InventoryLis
   });
 }
 
-export type InventoryDetailItem = ChecklistItem & { note: string | null; checkedByName: string | null; checkedAt: Date | null };
+/** Phiếu báo mất gắn với dòng kiểm kê: đang chờ duyệt hoặc đã duyệt (null = chưa báo mất). */
+export type LossBadge = "pending_ws" | "completed" | null;
+
+export type InventoryDetailItem = ChecklistItem & { note: string | null; checkedByName: string | null; checkedAt: Date | null; lossStatus: LossBadge };
+
+/** Một CCDC theo số lượng trong đợt kiểm kê quý. `expected` = số hệ thống tại lúc đếm (null nếu chưa đếm). */
+export type InventoryToolRow = {
+  toolId: string;
+  code: string | null;
+  name: string;
+  specification: string | null;
+  unit: string;
+  onHand: number;
+  counted: number | null;
+  expected: number | null;
+  note: string | null;
+  checkedByName: string | null;
+  lossQuantity: number | null;
+  lossStatus: LossBadge;
+};
 
 export type InventoryDetail = {
   session: {
@@ -85,10 +109,14 @@ export type InventoryDetail = {
     closedByName: string | null;
     period: string | null;
     autoClosed: boolean;
+    includesTools: boolean;
   };
   items: InventoryDetailItem[];
+  tools: InventoryToolRow[];
   canManage: boolean;
   canCheck: boolean;
+  /** Kỹ sư giám sát trở lên của nhóm (hoặc Quản lý Xưởng/Admin): có nút Báo mất. */
+  canReportLoss: boolean;
 };
 
 /** Một đợt kiểm kê + danh sách máy; null nếu không có hoặc tài khoản không được xem. */
@@ -107,6 +135,7 @@ export async function loadInventoryDetail(auth: AuthContext, id: string): Promis
     closedBy: inventorySessions.closedBy,
     period: inventorySessions.period,
     autoClosed: inventorySessions.autoClosed,
+    includesTools: inventorySessions.includesTools,
   }).from(inventorySessions).innerJoin(groups, eq(groups.id, inventorySessions.groupId)).where(eq(inventorySessions.id, id)).limit(1);
   if (!session || !canViewInventory(auth, session.groupId)) return null;
 
@@ -140,6 +169,46 @@ export async function loadInventoryDetail(auth: AuthContext, id: string): Promis
     for (const c of checkers) userName.set(c.id, c.name);
   }
 
+  // Phiếu báo mất liên quan đợt này (máy trong đợt, hoặc phiếu lập từ chính đợt này).
+  const machineIds = rows.map((r) => r.equipmentId);
+  const lossRows = await db.select({ equipmentId: lossReports.equipmentId, toolId: lossReports.toolId, quantity: lossReports.quantity, status: lossReports.status, createdAt: lossReports.createdAt, sessionId: lossReports.sourceInventorySessionId })
+    .from(lossReports)
+    .where(and(
+      inArray(lossReports.status, [...OPEN_LOSS_STATUSES, "completed"]),
+      or(eq(lossReports.sourceInventorySessionId, id), machineIds.length ? inArray(lossReports.equipmentId, machineIds) : undefined),
+    ))
+    .orderBy(desc(lossReports.createdAt));
+  const lossByMachine = new Map<string, LossBadge>();
+  const lossByTool = new Map<string, { quantity: number; status: LossBadge }>();
+  for (const loss of lossRows) {
+    // Phiếu mới nhất của mỗi máy / CCDC (danh sách đã sắp mới → cũ). "Đã mất" thắng "chờ duyệt".
+    if (loss.equipmentId && !lossByMachine.has(loss.equipmentId)) lossByMachine.set(loss.equipmentId, loss.status as LossBadge);
+    if (loss.toolId && loss.sessionId === id && !lossByTool.has(loss.toolId)) lossByTool.set(loss.toolId, { quantity: Number(loss.quantity), status: loss.status as LossBadge });
+  }
+
+  let tools: InventoryToolRow[] = [];
+  if (session.includesTools) {
+    const toolRows = await db.select({
+      toolId: toolCatalog.id, code: toolCatalog.code, name: toolCatalog.name, specification: toolCatalog.specification, unit: toolCatalog.unit,
+      onHand: toolCatalog.quantityOnHand, counted: inventoryToolCounts.countedQty, expected: inventoryToolCounts.expectedQty,
+      note: inventoryToolCounts.note, checkedBy: inventoryToolCounts.checkedBy,
+    }).from(toolCatalog)
+      .leftJoin(inventoryToolCounts, and(eq(inventoryToolCounts.toolId, toolCatalog.id), eq(inventoryToolCounts.sessionId, id)))
+      .where(and(eq(toolCatalog.groupId, session.groupId), eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active")))
+      .orderBy(asc(toolCatalog.name));
+    const toolCheckerIds = [...new Set(toolRows.map((r) => r.checkedBy).filter((v): v is string => Boolean(v) && !userName.has(v as string)))];
+    if (toolCheckerIds.length) {
+      const checkers = await db.select({ id: users.id, name: users.fullName }).from(users).where(inArray(users.id, toolCheckerIds));
+      for (const c of checkers) userName.set(c.id, c.name);
+    }
+    tools = toolRows.map((r) => ({
+      toolId: r.toolId, code: r.code, name: r.name, specification: r.specification, unit: r.unit,
+      onHand: Number(r.onHand), counted: r.counted === null ? null : Number(r.counted), expected: r.expected === null ? null : Number(r.expected),
+      note: r.note, checkedByName: r.checkedBy ? userName.get(r.checkedBy) ?? null : null,
+      lossQuantity: lossByTool.get(r.toolId)?.quantity ?? null, lossStatus: lossByTool.get(r.toolId)?.status ?? null,
+    }));
+  }
+
   return {
     session: {
       id: session.id, code: session.code, title: session.title, groupId: session.groupId, groupName: session.groupName,
@@ -148,14 +217,18 @@ export async function loadInventoryDetail(auth: AuthContext, id: string): Promis
       closedByName: session.closedBy ? userName.get(session.closedBy) ?? null : session.autoClosed ? "Hệ thống (tự đóng)" : null,
       period: session.period,
       autoClosed: session.autoClosed,
+      includesTools: session.includesTools,
     },
     items: rows.map((r) => ({
       equipmentId: r.equipmentId, code: r.code, legacyCode: r.legacyCode, name: r.name, type: r.type,
       expectedNote: r.expectedNote, offsite: r.offsite, unexpected: r.unexpected, result: r.result as InventoryResult | null,
       note: r.note, checkedByName: r.checkedBy ? userName.get(r.checkedBy) ?? null : null, checkedAt: r.checkedAt,
+      lossStatus: lossByMachine.get(r.equipmentId) ?? null,
     })),
+    tools,
     canManage: canManageInventory(auth, session.groupId),
     canCheck: canCheckInventory(auth, session.groupId),
+    canReportLoss: !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasGroupPermission(auth, session.groupId, "operator")),
   };
 }
 

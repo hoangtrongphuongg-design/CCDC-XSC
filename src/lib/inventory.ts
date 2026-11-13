@@ -160,3 +160,56 @@ export function filterChecklist<T extends ChecklistItem>(items: readonly T[], fi
     return terms.every((term) => haystack.includes(term));
   });
 }
+
+/* ------------------- Kiểm kê CCDC theo số lượng (mỗi quý) ------------------- */
+
+/** Đợt kiểm kê của các tháng 1, 4, 7, 10 có kèm đếm CCDC theo số lượng (mỗi 3 tháng một lần). */
+export const TOOL_QUARTER_MONTHS: readonly number[] = [1, 4, 7, 10];
+
+/** `period` dạng "YYYY-MM": có phải kỳ kiểm CCDC theo số lượng không. */
+export function isToolQuarter(period: string | null | undefined): boolean {
+  if (!period || !/^\d{4}-\d{2}$/.test(period)) return false;
+  return TOOL_QUARTER_MONTHS.includes(Number(period.slice(5)));
+}
+
+export type ToolCountState = "pending" | "ok" | "short" | "over";
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+/** Chênh lệch = đếm thực tế − số hệ thống tại lúc đếm (âm = thiếu, dương = thừa). null nếu chưa đếm. */
+export function toolCountDiff(row: { counted: number | null; expected: number | null }): number | null {
+  if (row.counted === null || row.expected === null) return null;
+  return round2(row.counted - row.expected);
+}
+
+export function toolCountState(row: { counted: number | null; expected: number | null }): ToolCountState {
+  const diff = toolCountDiff(row);
+  if (diff === null) return "pending";
+  if (diff === 0) return "ok";
+  return diff < 0 ? "short" : "over";
+}
+
+export const TOOL_COUNT_LABELS: Record<ToolCountState, string> = { pending: "Chưa đếm", ok: "Đủ", short: "Thiếu", over: "Thừa" };
+
+export type ToolCountSummary = { total: number; counted: number; pending: number; ok: number; short: number; over: number; progress: number };
+
+export function summarizeToolCounts(rows: ReadonlyArray<{ counted: number | null; expected: number | null }>): ToolCountSummary {
+  const s: ToolCountSummary = { total: rows.length, counted: 0, pending: 0, ok: 0, short: 0, over: 0, progress: 100 };
+  for (const row of rows) {
+    const state = toolCountState(row);
+    s[state] += 1;
+    if (state !== "pending") s.counted += 1;
+  }
+  s.progress = s.total ? Math.round((s.counted / s.total) * 100) : 100;
+  return s;
+}
+
+/** Số đếm nhập từ ô số: ≥ 0, tối đa 2 chữ số thập phân. */
+export function parseCountedQty(raw: unknown): { ok: true; value: number } | { ok: false; message: string } {
+  const text = String(raw ?? "").trim().replace(",", ".");
+  if (text === "") return { ok: false, message: "Vui lòng nhập số lượng đếm được." };
+  const value = Number(text);
+  if (!Number.isFinite(value) || value < 0) return { ok: false, message: "Số lượng đếm phải là số từ 0 trở lên." };
+  if (Math.abs(Math.round(value * 100) - value * 100) > 1e-6) return { ok: false, message: "Số lượng chỉ nhận tối đa 2 chữ số thập phân." };
+  return { ok: true, value: round2(value) };
+}

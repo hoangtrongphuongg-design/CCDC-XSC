@@ -80,6 +80,7 @@ export default async function InventoryListPage() {
                       <span className="inventory-state">{s.status === "open" ? "Đang mở" : "Đã đóng"}</span>
                     </div>
                     <span>{s.groupName}{s.title ? ` · ${s.title}` : ""}</span>
+                    {s.includesTools ? <small className="inventory-tools-tag">Kèm kiểm CCDC theo số lượng (kỳ quý)</small> : null}
                     {s.status === "open" && s.period ? (
                       <small className="inventory-due">
                         {periodOf(today) === s.period ? `Hạn ${INVENTORY_DEADLINE_DAY}/${Number(s.period.slice(5))} — ${daysUntilDeadline(s.period, today) <= 0 ? "hôm nay là hạn chót" : `còn ${daysUntilDeadline(s.period, today)} ngày`}` : "Quá hạn, chờ hệ thống tự đóng"}

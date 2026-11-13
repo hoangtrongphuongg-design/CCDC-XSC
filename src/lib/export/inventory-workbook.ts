@@ -2,13 +2,13 @@
  * Biên bản kiểm kê (Excel): các mục theo thứ tự cần chú ý — Không thấy, Chưa kiểm, Thừa,
  * Đang ở nơi khác, Có mặt — kèm tóm tắt ở đầu sheet.
  */
-import { SECTION_LABELS, SECTION_ORDER, sectionOf, summarizeInventory, INVENTORY_RESULT_LABELS } from "@/lib/inventory";
+import { SECTION_LABELS, SECTION_ORDER, TOOL_COUNT_LABELS, sectionOf, summarizeInventory, summarizeToolCounts, toolCountDiff, toolCountState, INVENTORY_RESULT_LABELS } from "@/lib/inventory";
 import { addDataRow, addHeading, finishSheet, newWorkbook, startSheet, toBytes } from "@/lib/export/workbook-kit";
 import { vnDateTime } from "@/lib/export/equipment-export";
 import type { InventoryDetail } from "@/lib/inventory-data";
 
 export async function buildInventoryWorkbook(input: { generatedAt: Date; exportedBy: string; detail: InventoryDetail }): Promise<Uint8Array> {
-  const { session, items } = input.detail;
+  const { session, items, tools } = input.detail;
   const summary = summarizeInventory(items);
   const workbook = newWorkbook(input.generatedAt);
 
@@ -43,10 +43,36 @@ export async function buildInventoryWorkbook(input: { generatedAt: Date; exporte
     for (const item of list) {
       index += 1;
       const result = item.result ? INVENTORY_RESULT_LABELS[item.result] : item.offsite ? "Nơi khác" : "Chưa kiểm";
-      const notes = [item.expectedNote, item.note].filter(Boolean).join(" · ");
+      const lossNote = item.lossStatus ? (item.lossStatus === "completed" ? "Đã mất (báo mất đã duyệt)" : "Đã báo mất — chờ duyệt") : null;
+      const notes = [item.expectedNote, item.note, lossNote].filter(Boolean).join(" · ");
       addDataRow(ctx, [index, item.code, item.legacyCode ?? "", item.name, item.type, result, notes, item.checkedByName ?? "", item.checkedAt ? vnDateTime(item.checkedAt) : ""]);
     }
   }
   finishSheet(ctx);
+
+  if (session.includesTools) {
+    const toolSummary = summarizeToolCounts(tools);
+    const toolCtx = startSheet(workbook, new Set<string>(["Biên bản kiểm kê"]), "CCDC theo số lượng", `CCDC THEO SỐ LƯỢNG – ${session.code}`,
+      `${session.groupName} · ${toolSummary.total} CCDC: ${toolSummary.ok} đủ · ${toolSummary.short} thiếu · ${toolSummary.over} thừa · ${toolSummary.pending} chưa đếm`, [
+        { header: "STT", width: 6 },
+        { header: "Mã", width: 16 },
+        { header: "Tên CCDC", width: 38 },
+        { header: "Quy cách", width: 24 },
+        { header: "Đơn vị", width: 10 },
+        { header: "Số hệ thống lúc đếm", width: 18 },
+        { header: "Đếm thực tế", width: 14 },
+        { header: "Chênh lệch", width: 12 },
+        { header: "Kết quả", width: 12 },
+        { header: "Báo mất", width: 26 },
+        { header: "Ghi chú", width: 30 },
+      ]);
+    tools.forEach((tool, index) => {
+      const state = toolCountState(tool);
+      const diff = toolCountDiff(tool);
+      const loss = tool.lossStatus ? `${tool.lossQuantity ?? ""} ${tool.unit} — ${tool.lossStatus === "completed" ? "đã duyệt" : "chờ duyệt"}` : "";
+      addDataRow(toolCtx, [index + 1, tool.code ?? "", tool.name, tool.specification ?? "", tool.unit, tool.expected ?? "", tool.counted ?? "", diff ?? "", TOOL_COUNT_LABELS[state], loss, tool.note ?? ""]);
+    });
+    finishSheet(toolCtx);
+  }
   return toBytes(await workbook.xlsx.writeBuffer());
 }

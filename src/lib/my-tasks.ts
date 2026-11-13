@@ -18,8 +18,8 @@ import { daysUntilDeadline, deadlineLabel, deadlineOf } from "@/lib/inventory-sc
 export type TaskSubject = Pick<AuthContext, "userId" | "isAdmin" | "isWsManager" | "isReadOnlyViewer" | "permissions">;
 
 /** Mục menu mà số đếm hiển thị cạnh. */
-export type TaskSection = "loans" | "transfers" | "repairs" | "disposals" | "inventory";
-export const TASK_SECTIONS: readonly TaskSection[] = ["loans", "transfers", "repairs", "disposals", "inventory"];
+export type TaskSection = "loans" | "transfers" | "repairs" | "disposals" | "losses" | "inventory";
+export const TASK_SECTIONS: readonly TaskSection[] = ["loans", "transfers", "repairs", "disposals", "losses", "inventory"];
 
 export type TaskTone = "blue" | "red" | "orange" | "sky";
 
@@ -62,8 +62,10 @@ export type TransferTaskRow = Base & {
 };
 export type RepairTaskRow = Base & { status: string; ownerGroupId: string };
 export type DisposalTaskRow = Base & { status: string; ownerGroupId: string; proposedBy: string };
+/** Phiếu báo mất (máy hoặc CCDC theo số lượng) đang mở. */
+export type LossTaskRow = Base & { status: string; ownerGroupId: string; reportedBy: string };
 /** Đợt kiểm kê ĐỊNH KỲ đang mở: `pending` = máy tại chỗ chưa kiểm. `updatedAt` = lúc mở đợt (chờ lâu nhất lên đầu). */
-export type InventoryTaskRow = { id: string; code: string; groupId: string; period: string; pending: number; updatedAt: Date };
+export type InventoryTaskRow = { id: string; code: string; groupId: string; period: string; pending: number; /** CCDC theo số lượng chưa đếm (đợt quý). */ toolPending?: number; updatedAt: Date };
 
 export type MyTaskInput = {
   loans: readonly MachineLoanTaskRow[];
@@ -72,6 +74,8 @@ export type MyTaskInput = {
   repairs: readonly RepairTaskRow[];
   /** Thanh lý máy + thanh lý CCDC theo số lượng (CCDC không có bước chờ nhập kho). */
   disposals: readonly DisposalTaskRow[];
+  /** Phiếu báo mất đang mở (bỏ qua nếu không truyền). */
+  losses?: readonly LossTaskRow[];
   /** Đợt kiểm kê định kỳ đang mở (bỏ qua nếu không truyền). */
   inventories?: readonly InventoryTaskRow[];
   warehouseGroupId: string | null;
@@ -167,16 +171,24 @@ export function buildMyTasks(subject: TaskSubject, input: MyTaskInput): MyTask[]
     }
   }
 
+  // Báo mất: Quản lý Xưởng / Admin duyệt (cấp Xưởng, như duyệt điều chuyển / thanh lý).
+  for (const row of input.losses ?? []) {
+    if (row.status === "pending_ws" && isWsLevel(subject)) {
+      add({ id: row.id, kind: "loss-ws", section: "losses", action: "Duyệt báo mất", label: `${row.label} · ${row.code}`, detail: `Nhóm quản lý: ${name(row.ownerGroupId)}`, since: row.updatedAt, href: "/losses", tone: "red" });
+    }
+  }
+
   // Kiểm kê định kỳ: việc của Đốc công (manager) nhóm đó, còn máy tại chỗ chưa kiểm; Admin/Quản lý Xưởng không tự có.
   for (const row of input.inventories ?? []) {
-    if (row.pending <= 0 || !isGroupMember(subject, row.groupId, "manager") || deadlineOf(row.period) < today) continue;
+    const toolPending = row.toolPending ?? 0;
+    if (row.pending + toolPending <= 0 || !isGroupMember(subject, row.groupId, "manager") || deadlineOf(row.period) < today) continue;
     const left = daysUntilDeadline(row.period, today);
     add({
       id: row.id,
       kind: "inventory",
       section: "inventory",
       action: `Kiểm kê định kỳ — hạn ${deadlineLabel(row.period)}`,
-      label: `${row.code} · còn ${row.pending} máy chưa kiểm`,
+      label: `${row.code} · còn ${[row.pending > 0 ? `${row.pending} máy` : "", toolPending > 0 ? `${toolPending} CCDC số lượng` : ""].filter(Boolean).join(" và ")} chưa kiểm`,
       detail: `Nhóm quản lý: ${name(row.groupId)}${left <= 0 ? " · hôm nay là hạn chót" : ` · còn ${left} ngày`}`,
       since: row.updatedAt,
       href: `/inventory/${row.id}`,
@@ -189,12 +201,12 @@ export function buildMyTasks(subject: TaskSubject, input: MyTaskInput): MyTask[]
 }
 
 export function countBySection(tasks: readonly MyTask[]): Record<TaskSection, number> {
-  const counts: Record<TaskSection, number> = { loans: 0, transfers: 0, repairs: 0, disposals: 0, inventory: 0 };
+  const counts: Record<TaskSection, number> = { loans: 0, transfers: 0, repairs: 0, disposals: 0, losses: 0, inventory: 0 };
   for (const task of tasks) counts[task.section] += 1;
   return counts;
 }
 
-export const EMPTY_TASK_COUNTS: Record<TaskSection, number> = { loans: 0, transfers: 0, repairs: 0, disposals: 0, inventory: 0 };
+export const EMPTY_TASK_COUNTS: Record<TaskSection, number> = { loans: 0, transfers: 0, repairs: 0, disposals: 0, losses: 0, inventory: 0 };
 
 /** Tổng số việc chờ của mọi mục (chuông, huy hiệu Trang chủ). */
 export function totalTaskCount(counts: Record<TaskSection, number>): number {

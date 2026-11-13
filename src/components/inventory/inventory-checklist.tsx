@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Check, Undo2, X } from "lucide-react";
 import { checkInventoryItemAction } from "@/actions/inventory";
+import { submitLoss } from "@/actions/ticket-forms";
+import { TicketDialog } from "@/components/ticket-dialog";
+import { FormField } from "@/components/ui/form-field";
 import {
   INVENTORY_RESULT_LABELS,
   filterChecklist,
@@ -14,7 +17,7 @@ import {
   type InventoryResult,
 } from "@/lib/inventory";
 
-type Item = ChecklistItem & { note: string | null };
+type Item = ChecklistItem & { note: string | null; lossStatus: "pending_ws" | "completed" | null };
 
 const FILTERS: Array<{ key: ChecklistFilter; label: string }> = [
   { key: "pending", label: "Cần kiểm" },
@@ -29,8 +32,16 @@ const FILTERS: Array<{ key: ChecklistFilter; label: string }> = [
  * Danh sách kiểm kê dùng trên điện thoại: bấm "Có mặt" / "Không thấy" cho từng máy; cập nhật ngay trên
  * màn hình (lạc quan) và hoàn lại nếu máy chủ từ chối (đợt đã đóng, mất quyền…).
  */
-export function InventoryChecklist({ sessionId, items, canCheck, open }: { sessionId: string; items: Item[]; canCheck: boolean; open: boolean }) {
+export function InventoryChecklist({ sessionId, items, canCheck, canReportLoss = false, open }: { sessionId: string; items: Item[]; canCheck: boolean; canReportLoss?: boolean; open: boolean }) {
   const [rows, setRows] = useState<Item[]>(items);
+
+  // Sau khi tạo phiếu báo mất, trang tải lại: cập nhật huy hiệu báo mất mà giữ kết quả đang chọn.
+  useEffect(() => {
+    setRows((current) => current.map((row) => {
+      const fresh = items.find((item) => item.equipmentId === row.equipmentId);
+      return fresh ? { ...row, lossStatus: fresh.lossStatus } : row;
+    }));
+  }, [items]);
   const [filter, setFilter] = useState<ChecklistFilter>("pending");
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +118,7 @@ export function InventoryChecklist({ sessionId, items, canCheck, open }: { sessi
               <small>{item.type}</small>
               {item.expectedNote ? <small className="inventory-expected">{item.expectedNote}</small> : null}
               {item.result === "missing" && item.note ? <small className="inventory-expected">Ghi chú: {item.note}</small> : null}
+              {item.lossStatus ? <small className="inventory-loss-badge">{item.lossStatus === "completed" ? "Đã mất (đã duyệt báo mất)" : "Đã báo mất — chờ Quản lý Xưởng duyệt"}</small> : null}
             </div>
             {canCheck ? (
               <div className="inventory-actions">
@@ -123,6 +135,15 @@ export function InventoryChecklist({ sessionId, items, canCheck, open }: { sessi
                 )}
               </div>
             ) : item.result ? <span className={`inventory-result is-${item.result}`}>{INVENTORY_RESULT_LABELS[item.result]}</span> : null}
+            {item.result === "missing" && !item.lossStatus && canReportLoss ? (
+              <div className="inventory-actions">
+                <TicketDialog variant="inline" buttonLabel="Báo mất" title={`Báo mất ${item.code}`} submitLabel="Gửi báo mất" action={submitLoss}>
+                  <input type="hidden" name="equipmentId" value={item.equipmentId} />
+                  <input type="hidden" name="sourceSessionId" value={sessionId} />
+                  <FormField label="Hoàn cảnh mất" required hint="Mất khi nào, ở đâu, ai giữ lần cuối."><textarea name="circumstances" required minLength={5} defaultValue={item.note || "Không thấy khi kiểm kê."} /></FormField>
+                </TicketDialog>
+              </div>
+            ) : null}
           </article>
         ))}
         {!visible.length ? <p className="muted inventory-empty">{rows.length ? "Không có máy nào ở mục này." : "Đợt kiểm kê chưa có máy nào."}</p> : null}

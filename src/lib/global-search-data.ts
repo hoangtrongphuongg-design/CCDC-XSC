@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { disposals, equipment, groups, machineLoans, quickLoans, repairs, toolCatalog, toolDisposals, transfers } from "@/lib/db/schema";
+import { disposals, equipment, groups, lossReports, machineLoans, quickLoans, repairs, toolCatalog, toolDisposals, transfers } from "@/lib/db/schema";
 import type { AuthContext } from "@/lib/auth/session";
 import { canViewWholeWorkshop } from "@/lib/auth/roles";
 import { CONDITION_LABELS, EQUIPMENT_STATUS_LABELS, WORKFLOW_LABELS } from "@/lib/constants";
@@ -126,7 +126,7 @@ async function searchTickets(auth: AuthContext, query: string, groupName: Readon
   const name = (id: string) => groupName.get(id) ?? "—";
   const scope = (...conditions: Array<SQL | undefined>): SQL | undefined => (whole ? undefined : or(...conditions));
 
-  const [loanRows, quickRows, transferRows, repairRows, disposalRows, toolDisposalRows] = await Promise.all([
+  const [loanRows, quickRows, transferRows, repairRows, disposalRows, toolDisposalRows, lossRows] = await Promise.all([
     db.select({ id: machineLoans.id, code: machineLoans.code, status: machineLoans.status, owner: machineLoans.ownerGroupId, borrower: machineLoans.borrowerGroupId, eqCode: equipment.code, eqName: equipment.name })
       .from(machineLoans).innerJoin(equipment, eq(equipment.id, machineLoans.equipmentId))
       .where(and(ilike(machineLoans.code, pattern), scope(inArray(machineLoans.ownerGroupId, ids), inArray(machineLoans.borrowerGroupId, ids))))
@@ -151,6 +151,12 @@ async function searchTickets(auth: AuthContext, query: string, groupName: Readon
       .from(toolDisposals).innerJoin(toolCatalog, eq(toolCatalog.id, toolDisposals.toolId))
       .where(and(ilike(toolDisposals.code, pattern), scope(inArray(toolDisposals.ownerGroupId, ids))))
       .orderBy(desc(toolDisposals.createdAt)).limit(TICKET_LIMIT_EACH),
+    db.select({ id: lossReports.id, code: lossReports.code, status: lossReports.status, owner: lossReports.ownerGroupId, eqCode: equipment.code, eqName: equipment.name, toolName: toolCatalog.name })
+      .from(lossReports)
+      .leftJoin(equipment, eq(equipment.id, lossReports.equipmentId))
+      .leftJoin(toolCatalog, eq(toolCatalog.id, lossReports.toolId))
+      .where(and(ilike(lossReports.code, pattern), scope(inArray(lossReports.ownerGroupId, ids))))
+      .orderBy(desc(lossReports.createdAt)).limit(TICKET_LIMIT_EACH),
   ]);
 
   return [
@@ -159,6 +165,7 @@ async function searchTickets(auth: AuthContext, query: string, groupName: Readon
     ...transferRows.map((r) => ({ key: `transfer:${r.id}`, kind: "Điều chuyển", code: r.code, label: `${r.eqName} (${r.eqCode})`, statusLabel: statusLabel(r.status), groups: `${name(r.source)} → ${name(r.target)}`, href: "/transfers" })),
     ...repairRows.map((r) => ({ key: `repair:${r.id}`, kind: "Sửa chữa", code: r.code, label: `${r.eqName} (${r.eqCode})`, statusLabel: statusLabel(r.status), groups: `Nhóm quản lý: ${name(r.owner)}`, href: "/repairs" })),
     ...disposalRows.map((r) => ({ key: `disposal:${r.id}`, kind: "Thanh lý", code: r.code, label: `${r.eqName} (${r.eqCode})`, statusLabel: statusLabel(r.status), groups: `Nhóm quản lý: ${name(r.owner)}`, href: "/disposals" })),
+    ...lossRows.map((r) => ({ key: `loss:${r.id}`, kind: "Báo mất", code: r.code, label: r.eqName ? `${r.eqName} (${r.eqCode})` : (r.toolName ?? "CCDC"), statusLabel: statusLabel(r.status), groups: `Nhóm quản lý: ${name(r.owner)}`, href: "/losses" })),
     ...toolDisposalRows.map((r) => ({ key: `tooldisposal:${r.id}`, kind: "Thanh lý CCDC", code: r.code, label: r.toolName, statusLabel: statusLabel(r.status), groups: `Nhóm quản lý: ${name(r.owner)}`, href: "/disposals" })),
   ];
 }

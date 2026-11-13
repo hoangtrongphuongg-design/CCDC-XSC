@@ -17,6 +17,7 @@ import {
   Network,
   QrCode,
   Recycle,
+  SearchX,
   ShieldCheck,
   Wrench,
 } from "lucide-react";
@@ -53,6 +54,7 @@ const workflowItems = [
   ["/transfers", "Điều chuyển", ArrowLeftRight],
   ["/repairs", "Sửa chữa", Wrench],
   ["/disposals", "Thanh lý", Recycle],
+  ["/losses", "Báo mất", SearchX],
 ] as const satisfies readonly NavItem[];
 
 /** Mục menu nào hiện số "việc chờ tôi". */
@@ -61,6 +63,7 @@ const TASK_SECTION_BY_HREF: Record<string, TaskSection> = {
   "/transfers": "transfers",
   "/repairs": "repairs",
   "/disposals": "disposals",
+  "/losses": "losses",
   "/inventory": "inventory",
 };
 
@@ -76,6 +79,7 @@ export function Sidebar({ auth, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthCo
   const roleLabel = getRoleSummary(auth);
   const canUseGroupWorkflows = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasAnyGroupPermission(auth));
   const canTransfer = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasManagerGroupPermission(auth));
+  const canReportLoss = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || auth.permissions.some((permission) => permission.level !== "viewer"));
   const canDispose = !auth.isReadOnlyViewer && (auth.isWorkshopAdmin || hasManagerGroupPermission(auth));
 
   // "Báo cáo" tổng hợp toàn Xưởng chỉ cho vai trò xem toàn Xưởng; "Lịch sử hoạt động"
@@ -91,6 +95,7 @@ export function Sidebar({ auth, taskCounts = EMPTY_TASK_COUNTS }: { auth: AuthCo
   const visibleWorkflowItems = workflowItems.filter(([href]) => {
     if (href === "/transfers") return canTransfer;
     if (href === "/disposals") return canDispose;
+    if (href === "/losses") return canReportLoss;
     if (["/machine-loans", "/repairs"].includes(href)) return canUseGroupWorkflows;
     return false;
   });

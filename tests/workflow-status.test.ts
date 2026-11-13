@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   disposalStatusEnum,
+  lossStatusEnum,
   machineLoanStatusEnum,
   quickLoanStatusEnum,
   repairStatusEnum,
@@ -10,11 +11,13 @@ import {
 import { OPEN_MACHINE_LOAN_STATUSES } from "../src/lib/loan-status";
 import {
   CLOSED_DISPOSAL_STATUSES,
+  CLOSED_LOSS_STATUSES,
   CLOSED_MACHINE_LOAN_STATUSES,
   CLOSED_QUICK_LOAN_STATUSES,
   CLOSED_REPAIR_STATUSES,
   CLOSED_TRANSFER_STATUSES,
   OPEN_DISPOSAL_STATUSES,
+  OPEN_LOSS_STATUSES,
   OPEN_QUICK_LOAN_STATUSES,
   OPEN_REPAIR_STATUSES,
   OPEN_TRANSFER_STATUSES,
@@ -32,4 +35,5 @@ test("trạng thái mở/đóng của mọi quy trình phủ đủ enum trong sc
   assertPartition("transfers", transferStatusEnum.enumValues, OPEN_TRANSFER_STATUSES, CLOSED_TRANSFER_STATUSES);
   assertPartition("repairs", repairStatusEnum.enumValues, OPEN_REPAIR_STATUSES, CLOSED_REPAIR_STATUSES);
   assertPartition("disposals", disposalStatusEnum.enumValues, OPEN_DISPOSAL_STATUSES, CLOSED_DISPOSAL_STATUSES);
+  assertPartition("loss_reports", lossStatusEnum.enumValues, OPEN_LOSS_STATUSES, CLOSED_LOSS_STATUSES);
 });
