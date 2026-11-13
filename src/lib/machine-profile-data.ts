@@ -4,6 +4,7 @@ import { activityLogs, disposals, equipment, groups, machineLoans, repairs, tran
 import type { AuthContext } from "@/lib/auth/session";
 import { canViewWholeWorkshop } from "@/lib/auth/roles";
 import { WORKFLOW_LABELS } from "@/lib/constants";
+import { repairStatusLabel } from "@/lib/repair-display";
 import { HISTORY_LIMIT, canViewEquipmentHistory } from "@/lib/equipment-history";
 import { OPEN_MACHINE_LOAN_STATUSES } from "@/lib/loan-status";
 import { canSeeFinancials, heldByGroupId, isInMyScope, isUuid } from "@/lib/machine-profile";
@@ -17,6 +18,8 @@ export type MachineProfile = {
   groupNames: ReadonlyMap<string, string>;
   heldByGroupName: string | null;
   tickets: ProfileTicket[];
+  /** Loại phiếu sửa đang ở bước "đang sửa" (internal / external), null nếu máy không đang sửa. */
+  activeRepairType: string | null;
   /** null = tài khoản không có quyền xem lịch sử máy này. */
   history: ProfileHistoryRow[] | null;
   showFinancials: boolean;
@@ -46,7 +49,7 @@ export async function loadMachineProfile(auth: AuthContext, id: string): Promise
   const tickets: ProfileTicket[] = [
     ...loanRows.map((r) => ({ key: `loan:${r.id}`, kind: "Mượn máy", code: r.code, statusLabel: statusLabel(r.status), groups: `${name(r.borrowerGroupId)} mượn của ${name(r.ownerGroupId)}`, updatedAt: r.updatedAt, href: "/machine-loans" })),
     ...transferRows.map((r) => ({ key: `transfer:${r.id}`, kind: "Điều chuyển", code: r.code, statusLabel: statusLabel(r.status), groups: `${name(r.sourceGroupId)} → ${name(r.targetGroupId)}`, updatedAt: r.updatedAt, href: "/transfers" })),
-    ...repairRows.map((r) => ({ key: `repair:${r.id}`, kind: "Sửa chữa", code: r.code, statusLabel: statusLabel(r.status), groups: `Báo bởi ${name(r.reportedByGroupId)}`, updatedAt: r.updatedAt, href: "/repairs" })),
+    ...repairRows.map((r) => ({ key: `repair:${r.id}`, kind: "Sửa chữa", code: r.code, statusLabel: repairStatusLabel(r.status, r.repairType), groups: `Báo bởi ${name(r.reportedByGroupId)}`, updatedAt: r.updatedAt, href: "/repairs" })),
     ...disposalRows.map((r) => ({ key: `disposal:${r.id}`, kind: "Thanh lý", code: r.code, statusLabel: statusLabel(r.status), groups: `Nhóm quản lý: ${name(r.ownerGroupId)}`, updatedAt: r.updatedAt, href: "/disposals" })),
   ].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
@@ -78,6 +81,7 @@ export async function loadMachineProfile(auth: AuthContext, id: string): Promise
     groupNames,
     heldByGroupName: heldBy ? name(heldBy) : null,
     tickets,
+    activeRepairType: repairRows.find((r) => r.status === "repairing")?.repairType ?? null,
     history,
     showFinancials: canSeeFinancials({ isWorkshopAdmin: auth.isWorkshopAdmin, isReadOnlyViewer: auth.isReadOnlyViewer, groupIds, ownerGroupId: machine.ownerGroupId }),
     inMyScope: isInMyScope({ isReadOnlyViewer: auth.isReadOnlyViewer, isWorkshopAdmin: auth.isWorkshopAdmin, groupIds, ownerGroupId: machine.ownerGroupId, heldByGroupId: heldBy }),

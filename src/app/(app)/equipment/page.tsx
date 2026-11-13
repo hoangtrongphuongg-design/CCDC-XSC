@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
+import { equipmentStatusDisplay } from "@/lib/repair-display";
 import { Boxes, CircleCheck, FileSpreadsheet, PackageOpen, Search, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
-import { equipment, groups, toolCatalog } from "@/lib/db/schema";
+import { equipment, groups, repairs, toolCatalog } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guards";
 import { EQUIPMENT_STATUS_LABELS, CONDITION_LABELS } from "@/lib/constants";
 import { getEquipmentCategoryLabel } from "@/lib/equipment-categories";
@@ -23,7 +24,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
   const searchText = q.trim();
   const normalizedSearch = searchText.toLocaleLowerCase("vi-VN");
 
-  const [rows, groupRows, toolRows] = await Promise.all([
+  const [rows, groupRows, toolRows, openRepairs] = await Promise.all([
     db.select({
       id: equipment.id,
       code: equipment.code,
@@ -60,7 +61,11 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
       .innerJoin(groups, eq(toolCatalog.groupId, groups.id))
       .where(and(eq(toolCatalog.isActive, true), eq(toolCatalog.recordStatus, "active")))
       .orderBy(asc(groups.name), asc(toolCatalog.code), asc(toolCatalog.name)),
+    // Máy đang sửa: nội bộ hay thuê ngoài lấy từ phiếu sửa đang mở.
+    db.select({ equipmentId: repairs.equipmentId, repairType: repairs.repairType }).from(repairs).where(eq(repairs.status, "repairing")),
   ]);
+  const repairTypeByEquipment = new Map(openRepairs.map((repair) => [repair.equipmentId, repair.repairType]));
+  const statusText = (row: { id: string; status: keyof typeof EQUIPMENT_STATUS_LABELS }) => equipmentStatusDisplay(row.status, repairTypeByEquipment.get(row.id));
 
   const groupMap = new Map(groupRows.map((group) => [group.id, group.name]));
   const containsSearch = (...values: Array<string | null | undefined>) => !normalizedSearch || values.some((value) =>
@@ -77,7 +82,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
     groupMap.get(row.currentGroupId),
     row.currentLocation,
     CONDITION_LABELS[row.condition],
-    EQUIPMENT_STATUS_LABELS[row.status],
+    statusText(row),
   ));
   const filteredToolRows = toolRows.filter((tool) => containsSearch(
     tool.code,
@@ -172,7 +177,7 @@ export default async function EquipmentPage({ searchParams }: { searchParams: Pr
               groupMap.get(row.currentGroupId) || "—",
               row.currentLocation || "—",
               <StatusBadge key="condition" label={CONDITION_LABELS[row.condition]} tone={conditionTone(row.condition)} />,
-              <StatusBadge key="status" label={EQUIPMENT_STATUS_LABELS[row.status]} tone={equipmentStatusTone(row.status)} />,
+              <StatusBadge key="status" label={statusText(row)} tone={equipmentStatusTone(row.status)} />,
             ])}
             empty={<EmptyState description={searchText ? `Không tìm thấy máy/CCDC phù hợp với “${searchText}”.` : "Chưa có máy/CCDC đã hoàn thành hồ sơ."} />}
           />

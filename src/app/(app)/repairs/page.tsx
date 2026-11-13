@@ -3,7 +3,7 @@ import { CheckCircle2, Clock3, Plus, ShieldAlert, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { equipment, groups, repairs } from "@/lib/db/schema";
 import { hasGroupPermission, requireUser } from "@/lib/auth/guards";
-import { WORKFLOW_LABELS } from "@/lib/constants";
+import { repairStatusLabel } from "@/lib/repair-display";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +54,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Sea
       </section>
       <section className="mobile-repair-list" aria-label="Danh sách phiếu báo hư">
         <div className="mobile-loan-section-title"><strong>Phiếu báo hư</strong><span>{rows.length}</span></div>
-        {rows.slice(0, 20).map((row) => { const machine = equipmentMap.get(row.equipmentId); return <article className="mobile-repair-card" key={`mobile-repair-${row.id}`}><div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || row.code} · {groupMap.get(row.reportedByGroupId) || "—"}</span><small>{row.status === "repairing" && row.repairType === "external" ? "Đang sửa ngoài" : row.status === "repairing" ? "Đang sửa nội bộ" : WORKFLOW_LABELS[row.status] || row.status}</small></div></article>; })}
+        {rows.slice(0, 20).map((row) => { const machine = equipmentMap.get(row.equipmentId); return <article className="mobile-repair-card" key={`mobile-repair-${row.id}`}><div><strong>{machine?.name || "Máy/CCDC"}</strong><span>{machine?.code || row.code} · {groupMap.get(row.reportedByGroupId) || "—"}</span><small>{repairStatusLabel(row.status, row.repairType)}</small></div></article>; })}
         {!rows.length ? <p className="mobile-ops-empty">Chưa có phiếu báo hư.</p> : null}
       </section>
       <div className="content-grid">
@@ -74,7 +74,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Sea
                 actions.push(<form action={markExternalIrreparableAction} key="external-fail" className="row-actions"><input type="hidden" name="repairId" value={row.id} /><input name="cost" type="number" min="0" step="1000" defaultValue={Number(row.cost || 0)} aria-label="Chi phí" className="field-inline-sm" /><input name="resultNotes" placeholder="Kết luận không thể phục hồi" aria-label="Kết luận" className="field-inline-md" /><Button size="sm" variant="secondary">Không thể phục hồi</Button></form>);
               }
               if (row.status === "wait_owner_confirm" && machine && hasGroupPermission(auth, machine.ownerGroupId, "manager")) actions.push(<form action={confirmRepairByOwnerAction} key="confirm"><input type="hidden" name="repairId" value={row.id} /><Button size="sm">Nhận lại</Button></form>);
-              return [<strong key="code">{row.code}</strong>, machine ? `${machine.code} — ${machine.name}` : row.equipmentId, groupMap.get(row.reportedByGroupId) || "—", row.issueDescription, <span key="cost" className="numeric">{formatNumber(row.cost)}</span>, <StatusBadge key="status" label={row.status === "repairing" && row.repairType === "external" ? "Đang sửa ngoài" : row.status === "repairing" ? "Đang sửa nội bộ" : WORKFLOW_LABELS[row.status] || row.status} tone={workflowTone(row.status)} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];
+              return [<strong key="code">{row.code}</strong>, machine ? `${machine.code} — ${machine.name}` : row.equipmentId, groupMap.get(row.reportedByGroupId) || "—", row.issueDescription, <span key="cost" className="numeric">{formatNumber(row.cost)}</span>, <StatusBadge key="status" label={repairStatusLabel(row.status, row.repairType)} tone={workflowTone(row.status)} />, <div key="actions" className="row-actions">{actions.length ? actions : "—"}</div>];
             })} empty={<EmptyState description="Chưa có phiếu sửa chữa." />} />
           </CardContent>
         </Card>

@@ -83,6 +83,7 @@ export default async function MyEquipmentPage() {
       activeTransferTargetGroupId: transfer?.targetGroupId || null,
       activeTransferStatus: transfer?.status || null,
       activeRepairStatus: repair?.status || null,
+      activeRepairType: repair?.repairType || null,
       updatedAt: row.updatedAt.toISOString(),
     };
   });

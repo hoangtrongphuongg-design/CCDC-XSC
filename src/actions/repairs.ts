@@ -48,7 +48,8 @@ export async function createRepairAction(formData: FormData) {
       issueDescription,
       status: "pending_acceptance",
     }).returning();
-    await tx.update(equipment).set({ status: "wait_inspection", condition: "awaiting_assessment", updatedAt: new Date() }).where(eq(equipment.id, equipmentId));
+    // Có phiếu báo hỏng thì tình trạng máy là Hư hỏng ngay (sửa xong → Tốt, không thể phục hồi → Không thể phục hồi).
+    await tx.update(equipment).set({ status: "wait_inspection", condition: "major_damage", updatedAt: new Date() }).where(eq(equipment.id, equipmentId));
     await writeAudit(tx as never, {
       actorUserId: auth.userId,
       actorGroupId: reportingGroupId,

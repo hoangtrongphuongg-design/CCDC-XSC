@@ -22,6 +22,7 @@ import { createQuantityToolAction, saveEquipmentRecordAction, type EquipmentForm
 import { loadEquipmentHistoryAction } from "@/actions/equipment-history";
 import { DataTable } from "@/components/data-table";
 import { SafeText } from "@/components/safe-text";
+import { equipmentStatusDisplay } from "@/lib/repair-display";
 import { ToolAdjustDialog, ToolEditDialog } from "@/components/equipment/tool-dialogs";
 import { filterTools, type ToolRow } from "@/lib/tool-filter";
 import { canAdjustToolQuantity, canEditTool } from "@/lib/tool-permissions";
@@ -88,6 +89,8 @@ export type IndividualEquipmentRow = {
   activeTransferTargetGroupId: string | null;
   activeTransferStatus: string | null;
   activeRepairStatus: string | null;
+  /** "internal" | "external" của phiếu sửa đang mở (máy đang sửa nội bộ hay thuê ngoài). */
+  activeRepairType: string | null;
   updatedAt: string;
 };
 
@@ -785,7 +788,7 @@ export function EquipmentWorkspace({
       if (borrows && !owns) return row.activeLoanStatus === "return_requested" ? "Đã báo trả" : "Đang mượn";
       if (row.ownerGroupId === row.activeLoanOwnerGroupId) return row.activeLoanStatus === "return_requested" ? "Chờ nhận lại" : "Đang cho mượn";
     }
-    return EQUIPMENT_STATUS_LABELS[row.status];
+    return equipmentStatusDisplay(row.status, row.activeRepairStatus === "repairing" ? row.activeRepairType : null);
   };
 
   const isRepairInScope = (row: IndividualEquipmentRow) => Boolean(
