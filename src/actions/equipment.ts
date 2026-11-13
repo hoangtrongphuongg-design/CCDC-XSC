@@ -2,7 +2,7 @@
 
 import { setFlashMessage } from "@/lib/auth/session";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -18,6 +18,7 @@ import { cleanLabel } from "@/lib/canonical-text";
 import { isOfficialOperationalGroupCode } from "@/lib/group-structure";
 import { GROUP_PERMISSION_LABELS } from "@/lib/auth/roles";
 import { validateQuantityAdjustment } from "@/lib/tool-permissions";
+import { canChangeIdentity, changedIdentityFields, legacyConflictMessage, normalizeLegacyCode } from "@/lib/equipment-identity";
 
 export type EquipmentFormState = {
   status: "idle" | "success" | "error" | "confirm";
@@ -109,19 +110,24 @@ async function assertOperationalGroup(groupId: string) {
   return group;
 }
 
+/**
+ * Tem nhôm là nhãn vật lý của đúng một máy: trùng với MÁY KHÁC (kể cả máy đã thanh lý) là LỖI chặn cứng, không còn
+ * "vẫn lưu". So khớp không phân biệt hoa/thường và khoảng trắng. Nơi gọi chỉ gọi khi tem mới hoặc vừa đổi.
+ */
+async function assertLegacyCodeFree(legacyCode: string, recordId?: string) {
+  const key = normalizeLegacyCode(legacyCode);
+  if (!key) return;
+  const sameLegacy = sql`lower(regexp_replace(btrim(${equipment.legacyCode}), '\\s+', ' ', 'g')) = ${key}`;
+  const [other] = await db.select({ code: equipment.code, status: equipment.status }).from(equipment)
+    .where(recordId ? and(sameLegacy, ne(equipment.id, recordId)) : sameLegacy).limit(1);
+  if (other) throw new Error(legacyConflictMessage(legacyCode.trim(), other));
+}
+
 async function findDuplicateWarning(input: {
   recordId?: string;
-  legacyCode?: string;
   serial?: string;
 }) {
   const messages: string[] = [];
-  if (input.legacyCode) {
-    const filters = input.recordId
-      ? and(eq(equipment.legacyCode, input.legacyCode), ne(equipment.id, input.recordId))
-      : eq(equipment.legacyCode, input.legacyCode);
-    const [duplicate] = await db.select({ code: equipment.code }).from(equipment).where(filters).limit(1);
-    if (duplicate) messages.push(`Tem nhôm “${input.legacyCode}” đang được dùng ở ${duplicate.code}.`);
-  }
   if (input.serial) {
     const filters = input.recordId
       ? and(eq(equipment.serial, input.serial), ne(equipment.id, input.recordId))
@@ -192,7 +198,6 @@ export async function saveEquipmentRecordAction(
 
     const duplicateWarnings = await findDuplicateWarning({
       recordId: data.recordId,
-      legacyCode: data.legacyCode,
       serial: data.serial,
     });
     if (duplicateWarnings.length && !data.confirmDuplicates) {
@@ -209,6 +214,23 @@ export async function saveEquipmentRecordAction(
       const canManageOwnGroup = hasGroupPermission(auth, before.ownerGroupId, "operator");
       if (!auth.isWorkshopAdmin && !canManageOwnGroup) {
         return { status: "error", message: "Bạn chỉ được cập nhật CCDC thuộc nhóm mình quản lý." };
+      }
+
+      // Danh tính (Tên / Nhóm thiết bị / Loại) cố định theo mã hệ thống: lịch sử gắn theo mã nên không cho đổi sang
+      // chủng loại khác. Chỉ Quản lý Xưởng / Admin hiệu chỉnh, bắt buộc lý do (xử lý ở khối quyền Admin bên dưới).
+      const changedIdentity = changedIdentityFields(before, data);
+      if (changedIdentity.length && !canChangeIdentity(auth)) {
+        return {
+          status: "error",
+          message: `${changedIdentity.join(", ")} đã cố định theo mã ${before.code}, không sửa được. Muốn đổi chủng loại hãy tạo mã mới; nhập sai thì nhờ Quản lý Xưởng hiệu chỉnh.`,
+        };
+      }
+      if (!changedIdentity.length) {
+        // Chỉ khác hoa/thường hay khoảng trắng: giữ nguyên chữ đã lưu.
+        data = { ...data, name: before.name, equipmentType: before.equipmentType, categoryCode: before.categoryCode as typeof data.categoryCode };
+      }
+      if (normalizeLegacyCode(data.legacyCode) !== normalizeLegacyCode(before.legacyCode)) {
+        await assertLegacyCodeFree(data.legacyCode ?? "", before.id);
       }
 
       let nextOwnerGroupId = before.ownerGroupId;
@@ -231,7 +253,8 @@ export async function saveEquipmentRecordAction(
         if (data.adminOriginType) nextOriginType = data.adminOriginType;
         if (data.adminSystemCode) nextCode = data.adminSystemCode.toUpperCase();
 
-        const changedSensitive = nextOwnerGroupId !== before.ownerGroupId
+        const changedSensitive = changedIdentity.length > 0
+          || nextOwnerGroupId !== before.ownerGroupId
           || nextOriginGroupId !== before.originGroupId
           || nextOriginType !== before.originType
           || nextCode !== before.code;
@@ -319,6 +342,7 @@ export async function saveEquipmentRecordAction(
     if (!auth.isWorkshopAdmin && !hasGroupPermission(auth, data.ownerGroupId, "operator")) {
       return { status: "error", message: "Chỉ Kỹ sư giám sát hoặc Đốc công được thêm CCDC cho nhóm mình." };
     }
+    if (data.legacyCode) await assertLegacyCodeFree(data.legacyCode);
     if (!auth.isWorkshopAdmin && data.originType !== "existing") {
       return { status: "error", message: "Chỉ Quản lý Xưởng / Admin được tiếp nhận hoặc cấp phát CCDC mới." };
     }
@@ -475,6 +499,7 @@ export async function updateQuantityToolAction(
   const condition = String(formData.get("condition") || "good");
   const currentLocation = String(formData.get("currentLocation") || "").trim();
   const notes = String(formData.get("notes") || "").trim();
+  const identityReason = String(formData.get("identityReason") || "").trim().replace(/\s+/g, " ");
 
   if (!toolId || !expectedUpdatedAt) return { status: "error", message: "Thiếu thông tin CCDC cần sửa." };
   if (name.length < 2 || name.length > 180) return { status: "error", message: "Tên CCDC cần từ 2 đến 180 ký tự." };
@@ -491,15 +516,27 @@ export async function updateQuantityToolAction(
     }
     const auth = await requireGroupPermission(current.groupId, "operator");
 
+    // Tên + Nhóm thiết bị là danh tính của CCDC: chỉ Quản lý Xưởng / Admin đổi, bắt buộc lý do (ghi nhật ký).
+    const changedIdentity = changedIdentityFields(
+      { name: current.name, equipmentType: current.equipmentType, categoryCode: current.categoryCode },
+      { name, equipmentType: current.equipmentType, categoryCode },
+    );
+    if (changedIdentity.length) {
+      if (!canChangeIdentity(auth)) {
+        return { status: "error", message: `${changedIdentity.join(", ")} đã cố định theo mã ${current.code ?? "CCDC"}, không sửa được. Muốn đổi chủng loại hãy thêm CCDC mới; nhập sai thì nhờ Quản lý Xưởng hiệu chỉnh.` };
+      }
+      if (identityReason.length < 5) return { status: "error", message: "Đổi Tên / Nhóm thiết bị cần ghi lý do hiệu chỉnh (ít nhất 5 ký tự)." };
+    }
+
     await db.transaction(async (tx) => {
       const [locked] = await tx.select().from(toolCatalog).where(eq(toolCatalog.id, toolId)).for("update");
       if (!locked || locked.updatedAt.toISOString() !== expectedUpdatedAt) {
         throw new Error("CCDC này vừa được người khác cập nhật. Hãy đóng hộp thoại, tải lại trang rồi sửa lại.");
       }
       const [updated] = await tx.update(toolCatalog).set({
-        name,
+        name: changedIdentity.length ? name : current.name,
         // CCDC theo số lượng: "loại" luôn bằng tên (giống lúc thêm mới).
-        equipmentType: name,
+        equipmentType: changedIdentity.length ? name : current.equipmentType,
         categoryCode,
         specification: specification || null,
         unit,
@@ -520,6 +557,7 @@ export async function updateQuantityToolAction(
         description: `Sửa thông tin CCDC theo số lượng ${current.code ?? ""} ${name}`.replace(/\s+/g, " "),
         beforeData: locked,
         afterData: updated,
+        reason: changedIdentity.length ? identityReason : null,
       });
     });
     await setFlashMessage("success", "Đã cập nhật CCDC", `${current.code ?? ""} · ${name}`.trim());

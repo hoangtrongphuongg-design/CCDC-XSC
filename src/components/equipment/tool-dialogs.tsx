@@ -33,8 +33,14 @@ function ToolModal({ title, kicker, onClose, children }: { title: string; kicker
 }
 
 /** Sửa thông tin CCDC theo số lượng (không đổi số lượng — dùng "Hiệu chỉnh SL"). */
-export function ToolEditDialog({ tool, onClose }: { tool: ToolRow; onClose: () => void }) {
+export function ToolEditDialog({ tool, canChangeIdentity, onClose }: { tool: ToolRow; /** Quản lý Xưởng / Admin: đổi được Tên + Nhóm thiết bị, kèm lý do. */ canChangeIdentity: boolean; onClose: () => void }) {
   const [state, action, pending] = useActionState(updateQuantityToolAction, initialState);
+  const [name, setName] = useState(tool.name);
+  const [categoryCode, setCategoryCode] = useState(tool.categoryCode);
+  const identityChanged = name.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi-VN") !== tool.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi-VN") || categoryCode !== tool.categoryCode;
+  const identityNote = canChangeIdentity
+    ? "Danh tính CCDC gắn với mã. Đổi Tên / Nhóm thiết bị cần ghi lý do hiệu chỉnh và được ghi vào lịch sử."
+    : `Cố định theo mã ${tool.code || "CCDC"}. Muốn đổi chủng loại hãy thêm CCDC mới; nhập sai thì nhờ Quản lý Xưởng hiệu chỉnh.`;
   useEffect(() => {
     if (state.status !== "success") return;
     const timer = window.setTimeout(onClose, 400);
@@ -48,9 +54,10 @@ export function ToolEditDialog({ tool, onClose }: { tool: ToolRow; onClose: () =
         <input type="hidden" name="expectedUpdatedAt" value={tool.updatedAt} />
         <section className="asset-form-section">
           <div className="form-grid two">
-            <FormField label="Tên CCDC" required><input name="name" required defaultValue={tool.name} /></FormField>
+            <FormField label="Tên CCDC" required hint={identityNote}><input name="name" required value={name} onChange={(event) => setName(event.target.value)} readOnly={!canChangeIdentity} aria-readonly={!canChangeIdentity} className={canChangeIdentity ? undefined : "is-locked"} /></FormField>
             <FormField label="Nhóm thiết bị" required>
-              <select name="categoryCode" defaultValue={tool.categoryCode}>
+              {canChangeIdentity ? null : <input type="hidden" name="categoryCode" value={tool.categoryCode} />}
+              <select name={canChangeIdentity ? "categoryCode" : undefined} value={categoryCode} onChange={(event) => setCategoryCode(event.target.value)} disabled={!canChangeIdentity}>
                 {disciplineOrder.map((discipline) => (
                   <optgroup key={discipline} label={EQUIPMENT_DISCIPLINE_LABELS[discipline]}>
                     {EQUIPMENT_CATEGORIES.filter((category) => category.discipline === discipline).map((category) => <option key={category.code} value={category.code}>{category.name}</option>)}
@@ -66,6 +73,9 @@ export function ToolEditDialog({ tool, onClose }: { tool: ToolRow; onClose: () =
             <FormField label="Vị trí"><input name="currentLocation" defaultValue={tool.currentLocation || ""} placeholder="Kho Workshop, Tủ số 2..." /></FormField>
           </div>
           <div className="form-grid"><FormField label="Ghi chú"><textarea name="notes" rows={3} defaultValue={tool.notes || ""} /></FormField></div>
+          {canChangeIdentity && identityChanged ? (
+            <div className="form-grid"><FormField label="Lý do đổi Tên / Nhóm thiết bị" required hint="Bắt buộc, ít nhất 5 ký tự; ghi vào Lịch sử hoạt động."><textarea name="identityReason" rows={2} required minLength={5} /></FormField></div>
+          ) : null}
           <p className="field-hint">Số lượng tồn ({tool.quantity} {tool.unit}) không sửa ở đây: dùng nút “Hiệu chỉnh SL” (Đốc công trở lên, có ghi lý do).</p>
         </section>
         {state.message ? <p className={`form-message ${state.status === "error" ? "error" : "success"}`} role={state.status === "error" ? "alert" : "status"}>{state.message}</p> : null}

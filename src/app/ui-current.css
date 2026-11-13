@@ -2967,3 +2967,7 @@ body {
 .inventory-run-now small { font-size: 12px; }
 .inventory-card .inventory-due { color: var(--primary); font-weight: 600; }
 .inventory-card .inventory-auto-closed { color: var(--danger); font-weight: 600; }
+
+/* Ô danh tính đã khóa theo mã hệ thống (Tên / Nhóm thiết bị / Loại) */
+.form-field input.is-locked,
+.form-field select:disabled { background: #f1f5f9; color: var(--text-muted); cursor: not-allowed; }
