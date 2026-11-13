@@ -2976,3 +2976,20 @@ body {
 .repair-export-bar { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .repair-export-bar label { display: grid; gap: 4px; font-size: 12px; font-weight: 650; color: var(--text-secondary); }
 .repair-export-bar input[type="date"] { min-height: 38px; }
+
+/* Bộ lọc Dụng cụ toàn xưởng */
+.stat-card-link { display: block; color: inherit; text-decoration: none; border-radius: 12px; }
+.stat-card-link:hover { outline: 2px solid color-mix(in srgb, var(--primary) 35%, transparent); }
+.stat-card-link.is-active { outline: 2px solid var(--primary); }
+.equipment-filter-panel { margin-bottom: 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.equipment-filter-panel > summary { cursor: pointer; padding: 12px 16px; font-weight: 650; list-style: none; min-height: 44px; display: flex; align-items: center; }
+.equipment-filter-panel[open] > summary { border-bottom: 1px solid var(--border); }
+.equipment-filter-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 12px; padding: 14px 16px; align-items: end; }
+.equipment-filter-bar label { display: grid; gap: 4px; font-size: 12px; font-weight: 650; color: var(--text-secondary); min-width: 0; }
+.equipment-filter-bar .equipment-filter-search { grid-column: 1 / -1; }
+.equipment-filter-bar select, .equipment-filter-bar input { min-height: 40px; width: 100%; }
+.equipment-filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.equipment-filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 13px; color: var(--text-secondary); }
+.filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border: 1px solid var(--border-strong, var(--border)); border-radius: 999px; background: #f1f6fa; color: var(--primary); font-size: 12px; font-weight: 650; text-decoration: none; }
+.filter-chip:hover { background: #e3eef7; }
+@media (pointer: coarse) { .filter-chip { min-height: 44px; } }
